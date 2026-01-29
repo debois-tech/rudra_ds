@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Search, Phone, Mail } from 'lucide-react';
+import { Plus, Search, Phone, Trash2, Edit2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import Link from 'next/link'; // <--- IMPORTANT IMPORT
+import Link from 'next/link';
 
 // Define what a "Person" looks like
 type Person = {
@@ -48,12 +48,27 @@ export default function PersonsPage() {
     setLoading(false);
   };
 
-  // 2. Run fetch on initial load
+  // 2. Delete Function (Now inside the component scope)
+  const handleDelete = async (id: string) => {
+    const confirmed = confirm("Are you sure? This will also remove their linked vehicles and documents.");
+    if (!confirmed) return;
+
+    const { error } = await supabase.from('persons').delete().eq('p_id', id);
+    
+    if (error) {
+      toast.error("Error deleting student: " + error.message);
+    } else {
+      toast.success("Student removed successfully");
+      fetchPersons(); // This now works because it is in the same scope!
+    }
+  };
+
+  // 3. Run fetch on initial load
   useEffect(() => {
     fetchPersons();
   }, []);
 
-  // 3. Filter data based on search
+  // 4. Filter data based on search
   const filteredPersons = persons.filter(person => 
     person.p_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     person.p_mobile.includes(searchTerm)
@@ -68,7 +83,6 @@ export default function PersonsPage() {
           <p className="text-slate-500 mt-1">Manage driving school students and contact details.</p>
         </div>
         
-        {/* THIS IS THE FIX: Wrapping the button in a Link */}
         <Link href="/dashboard/persons/new">
           <Button className="bg-emerald-600 hover:bg-emerald-700">
             <Plus className="h-4 w-4 mr-2" /> Add New Student
@@ -76,13 +90,13 @@ export default function PersonsPage() {
         </Link>
       </div>
 
-      {/* Search & Stats */}
+      {/* Search Card */}
       <Card className="p-4">
         <div className="relative">
           <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-          <Input 
+          <input 
             placeholder="Search by name or mobile number..." 
-            className="pl-10 max-w-sm"
+            className="flex h-10 w-full rounded-md border border-input bg-background px-10 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 max-w-sm"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -110,7 +124,7 @@ export default function PersonsPage() {
             ) : filteredPersons.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={4} className="h-32 text-center text-slate-500">
-                  No students found. Add your first student!
+                  No students found.
                 </TableCell>
               </TableRow>
             ) : (
@@ -128,9 +142,19 @@ export default function PersonsPage() {
                     {person.p_email || '-'}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-800">
-                      Edit
-                    </Button>
+                    <div className="flex justify-end gap-2">
+                      <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-800">
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                        onClick={() => handleDelete(person.p_id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))

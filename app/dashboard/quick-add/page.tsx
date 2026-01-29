@@ -1,77 +1,93 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import { User, Car, FileText, CheckCircle2, Loader2, ArrowRight, ArrowLeft } from 'lucide-react';
+import { useForm, useFieldArray } from 'react-hook-form';
+import { 
+  User, Car, FileText, Plus, Trash2, 
+  Loader2, CheckCircle2, ArrowRight, ArrowLeft, Info 
+} from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 
-// One big schema for everything
-const quickSchema = z.object({
-  // Student
-  p_name: z.string().min(2, "Name is required"),
-  p_mobile: z.string().length(10, "Mobile must be 10 digits"),
-  // Vehicle
-  v_number: z.string().min(5, "Vehicle number required").toUpperCase(),
-  v_name: z.string().min(2, "Vehicle model required"),
-  // Document (License)
-  doc_number: z.string().min(5, "License/Doc number required"),
-  exp_date: z.string().min(10, "Expiry date required"),
-});
-
-export default function QuickAddPage() {
+export default function ComprehensiveQuickAdd() {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [docTypes, setDocTypes] = useState<any[]>([]);
   const router = useRouter();
 
-  const form = useForm<z.infer<typeof quickSchema>>({
-    resolver: zodResolver(quickSchema),
-    defaultValues: { p_name: "", p_mobile: "", v_number: "", v_name: "", doc_number: "", exp_date: "" }
+  // Fetch classifications from DBA reference table
+  useEffect(() => {
+    async function loadMeta() {
+      const { data } = await supabase.from('document_types').select('*');
+      if (data) setDocTypes(data);
+    }
+    loadMeta();
+  }, []);
+
+  const personDocTypes = docTypes.filter(t => t.entity_type === 'person');
+  const vehicleDocTypes = docTypes.filter(t => t.entity_type === 'vehicle');
+
+  const form = useForm({
+    defaultValues: {
+      p_name: "",
+      p_mobile: "",
+      personDocs: [{ doc_type_id: "", doc_number: "", exp_date: "" }],
+      vehicles: [
+        { v_number: "", v_name: "", documents: [{ doc_type_id: "", doc_number: "", exp_date: "" }] }
+      ]
+    }
   });
 
-  async function onSubmit(values: z.infer<typeof quickSchema>) {
+  const { fields: vehicleFields, append: appendVehicle, remove: removeVehicle } = useFieldArray({
+    control: form.control,
+    name: "vehicles"
+  });
+
+  async function onSubmit(values: any) {
     setLoading(true);
     try {
-      // 1. Create Person
+      // 1. Create Person record
       const { data: person, error: pError } = await supabase
         .from('persons')
         .insert([{ p_name: values.p_name, p_mobile: values.p_mobile }])
-        .select()
-        .single();
-      
+        .select().single();
       if (pError) throw pError;
 
-      // 2. Create Vehicle
-      const { data: vehicle, error: vError } = await supabase
-        .from('vehicles')
-        .insert([{ p_id: person.p_id, v_number: values.v_number, v_name: values.v_name, v_type: 'car' }])
-        .select()
-        .single();
-      
-      if (vError) throw vError;
+      // 2. Insert Personal Docs (e.g., Driving License)
+      const pDocs = values.personDocs.filter((d: any) => d.doc_type_id).map((d: any) => ({
+        entity_id: person.p_id,
+        entity_type: 'person',
+        doc_type_id: parseInt(d.doc_type_id),
+        doc_number: d.doc_number,
+        exp_date: d.exp_date
+      }));
+      if (pDocs.length > 0) await supabase.from('documents').insert(pDocs);
 
-      // 3. Create Document (Driving License by default)
-      const { error: dError } = await supabase
-        .from('documents')
-        .insert([{ 
-          entity_id: person.p_id, 
-          entity_type: 'person', 
-          doc_type_id: 1, // 1 is usually DL based on our setup
-          doc_number: values.doc_number, 
-          exp_date: values.exp_date 
-        }]);
+      // 3. Process Vehicles and their specific Docs
+      for (const v of values.vehicles) {
+        if (!v.v_number) continue;
+        const { data: vehicle, error: vError } = await supabase
+          .from('vehicles')
+          .insert([{ p_id: person.p_id, v_number: v.v_number.toUpperCase(), v_name: v.v_name, v_type: 'car' }])
+          .select().single();
+        if (vError) throw vError;
 
-      if (dError) throw dError;
+        const vDocs = v.documents.filter((d: any) => d.doc_type_id).map((d: any) => ({
+          entity_id: vehicle.v_id,
+          entity_type: 'vehicle',
+          doc_type_id: parseInt(d.doc_type_id),
+          doc_number: d.doc_number,
+          exp_date: d.exp_date
+        }));
+        if (vDocs.length > 0) await supabase.from('documents').insert(vDocs);
+      }
 
-      toast.success("Full Profile Created Successfully!");
+      toast.success("Client onboarded with full document compliance!");
       router.push('/dashboard');
     } catch (err: any) {
       toast.error(err.message);
@@ -81,99 +97,132 @@ export default function QuickAddPage() {
   }
 
   return (
-  <div className="max-w-xl mx-auto space-y-8 pt-4 pb-10">
-    <div className="text-center">
-      <h1 className="text-3xl font-bold text-slate-900">Quick Onboarding</h1>
-      <p className="text-slate-500 mt-2">Register a student, vehicle, and license in one go.</p>
+    <div className="max-w-4xl mx-auto space-y-8 pb-20 pt-4">
+      <div className="text-center space-y-2">
+        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Student Compliance Onboarding</h1>
+        <p className="text-slate-500">DBA Optimized: Multi-entity data entry for Rudra Driving School.</p>
+      </div>
+
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+          
+          {/* STEP 1: IDENTITY & PERSONAL DOCS */}
+          {step === 1 && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
+              <Card className="border-t-4 border-t-blue-600 shadow-sm">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-2 text-blue-700 font-bold mb-6 text-lg">
+                    <User className="h-5 w-5" /> 1. Student Identity
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <FormField control={form.control} name="p_name" render={({ field }) => (
+                      <FormItem><FormLabel>Full Legal Name</FormLabel><FormControl><Input placeholder="Omkar Kokane" {...field} /></FormControl></FormItem>
+                    )} />
+                    <FormField control={form.control} name="p_mobile" render={({ field }) => (
+                      <FormItem><FormLabel>Mobile Number</FormLabel><FormControl><Input placeholder="9876543210" maxLength={10} {...field} /></FormControl></FormItem>
+                    )} />
+                  </div>
+
+                  <div className="mt-8 pt-6 border-t border-slate-100">
+                    <p className="text-sm font-semibold text-slate-600 flex items-center gap-2 mb-4"><FileText className="h-4 w-4"/> Personal Documents (License, etc.)</p>
+                    {form.watch(`personDocs`).map((_, dIndex) => (
+                      <div key={dIndex} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end mb-4 bg-slate-50 p-3 rounded-lg">
+                        <FormField control={form.control} name={`personDocs.${dIndex}.doc_type_id`} render={({ field }) => (
+                          <FormItem><FormLabel className="text-xs">Type</FormLabel>
+                            <select {...field} className="flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm">
+                              <option value="">Select</option>
+                              {personDocTypes.map(t => <option key={t.doc_type_id} value={t.doc_type_id}>{t.doc_type_name}</option>)}
+                            </select>
+                          </FormItem>
+                        )} />
+                        <FormField control={form.control} name={`personDocs.${dIndex}.doc_number`} render={({ field }) => (
+                          <FormItem><FormLabel className="text-xs">Number</FormLabel><FormControl><Input className="h-9 bg-white" {...field} /></FormControl></FormItem>
+                        )} />
+                        <FormField control={form.control} name={`personDocs.${dIndex}.exp_date`} render={({ field }) => (
+                          <FormItem><FormLabel className="text-xs">Expiry</FormLabel><FormControl><Input type="date" className="h-9 bg-white" {...field} /></FormControl></FormItem>
+                        )} />
+                        <Button type="button" variant="ghost" className="text-red-500 h-9" onClick={() => {
+                          const current = form.getValues('personDocs');
+                          if(current.length > 1) form.setValue('personDocs', current.filter((_, i) => i !== dIndex));
+                        }}><Trash2 className="h-4 w-4"/></Button>
+                      </div>
+                    ))}
+                    <Button type="button" variant="ghost" size="sm" className="text-blue-600" onClick={() => form.setValue('personDocs', [...form.getValues('personDocs'), { doc_type_id: "", doc_number: "", exp_date: "" }])}>+ Add Document</Button>
+                  </div>
+                </CardContent>
+              </Card>
+              <Button type="button" className="w-full h-12 text-lg bg-slate-900" onClick={() => setStep(2)}>Next: Register Vehicles <ArrowRight className="ml-2 h-5 w-5"/></Button>
+            </div>
+          )}
+
+          {/* STEP 2: ASSETS & COMPLIANCE */}
+          {step === 2 && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
+              {vehicleFields.map((vField, vIndex) => (
+                <Card key={vField.id} className="border-t-4 border-t-emerald-600 shadow-sm overflow-hidden">
+                  <div className="bg-emerald-50 px-6 py-3 flex justify-between items-center border-b border-emerald-100">
+                    <h3 className="font-bold text-emerald-800 flex items-center gap-2"><Car className="h-5 w-5"/> Vehicle #{vIndex + 1}</h3>
+                    {vIndex > 0 && <Button variant="ghost" size="sm" className="text-red-600" onClick={() => removeVehicle(vIndex)}><Trash2 className="h-4 w-4"/></Button>}
+                  </div>
+                  
+                  <CardContent className="p-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                      <FormField control={form.control} name={`vehicles.${vIndex}.v_number`} render={({ field }) => (
+                        <FormItem><FormLabel>Registration Number</FormLabel><FormControl><Input placeholder="MH15AB1234" {...field} /></FormControl></FormItem>
+                      )} />
+                      <FormField control={form.control} name={`vehicles.${vIndex}.v_name`} render={({ field }) => (
+                        <FormItem><FormLabel>Model / Name</FormLabel><FormControl><Input placeholder="Swift" {...field} /></FormControl></FormItem>
+                      )} />
+                    </div>
+
+                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-4">
+                      <p className="text-sm font-bold text-slate-700 flex items-center gap-2"><Info className="h-4 w-4 text-emerald-600"/> Compliance Documents (PUC, Insurance, etc.)</p>
+                      {form.watch(`vehicles.${vIndex}.documents`).map((_, dIndex) => (
+                        <div key={dIndex} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end pb-4 border-b border-slate-200 last:border-0">
+                          <FormField control={form.control} name={`vehicles.${vIndex}.documents.${dIndex}.doc_type_id`} render={({ field }) => (
+                            <FormItem><FormLabel className="text-xs">Classification</FormLabel>
+                              <select {...field} className="flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm">
+                                <option value="">Select Type</option>
+                                {vehicleDocTypes.map(t => <option key={t.doc_type_id} value={t.doc_type_id}>{t.doc_type_name}</option>)}
+                              </select>
+                            </FormItem>
+                          )} />
+                          <FormField control={form.control} name={`vehicles.${vIndex}.documents.${dIndex}.doc_number`} render={({ field }) => (
+                            <FormItem><FormLabel className="text-xs">Document No.</FormLabel><FormControl><Input className="h-9 bg-white" {...field} /></FormControl></FormItem>
+                          )} />
+                          <FormField control={form.control} name={`vehicles.${vIndex}.documents.${dIndex}.exp_date`} render={({ field }) => (
+                            <FormItem><FormLabel className="text-xs">Expiry Date</FormLabel><FormControl><Input type="date" className="h-9 bg-white" {...field} /></FormControl></FormItem>
+                          )} />
+                          <Button type="button" variant="ghost" className="text-red-500 h-9" onClick={() => {
+                            const current = form.getValues(`vehicles.${vIndex}.documents`);
+                            if(current.length > 1) form.setValue(`vehicles.${vIndex}.documents`, current.filter((_, i) => i !== dIndex));
+                          }}><Trash2 className="h-4 w-4"/></Button>
+                        </div>
+                      ))}
+                      <Button type="button" variant="outline" size="sm" className="w-full bg-white border-dashed text-emerald-700" onClick={() => {
+                        const current = form.getValues(`vehicles.${vIndex}.documents`);
+                        form.setValue(`vehicles.${vIndex}.documents`, [...current, { doc_type_id: "", doc_number: "", exp_date: "" }]);
+                      }}>+ Add Compliance Doc</Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+
+              <Button type="button" variant="outline" className="w-full h-14 border-2 border-dashed border-slate-300 text-slate-500 hover:text-emerald-600 hover:border-emerald-300 transition-all" onClick={() => appendVehicle({ v_number: "", v_name: "", documents: [{ doc_type_id: "", doc_number: "", exp_date: "" }] })}>
+                <Plus className="mr-2 h-5 w-5"/> Add Another Vehicle for this Student
+              </Button>
+
+              <div className="flex gap-4 pt-8">
+                <Button type="button" variant="ghost" size="lg" onClick={() => setStep(1)}><ArrowLeft className="mr-2 h-5 w-5"/> Back to Identity</Button>
+                <Button type="submit" size="lg" className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-lg shadow-lg" disabled={loading}>
+                  {loading ? <Loader2 className="animate-spin mr-2"/> : <CheckCircle2 className="mr-2 h-5 w-5"/>}
+                  Finalize & Sync Records
+                </Button>
+              </div>
+            </div>
+          )}
+        </form>
+      </Form>
     </div>
-
-    {/* Progress Indicator */}
-    <div className="flex justify-between items-center px-8">
-      {[1, 2, 3].map((s) => (
-        <div key={s} className={`flex items-center ${s !== 3 ? 'w-full' : ''}`}>
-          <div className={`h-10 w-10 shrink-0 rounded-full flex items-center justify-center border-2 transition-colors ${step >= s ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-200 text-slate-400'}`}>
-            {step > s ? <CheckCircle2 className="h-6 w-6" /> : <span className="font-semibold">{s}</span>}
-          </div>
-          {s !== 3 && <div className={`h-1 w-full mx-2 ${step > s ? 'bg-emerald-600' : 'bg-slate-100'}`} />}
-        </div>
-      ))}
-    </div>
-
-    <Card className="shadow-md border-slate-200">
-      <CardContent className="p-8">
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            
-            {/* Step 1: Student */}
-            {step === 1 && (
-              <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
-                <div className="flex items-center gap-2 text-emerald-700 font-bold text-lg mb-2">
-                  <User className="h-5 w-5" /> Step 1: Student Details
-                </div>
-                <FormField control={form.control} name="p_name" render={({ field }) => (
-                  <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="John Doe" {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
-                <FormField control={form.control} name="p_mobile" render={({ field }) => (
-                  <FormItem><FormLabel>Mobile Number</FormLabel><FormControl><Input placeholder="9876543210" maxLength={10} {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
-                <div className="pt-4">
-                  <Button type="button" className="w-full h-11 text-base bg-slate-900 hover:bg-slate-800" onClick={() => setStep(2)}>
-                    Next: Vehicle Info <ArrowRight className="ml-2 h-4 w-4"/>
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* Step 2: Vehicle */}
-            {step === 2 && (
-              <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
-                <div className="flex items-center gap-2 text-emerald-700 font-bold text-lg mb-2">
-                  <Car className="h-5 w-5" /> Step 2: Vehicle Details
-                </div>
-                <FormField control={form.control} name="v_number" render={({ field }) => (
-                  <FormItem><FormLabel>Vehicle Registration No.</FormLabel><FormControl><Input placeholder="MH15AB1234" {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
-                <FormField control={form.control} name="v_name" render={({ field }) => (
-                  <FormItem><FormLabel>Model (e.g. Swift)</FormLabel><FormControl><Input placeholder="Maruti Swift" {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
-                <div className="flex gap-3 pt-4">
-                  <Button type="button" variant="outline" className="flex-1 h-11" onClick={() => setStep(1)}>
-                    <ArrowLeft className="mr-2 h-4 w-4"/> Back
-                  </Button>
-                  <Button type="button" className="flex-1 h-11 bg-slate-900 hover:bg-slate-800" onClick={() => setStep(3)}>
-                    Next: Documents <ArrowRight className="ml-2 h-4 w-4"/>
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* Step 3: Document */}
-            {step === 3 && (
-              <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
-                <div className="flex items-center gap-2 text-emerald-700 font-bold text-lg mb-2">
-                  <FileText className="h-5 w-5" /> Step 3: Driving License
-                </div>
-                <FormField control={form.control} name="doc_number" render={({ field }) => (
-                  <FormItem><FormLabel>DL Number</FormLabel><FormControl><Input placeholder="DL-XXXXX" {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
-                <FormField control={form.control} name="exp_date" render={({ field }) => (
-                  <FormItem><FormLabel>License Expiry Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
-                <div className="flex gap-3 pt-4">
-                  <Button type="button" variant="outline" className="flex-1 h-11" onClick={() => setStep(2)}>
-                    <ArrowLeft className="mr-2 h-4 w-4"/> Back
-                  </Button>
-                  <Button type="submit" className="flex-1 h-11 bg-emerald-600 hover:bg-emerald-700" disabled={loading}>
-                    {loading ? <Loader2 className="animate-spin" /> : "Complete Registration"}
-                  </Button>
-                </div>
-              </div>
-            )}
-
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
-  </div>
-);
+  );
 }
