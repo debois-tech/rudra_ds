@@ -1,0 +1,21 @@
+name: Daily WhatsApp Alerts
+on:
+  schedule:
+    - cron: '30 3 * * *' # Runs at 9:00 AM IST (3:30 AM UTC)
+  workflow_dispatch: # Allows you to run it manually from GitHub
+
+jobs:
+  send-alerts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-id: '20'
+      - run: npm install
+      - run: node scripts/send-notifications.js
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_KEY }}
+          META_WHATSAPP_TOKEN: ${{ secrets.WHATSAPP_TOKEN }}
+          META_WHATSAPP_PHONE_ID: ${{ secrets.WHATSAPP_PHONE_ID }}
