@@ -2,11 +2,14 @@ require('dotenv').config({ path: '.env.local' });
 const { createClient } = require('@supabase/supabase-js');
 
 // --- ⚙️ CONTROL PANEL --------------------------------------------------
-const TEMPLATE_NAME = "expiry_alert"; // Ensure this matches your Meta Template Name
+const TEMPLATE_NAME = "expiry_alert"; // Your Meta WhatsApp Template Name
 
-// 🟢 TRUE  = Test Mode (Ignores dates, sends to ALL valid docs)
-// 🔴 FALSE = Production Mode (Only sends 7 days, 1 day, 0 days before)
-const FORCE_SEND_ALL = true; 
+// 🟢 TRUE  = Test Mode (Ignores dates, sends to ALL docs with valid mobile)
+// 🔴 FALSE = Production Mode (Only sends on configured reminder days)
+const FORCE_SEND_ALL = process.env.FORCE_SEND_ALL === 'true' || false;
+
+// Default reminder days if app_settings not configured
+const DEFAULT_REMINDER_DAYS = [7, 3, 1, 0];
 // -----------------------------------------------------------------------
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -16,60 +19,83 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 const token = process.env.META_WHATSAPP_TOKEN;
 const phoneId = process.env.META_WHATSAPP_PHONE_ID;
 
+// Get reminder days from app_settings
+const getReminderDays = async () => {
+  try {
+    const { data } = await supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'notification_days')
+      .single();
+
+    if (data?.value) {
+      return data.value.split(',').map(d => parseInt(d.trim())).filter(n => !isNaN(n));
+    }
+  } catch (e) {
+    console.log('⚠️ Using default reminder days');
+  }
+  return DEFAULT_REMINDER_DAYS;
+};
+
 const getDaysDifference = (expiryDateString) => {
   const today = new Date();
-  today.setHours(0, 0, 0, 0); 
+  today.setHours(0, 0, 0, 0);
   const expiry = new Date(expiryDateString);
   expiry.setHours(0, 0, 0, 0);
-  return Math.ceil((expiry - today) / (1000 * 60 * 60 * 24)); 
+  return Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
+};
+
+const formatMobileNumber = (mobile) => {
+  if (!mobile) return null;
+
+  // Remove spaces, dashes, parentheses, or + signs
+  let formatted = mobile.replace(/\D/g, '');
+
+  // If number is 10 digits (Indian format), add 91
+  if (formatted.length === 10) {
+    formatted = '91' + formatted;
+  }
+
+  return formatted;
 };
 
 const sendMessage = async (mobile, name, docName, daysLeft, vehicleInfo = "") => {
-  if (!mobile) {
+  const formattedNumber = formatMobileNumber(mobile);
+
+  if (!formattedNumber) {
     console.log(`      ⚠️ Skipping ${name}: No mobile number found.`);
-    return;
-  }
-  
-  // --- 1. CLEAN & FORMAT NUMBER (The "91" Fix) ---
-  // Remove spaces, dashes, parentheses, or + signs
-  let formattedNumber = mobile.replace(/\D/g, '');
-
-  // If number is 10 digits (e.g. 98220...), add 91
-  if (formattedNumber.length === 10) {
-    formattedNumber = '91' + formattedNumber;
-  }
-  // If it's already 12 digits (e.g. 9198220...), keep it. 
-  // If it's something else, we try sending it as-is but warn the user.
-  else if (formattedNumber.length !== 12) {
-    console.warn(`      ⚠️ Warning: Number ${formattedNumber} length seems odd (${formattedNumber.length} digits). Trying anyway...`);
+    return { success: false, reason: 'no_mobile' };
   }
 
-  // Customize Message for Vehicle
+  // Customize message for vehicle documents
   let finalDocName = docName;
   if (vehicleInfo) finalDocName = `${docName} (${vehicleInfo})`;
 
-  console.log(`   🚀 Sending to ${name} (${formattedNumber}): "${finalDocName}" (Due: ${daysLeft} days)`);
+  console.log(`   🚀 Sending to ${name} (${formattedNumber}): "${finalDocName}" (Due in ${daysLeft} days)`);
 
   try {
     const response = await fetch(
       `https://graph.facebook.com/v17.0/${phoneId}/messages`,
       {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({
           messaging_product: "whatsapp",
           to: formattedNumber,
           type: "template",
           template: {
             name: TEMPLATE_NAME,
-            language: { code: "en" }, // Changed to 'en' per your fix
+            language: { code: "en" },
             components: [
               {
                 type: "body",
                 parameters: [
-                  { type: "text", text: name },          
-                  { type: "text", text: finalDocName },  
-                  { type: "text", text: String(daysLeft) } 
+                  { type: "text", text: name },
+                  { type: "text", text: finalDocName },
+                  { type: "text", text: String(daysLeft) }
                 ]
               }
             ]
@@ -78,60 +104,135 @@ const sendMessage = async (mobile, name, docName, daysLeft, vehicleInfo = "") =>
       }
     );
 
-    if (response.ok) console.log(`      ✅ WhatsApp Sent!`);
-    else {
+    if (response.ok) {
+      console.log(`      ✅ WhatsApp Sent!`);
+      return { success: true };
+    } else {
       const err = await response.json();
       console.log(`      ❌ WhatsApp Failed: ${err.error?.message}`);
+      return { success: false, reason: err.error?.message };
     }
-  } catch (e) { console.error(`      ❌ Network Error`, e); }
+  } catch (e) {
+    console.error(`      ❌ Network Error`, e.message);
+    return { success: false, reason: 'network_error' };
+  }
+};
+
+const logNotification = async (docId, daysLeft, status, errorMsg = null) => {
+  try {
+    await supabase.from('notification_logs').insert({
+      doc_id: docId,
+      days_before: daysLeft,
+      status: status,
+      error_message: errorMsg,
+    });
+  } catch (e) {
+    console.log('⚠️ Could not log notification:', e.message);
+  }
 };
 
 const run = async () => {
-  console.log(`🚀 Script Started | Mode: ${FORCE_SEND_ALL ? '🔥 TEST (Send All)' : '🛡️ STRICT (7/1/0 Days)'}`);
+  console.log('═══════════════════════════════════════════════════════════════');
+  console.log(`🚀 RUDRA DS - Document Expiry Notification System`);
+  console.log(`📅 Run Time: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
+  console.log(`🔧 Mode: ${FORCE_SEND_ALL ? '🔥 TEST (Send All)' : '🛡️ PRODUCTION (Scheduled Days)'}`);
+  console.log('═══════════════════════════════════════════════════════════════\n');
 
+  // Get configured reminder days
+  const reminderDays = await getReminderDays();
+  console.log(`📌 Reminder Days: ${reminderDays.join(', ')} days before expiry\n`);
+
+  // Fetch all documents with expiry dates
   const { data: documents, error } = await supabase
     .from('documents')
     .select('*, document_types(doc_type_name)')
     .not('exp_date', 'is', null);
 
-  if (error) return console.error("❌ DB Error:", error.message);
-  console.log(`🔍 Found ${documents.length} total documents.`);
+  if (error) {
+    console.error("❌ Database Error:", error.message);
+    return;
+  }
+
+  console.log(`🔍 Found ${documents.length} total documents with expiry dates.\n`);
+
+  let sentCount = 0;
+  let skippedCount = 0;
 
   for (const doc of documents) {
     const daysLeft = getDaysDifference(doc.exp_date);
-    const isCritical = (daysLeft === 7 || daysLeft === 1 || daysLeft === 0);
+    const shouldSend = FORCE_SEND_ALL || reminderDays.includes(daysLeft);
 
-    if (!FORCE_SEND_ALL && !isCritical) continue; 
+    if (!shouldSend) {
+      skippedCount++;
+      continue;
+    }
 
-    // Find Owner Logic
-    let owner = null;
-    let vehicleStr = "";
+    console.log(`\n📄 Processing Doc ID: ${doc.doc_id}`);
+    console.log(`   Type: ${doc.document_types?.doc_type_name || 'Unknown'}`);
+    console.log(`   Expiry: ${doc.exp_date} (${daysLeft} days left)`);
 
-    if (doc.entity_type === 'person') {
-      const { data: p } = await supabase.from('persons').select('*').eq('p_id', doc.entity_id).single();
-      owner = p;
-    } 
+    // Find the owner based on entity type
+    let ownerName = null;
+    let ownerMobile = null;
+    let vehicleInfo = "";
+
+    if (doc.entity_type === 'customer') {
+      // Document belongs to a customer directly
+      const { data: customer } = await supabase
+        .from('customers')
+        .select('c_name, c_mobile')
+        .eq('c_id', doc.entity_id)
+        .single();
+
+      if (customer) {
+        ownerName = customer.c_name;
+        ownerMobile = customer.c_mobile;
+      }
+    }
     else if (doc.entity_type === 'vehicle') {
-      const { data: v } = await supabase.from('vehicles').select('*, persons(*)').eq('v_id', doc.entity_id).single();
-      if (v && v.persons) {
-        owner = v.persons;
-        vehicleStr = v.v_number;
+      // Document belongs to a vehicle - find the vehicle's owner
+      const { data: vehicle } = await supabase
+        .from('vehicles')
+        .select('v_number, v_name, owner_id, customers(c_name, c_mobile)')
+        .eq('v_id', doc.entity_id)
+        .single();
+
+      if (vehicle && vehicle.customers) {
+        ownerName = vehicle.customers.c_name;
+        ownerMobile = vehicle.customers.c_mobile;
+        vehicleInfo = vehicle.v_number;
       }
     }
 
-    if (owner) {
-      await sendMessage(
-        owner.p_mobile, // Pass the DB number directly
-        owner.p_name,
+    if (ownerName && ownerMobile) {
+      const result = await sendMessage(
+        ownerMobile,
+        ownerName,
         doc.document_types?.doc_type_name || "Document",
         daysLeft,
-        vehicleStr
+        vehicleInfo
       );
+
+      // Log the notification
+      await logNotification(
+        doc.doc_id,
+        daysLeft,
+        result.success ? 'sent' : 'failed',
+        result.reason || null
+      );
+
+      if (result.success) sentCount++;
     } else {
-      console.log(`   ⚠️ Skipped Doc ID ${doc.doc_id}: Owner not found.`);
+      console.log(`   ⚠️ Skipped: Owner not found for entity ${doc.entity_id}`);
+      skippedCount++;
     }
   }
-  console.log("🏁 Script Finished.");
+
+  console.log('\n═══════════════════════════════════════════════════════════════');
+  console.log(`🏁 COMPLETED`);
+  console.log(`   ✅ Sent: ${sentCount} notifications`);
+  console.log(`   ⏭️ Skipped: ${skippedCount} documents`);
+  console.log('═══════════════════════════════════════════════════════════════');
 };
 
 run();
