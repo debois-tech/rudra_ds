@@ -1,15 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { Suspense, useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { vehicleApi, customerApi } from '@/lib/api';
+import type { CustomerDashboardView } from '@/lib/types';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { ArrowLeft, Loader2, Save } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
   Form,
   FormControl,
@@ -28,68 +29,64 @@ import {
 import { toast } from "sonner";
 import Link from 'next/link';
 
-// 1. Validation Schema
 const formSchema = z.object({
-  v_number: z.string().min(2, "Vehicle number is required").transform(val => val.toUpperCase()),
-  v_type: z.string().min(1, "Please select a vehicle type"),
-  v_name: z.string().min(2, "Model name is required (e.g. Honda City)"),
-  p_id: z.string().uuid("Please select an owner"),
+  owner_id: z.string().uuid({ message: "Please select an owner." }),
+  v_number: z.string().min(4, { message: "Vehicle number is required." }).max(15),
+  v_name: z.string().optional(),
+  v_type: z.string().default('car'),
 });
 
-type StudentOption = {
-  p_id: string;
-  p_name: string;
-  p_mobile: string;
-};
+type FormData = z.infer<typeof formSchema>;
 
-export default function AddVehiclePage() {
+function AddVehicleForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const preselectedOwner = searchParams.get('owner');
+
   const [loading, setLoading] = useState(false);
-  const [students, setStudents] = useState<StudentOption[]>([]);
+  const [customers, setCustomers] = useState<CustomerDashboardView[]>([]);
 
-  // 2. Fetch Students for the Dropdown
-  useEffect(() => {
-    async function fetchStudents() {
-      const { data, error } = await supabase
-        .from('persons')
-        .select('p_id, p_name, p_mobile')
-        .order('p_name');
-      
-      if (error) {
-        toast.error("Failed to load students list");
-      } else {
-        setStudents(data || []);
-      }
-    }
-    fetchStudents();
-  }, []);
-
-  // 3. Initialize Form
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      owner_id: preselectedOwner || "",
       v_number: "",
-      v_type: "car",
       v_name: "",
-      p_id: "",
+      v_type: "car",
     },
   });
 
-  // 4. Submit Handler
-  async function onSubmit(values: z.infer<typeof formSchema>) {
-    setLoading(true);
-
-    const { error } = await supabase.from('vehicles').insert([values]);
-
-    if (error) {
-      if (error.code === '23505') { // Unique constraint violation code
-        toast.error("This vehicle number already exists!");
-      } else {
-        toast.error("Error adding vehicle: " + error.message);
+  useEffect(() => {
+    async function loadCustomers() {
+      try {
+        const data = await customerApi.getAll();
+        setCustomers(data);
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        toast.error("Error loading customers: " + message);
       }
-    } else {
-      toast.success("Vehicle added successfully! 🚗");
-      router.push('/dashboard/vehicles');
+    }
+    loadCustomers();
+  }, []);
+
+  async function onSubmit(values: FormData) {
+    setLoading(true);
+    try {
+      const vehicle = await vehicleApi.create({
+        owner_id: values.owner_id,
+        v_number: values.v_number,
+        v_name: values.v_name,
+        v_type: values.v_type,
+      });
+      toast.success(`Vehicle "${vehicle.v_number}" added successfully!`);
+      if (preselectedOwner) {
+        router.push(`/dashboard/customers/${preselectedOwner}`);
+      } else {
+        router.push('/dashboard/vehicles');
+      }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      toast.error("Error adding vehicle: " + message);
     }
     setLoading(false);
   }
@@ -97,39 +94,43 @@ export default function AddVehiclePage() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex items-center gap-4">
-        <Link href="/dashboard/vehicles">
+        <Link href={preselectedOwner ? `/dashboard/customers/${preselectedOwner}` : "/dashboard/vehicles"}>
           <Button variant="ghost" size="icon">
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
-        <h1 className="text-2xl font-bold text-slate-900">Add New Vehicle</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Add New Vehicle</h1>
+          <p className="text-slate-500 text-sm">Register a vehicle for a customer</p>
+        </div>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>Vehicle Details</CardTitle>
+          <CardDescription>Enter vehicle information below.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              
-              {/* Owner Selection Dropdown */}
+
+              {/* Owner Selection */}
               <FormField
                 control={form.control}
-                name="p_id"
+                name="owner_id"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Vehicle Owner <span className="text-red-500">*</span></FormLabel>
+                    <FormLabel>Owner (Customer) <span className="text-red-500">*</span></FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select a student..." />
+                          <SelectValue placeholder="Select customer..." />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {students.map((student) => (
-                          <SelectItem key={student.p_id} value={student.p_id}>
-                            {student.p_name} ({student.p_mobile})
+                        {customers.map((c) => (
+                          <SelectItem key={c.c_id} value={c.c_id}>
+                            {c.c_name} ({c.c_mobile})
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -147,62 +148,64 @@ export default function AddVehiclePage() {
                   <FormItem>
                     <FormLabel>Vehicle Number <span className="text-red-500">*</span></FormLabel>
                     <FormControl>
-                      <Input placeholder="MH15AB1234" {...field} />
+                      <Input
+                        placeholder="e.g. MH12AB1234"
+                        {...field}
+                        onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              {/* Vehicle Type & Name Group */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="v_type"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Type</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select type" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="car">Car (LMV)</SelectItem>
-                          <SelectItem value="bike">Bike (MCWG)</SelectItem>
-                          <SelectItem value="commercial">Commercial (TR)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+              {/* Vehicle Name/Model */}
+              <FormField
+                control={form.control}
+                name="v_name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Vehicle Name/Model</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g. Maruti Swift, Honda Activa" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-                <FormField
-                  control={form.control}
-                  name="v_name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Model Name</FormLabel>
+              {/* Vehicle Type */}
+              <FormField
+                control={form.control}
+                name="v_type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Vehicle Type</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
-                        <Input placeholder="e.g. Swift Dzire" {...field} />
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select type..." />
+                        </SelectTrigger>
                       </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+                      <SelectContent>
+                        <SelectItem value="car">Car</SelectItem>
+                        <SelectItem value="bike">Bike / Scooter</SelectItem>
+                        <SelectItem value="truck">Truck</SelectItem>
+                        <SelectItem value="bus">Bus</SelectItem>
+                        <SelectItem value="auto">Auto Rickshaw</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700" disabled={loading}>
                 {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
-                  </>
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</>
                 ) : (
-                  <>
-                    <Save className="mr-2 h-4 w-4" /> Save Vehicle
-                  </>
+                  <><Save className="mr-2 h-4 w-4" /> Save Vehicle</>
                 )}
               </Button>
             </form>
@@ -210,5 +213,13 @@ export default function AddVehiclePage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function AddVehiclePage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-slate-500">Loading...</div>}>
+      <AddVehicleForm />
+    </Suspense>
   );
 }

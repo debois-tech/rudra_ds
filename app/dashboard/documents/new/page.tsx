@@ -1,19 +1,19 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { Suspense, useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { documentApi, documentTypeApi, customerApi, vehicleApi } from '@/lib/api';
+import type { DocumentType, CustomerDashboardView, Vehicle } from '@/lib/types';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { ArrowLeft, Loader2, Save, CalendarIcon } from 'lucide-react';
+import { ArrowLeft, Loader2, Save } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -30,82 +30,104 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "sonner";
 import Link from 'next/link';
 
-// Schema
 const formSchema = z.object({
   doc_type_id: z.string().min(1, "Select a document type"),
-  entity_type: z.enum(["person", "vehicle"]),
+  entity_type: z.enum(["customer", "vehicle"]),
   entity_id: z.string().uuid("Select who this document belongs to"),
-  doc_number: z.string().min(2, "Document number is required"),
+  doc_number: z.string().optional(),
   issue_date: z.string().optional(),
   exp_date: z.string().min(10, "Expiry date is required"),
 });
 
-export default function AddDocumentPage() {
-  const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  
-  // Data States
-  const [docTypes, setDocTypes] = useState<any[]>([]);
-  const [persons, setPersons] = useState<any[]>([]);
-  const [vehicles, setVehicles] = useState<any[]>([]);
+type FormData = z.infer<typeof formSchema>;
 
-  // Form
-  const form = useForm<z.infer<typeof formSchema>>({
+function AddDocumentForm() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const preselectedCustomer = searchParams.get('customer');
+
+  const [loading, setLoading] = useState(false);
+  const [docTypes, setDocTypes] = useState<DocumentType[]>([]);
+  const [customers, setCustomers] = useState<CustomerDashboardView[]>([]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+
+  const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      entity_type: "person",
+      entity_type: "customer",
       doc_number: "",
-      // Initialize these to empty strings to fix the React warning
-      issue_date: "", 
+      issue_date: "",
       exp_date: "",
       doc_type_id: "",
-      entity_id: "",
+      entity_id: preselectedCustomer || "",
     },
   });
 
-  // Watch entity type to switch dropdowns
   const entityType = form.watch("entity_type");
 
-  // 1. Fetch Data (Types, Persons, Vehicles)
   useEffect(() => {
-    const loadData = async () => {
-      // Fetch Doc Types
-      const { data: types } = await supabase.from('document_types').select('*');
-      setDocTypes(types || []);
-
-      // Fetch Persons
-      const { data: ppl } = await supabase.from('persons').select('p_id, p_name, p_mobile');
-      setPersons(ppl || []);
-
-      // Fetch Vehicles
-      const { data: vhcls } = await supabase.from('vehicles').select('v_id, v_number, v_name');
-      setVehicles(vhcls || []);
-    };
+    async function loadData() {
+      try {
+        const [types, custs] = await Promise.all([
+          documentTypeApi.getAll(),
+          customerApi.getAll(),
+        ]);
+        setDocTypes(types);
+        setCustomers(custs);
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        toast.error("Error loading data: " + message);
+      }
+    }
     loadData();
   }, []);
 
-  // 2. Filter Doc Types based on selection
+  // Load vehicles when entity type is vehicle OR when customer changes
+  useEffect(() => {
+    async function loadVehicles() {
+      if (entityType === 'vehicle') {
+        try {
+          // If a customer is preselected, only load their vehicles
+          if (preselectedCustomer) {
+            const vehs = await vehicleApi.getByOwner(preselectedCustomer);
+            setVehicles(vehs);
+          } else {
+            const allVehs = await vehicleApi.getAll();
+            setVehicles(allVehs);
+          }
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : 'Unknown error';
+          toast.error("Error loading vehicles: " + message);
+        }
+      }
+    }
+    loadVehicles();
+  }, [entityType, preselectedCustomer]);
+
+  // Filter doc types based on entity type
   const filteredDocTypes = docTypes.filter(dt => dt.entity_type === entityType);
 
-  // 3. Submit
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  async function onSubmit(values: FormData) {
     setLoading(true);
-    
-    // Ensure dates are formatted YYYY-MM-DD (HTML input does this by default)
-    const { error } = await supabase.from('documents').insert([{
-      doc_type_id: parseInt(values.doc_type_id), // Convert string to int
-      entity_type: values.entity_type,
-      entity_id: values.entity_id,
-      doc_number: values.doc_number,
-      issue_date: values.issue_date || null,
-      exp_date: values.exp_date,
-    }]);
+    try {
+      await documentApi.create({
+        doc_type_id: parseInt(values.doc_type_id),
+        entity_type: values.entity_type,
+        entity_id: values.entity_id,
+        doc_number: values.doc_number || undefined,
+        issue_date: values.issue_date || undefined,
+        exp_date: values.exp_date,
+      });
+      toast.success("Document saved successfully!");
 
-    if (error) {
-      toast.error("Error saving document: " + error.message);
-    } else {
-      toast.success("Document saved! 📄");
-      router.push('/dashboard/documents');
+      if (preselectedCustomer) {
+        router.push(`/dashboard/customers/${preselectedCustomer}`);
+      } else {
+        router.push('/dashboard/documents');
+      }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      toast.error("Error saving document: " + message);
     }
     setLoading(false);
   }
@@ -113,20 +135,26 @@ export default function AddDocumentPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex items-center gap-4">
-        <Link href="/dashboard/documents">
-          <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
+        <Link href={preselectedCustomer ? `/dashboard/customers/${preselectedCustomer}` : "/dashboard/documents"}>
+          <Button variant="ghost" size="icon">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
         </Link>
-        <h1 className="text-2xl font-bold text-slate-900">Add New Document</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Add New Document</h1>
+          <p className="text-slate-500 text-sm">Track document expiry for customer or vehicle</p>
+        </div>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>Document Details</CardTitle>
+          <CardDescription>Enter document information below.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              
+
               {/* Entity Type Radio */}
               <FormField
                 control={form.control}
@@ -136,15 +164,19 @@ export default function AddDocumentPage() {
                     <FormLabel>This document belongs to...</FormLabel>
                     <FormControl>
                       <RadioGroup
-                        onValueChange={field.onChange}
+                        onValueChange={(val) => {
+                          field.onChange(val);
+                          form.setValue('entity_id', '');
+                          form.setValue('doc_type_id', '');
+                        }}
                         defaultValue={field.value}
                         className="flex gap-4"
                       >
                         <FormItem className="flex items-center space-x-2 space-y-0">
                           <FormControl>
-                            <RadioGroupItem value="person" />
+                            <RadioGroupItem value="customer" />
                           </FormControl>
-                          <FormLabel className="font-normal cursor-pointer">A Student</FormLabel>
+                          <FormLabel className="font-normal cursor-pointer">A Customer (Personal Doc)</FormLabel>
                         </FormItem>
                         <FormItem className="flex items-center space-x-2 space-y-0">
                           <FormControl>
@@ -158,27 +190,31 @@ export default function AddDocumentPage() {
                 )}
               />
 
-              {/* Dynamic Entity Select (Person OR Vehicle) */}
+              {/* Entity Selection */}
               <FormField
                 control={form.control}
                 name="entity_id"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Select {entityType === 'person' ? 'Student' : 'Vehicle'}</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormLabel>Select {entityType === 'customer' ? 'Customer' : 'Vehicle'} <span className="text-red-500">*</span></FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder={`Select ${entityType}...`} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {entityType === 'person' 
-                          ? persons.map(p => (
-                              <SelectItem key={p.p_id} value={p.p_id}>{p.p_name} ({p.p_mobile})</SelectItem>
-                            ))
+                        {entityType === 'customer'
+                          ? customers.map(c => (
+                            <SelectItem key={c.c_id} value={c.c_id}>
+                              {c.c_name} ({c.c_mobile})
+                            </SelectItem>
+                          ))
                           : vehicles.map(v => (
-                              <SelectItem key={v.v_id} value={v.v_id}>{v.v_number} - {v.v_name}</SelectItem>
-                            ))
+                            <SelectItem key={v.v_id} value={v.v_id}>
+                              {v.v_number} - {v.v_name || v.v_type}
+                            </SelectItem>
+                          ))
                         }
                       </SelectContent>
                     </Select>
@@ -187,17 +223,17 @@ export default function AddDocumentPage() {
                 )}
               />
 
-              {/* Document Type Select */}
+              {/* Document Type */}
               <FormField
                 control={form.control}
                 name="doc_type_id"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Document Type</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormLabel>Document Type <span className="text-red-500">*</span></FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select type..." />
+                          <SelectValue placeholder="Select document type..." />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -213,7 +249,7 @@ export default function AddDocumentPage() {
                 )}
               />
 
-              {/* Doc Number */}
+              {/* Document Number */}
               <FormField
                 control={form.control}
                 name="doc_number"
@@ -235,7 +271,7 @@ export default function AddDocumentPage() {
                   name="issue_date"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Issue Date (Optional)</FormLabel>
+                      <FormLabel>Issue Date</FormLabel>
                       <FormControl>
                         <Input type="date" {...field} />
                       </FormControl>
@@ -260,13 +296,24 @@ export default function AddDocumentPage() {
               </div>
 
               <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700" disabled={loading}>
-                {loading ? <Loader2 className="animate-spin" /> : <Save className="mr-2 h-4 w-4" />} 
-                Save Document
+                {loading ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</>
+                ) : (
+                  <><Save className="mr-2 h-4 w-4" /> Save Document</>
+                )}
               </Button>
             </form>
           </Form>
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function AddDocumentPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-slate-500">Loading...</div>}>
+      <AddDocumentForm />
+    </Suspense>
   );
 }

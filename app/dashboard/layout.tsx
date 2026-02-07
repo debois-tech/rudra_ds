@@ -48,7 +48,7 @@ export default function DashboardLayout({
       <main className="flex-1 p-4 md:p-8 md:ml-64">
         {children}
       </main>
-      
+
       {/* Toast Notification Provider */}
       <Toaster />
     </div>
@@ -57,13 +57,12 @@ export default function DashboardLayout({
 
 function NavLinks() {
   const links = [
-    // Update these paths to include /dashboard
     { href: "/dashboard", label: "Dashboard", icon: BarChart3 },
-    { href: "/dashboard/persons", label: "Students / Persons", icon: Users },
+    { href: "/dashboard/customers", label: "Customers", icon: Users },
     { href: "/dashboard/vehicles", label: "Vehicles", icon: Car },
-    { href: "/dashboard/documents", label: "Documents", icon: FileText },
-    { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
-    { href: "/dashboard/quick-add", label: "Quick Onboard", icon: Zap },
+    { href: "/dashboard/documents", label: "All Documents", icon: FileText },
+    { href: "/dashboard/documents/expiring", label: "Expiring Docs", icon: Bell },
+    { href: "/dashboard/settings", label: "Settings", icon: Zap },
   ]
 
   return (
