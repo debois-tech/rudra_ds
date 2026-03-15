@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 // GET /api/admin/stats — Platform-wide stats
 export async function GET(request: NextRequest) {
-    const authError = await requireSuperAdmin()
+    const authError = await requireSuperAdmin(request)
     if (authError) return authError
 
     const supabase = createSupabaseAdmin()

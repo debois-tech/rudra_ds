@@ -7,7 +7,7 @@ export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
-    const authError = await requireSuperAdmin()
+    const authError = await requireSuperAdmin(request)
     if (authError) return authError
 
     const supabase = createSupabaseAdmin()

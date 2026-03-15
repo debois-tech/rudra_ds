@@ -3,8 +3,8 @@ import { requireSuperAdmin } from '@/lib/admin-auth-guard'
 import { NextResponse, type NextRequest } from 'next/server'
 
 // GET /api/admin/users — List all users with org names
-export async function GET() {
-    const authError = await requireSuperAdmin()
+export async function GET(request: NextRequest) {
+    const authError = await requireSuperAdmin(request)
     if (authError) return authError
 
     const supabase = createSupabaseAdmin()
@@ -29,7 +29,7 @@ export async function GET() {
 
 // POST /api/admin/users — Create new user via Admin Auth API
 export async function POST(request: NextRequest) {
-    const authError = await requireSuperAdmin()
+    const authError = await requireSuperAdmin(request)
     if (authError) return authError
 
     const supabase = createSupabaseAdmin()
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
 
 // DELETE /api/admin/users — Delete user (pass userId in body)
 export async function DELETE(request: NextRequest) {
-    const authError = await requireSuperAdmin()
+    const authError = await requireSuperAdmin(request)
     if (authError) return authError
 
     const supabase = createSupabaseAdmin()

@@ -3,8 +3,8 @@ import { requireSuperAdmin } from '@/lib/admin-auth-guard'
 import { NextResponse, type NextRequest } from 'next/server'
 
 // GET /api/admin/organizations — List all organizations
-export async function GET() {
-    const authError = await requireSuperAdmin()
+export async function GET(request: NextRequest) {
+    const authError = await requireSuperAdmin(request)
     if (authError) return authError
 
     const supabase = createSupabaseAdmin()
@@ -23,7 +23,7 @@ export async function GET() {
 
 // POST /api/admin/organizations — Create new organization
 export async function POST(request: NextRequest) {
-    const authError = await requireSuperAdmin()
+    const authError = await requireSuperAdmin(request)
     if (authError) return authError
 
     const supabase = createSupabaseAdmin()
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
 
 // PATCH /api/admin/organizations — Update organization (pass id in body)
 export async function PATCH(request: NextRequest) {
-    const authError = await requireSuperAdmin()
+    const authError = await requireSuperAdmin(request)
     if (authError) return authError
 
     const supabase = createSupabaseAdmin()
