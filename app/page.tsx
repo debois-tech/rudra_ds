@@ -1,48 +1,40 @@
-'use client';
-import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
+import { createServerClient } from '@supabase/ssr'
 
-export default function Home() {
-  const [docTypes, setDocTypes] = useState<any[]>([]);
-  const [error, setError] = useState<string | null>(null);
+export default async function Home() {
+  const cookieStore = await cookies()
 
-  useEffect(() => {
-    const fetchData = async () => {
-      // Fetch data from the 'document_types' table
-      const { data, error } = await supabase.from('document_types').select('*');
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+        setAll(cookiesToSet) {
+          // Ignore on server during render
+        },
+      },
+    }
+  )
 
-      if (error) {
-        console.error('Error fetching:', error);
-        setError(error.message);
-      } else {
-        setDocTypes(data || []);
-      }
-    };
+  const { data: { user } } = await supabase.auth.getUser()
 
-    fetchData();
-  }, []);
+  if (!user) {
+    redirect('/login')
+  }
 
-  return (
-    <main className="min-h-screen p-24 bg-slate-950 text-white">
-      <h1 className="text-4xl font-bold mb-8 text-emerald-400">Rudra DS Connectivity Test</h1>
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
 
-      {error ? (
-        <div className="p-4 bg-red-500/20 border border-red-500 rounded text-red-200">
-          Connection Failed: {error}
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <p className="text-xl">✅ Connected to Mumbai DB!</p>
-          <p className="text-slate-400">Found {docTypes.length} Document Types:</p>
-          <ul className="list-disc pl-6 space-y-2">
-            {docTypes.map((doc) => (
-              <li key={doc.doc_type_id} className="text-lg">
-                {doc.doc_type_name} <span className="text-xs bg-slate-800 px-2 py-1 rounded text-slate-400">({doc.entity_type})</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </main>
-  );
+  if (profile?.role === 'super_admin') {
+    redirect('/admin')
+  } else {
+    redirect('/dashboard')
+  }
 }

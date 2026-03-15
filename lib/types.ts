@@ -1,4 +1,33 @@
-// TypeScript types for Rudra Driving School Database
+// TypeScript types for Rudra Driving School Database (Multi-Tenant)
+
+// =============================================
+// MULTI-TENANT TYPES
+// =============================================
+
+export interface Organization {
+  id: string;
+  name: string;
+  slug: string;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  logo_url: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Profile {
+  id: string;
+  org_id: string | null;
+  role: 'super_admin' | 'user';
+  full_name: string | null;
+  email: string | null;
+  avatar_url: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
 
 // =============================================
 // DATABASE TABLE TYPES
@@ -13,6 +42,7 @@ export interface Customer {
   c_address: string | null;
   c_dob: string | null;
   c_registration_id: string;
+  org_id: string;
   created_at: string;
   updated_at: string;
 }
@@ -32,6 +62,7 @@ export interface Vehicle {
   v_number: string;
   v_name: string | null;
   v_type: string;
+  org_id: string;
   created_at: string;
   updated_at: string;
 }
@@ -55,6 +86,7 @@ export interface DocumentType {
   doc_type_name: string;
   entity_type: 'customer' | 'vehicle';
   default_validity_days: number;
+  org_id: string | null; // null = shared/global type
 }
 
 export interface Document {
@@ -65,6 +97,7 @@ export interface Document {
   doc_number: string | null;
   issue_date: string | null;
   exp_date: string;
+  org_id: string;
   created_at: string;
   updated_at: string;
 }
@@ -86,11 +119,13 @@ export interface NotificationLog {
   status: string;
   whatsapp_message_id: string | null;
   sent_at: string;
+  org_id: string;
 }
 
 export interface AppSetting {
   key: string;
   value: unknown;
+  org_id: string;
   updated_at: string;
 }
 
@@ -107,6 +142,7 @@ export interface DocumentFullView {
   doc_number: string | null;
   issue_date: string | null;
   exp_date: string;
+  org_id: string;
   days_left: number;
   status: 'expired' | 'critical' | 'warning' | 'valid';
   customer_id: string;
@@ -126,6 +162,7 @@ export interface CustomerDashboardView {
   c_address: string | null;
   c_dob: string | null;
   c_registration_id: string;
+  org_id: string;
   created_at: string;
   updated_at: string;
   vehicle_count: number;
@@ -141,6 +178,8 @@ export interface CustomerDashboardView {
 export type EntityType = 'customer' | 'vehicle';
 
 export type DocumentStatus = 'expired' | 'critical' | 'warning' | 'valid';
+
+export type UserRole = 'super_admin' | 'user';
 
 export interface DashboardStats {
   totalCustomers: number;

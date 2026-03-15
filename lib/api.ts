@@ -1,7 +1,9 @@
-// Centralized API functions for Rudra Driving School
-// This ensures tight coupling between code and database
+// Centralized API functions for Rudra Driving School (Multi-Tenant)
+// RLS handles tenant scoping automatically on SELECT/UPDATE/DELETE.
+// For INSERT, we must include org_id in the payload.
 
-import { supabase } from './supabase';
+import { createSupabaseBrowser } from './supabase';
+import { getCurrentProfile } from './auth';
 import type {
     Customer,
     CustomerFormData,
@@ -17,13 +19,28 @@ import type {
     DashboardStats,
 } from './types';
 
+// Helper to get the current user's org_id.
+// NOTE: No module-level caching here — a stale cache could leak one user's
+// org_id into another user's session if they share the same browser tab.
+// getCurrentProfile() uses the live Supabase auth session, which is safe.
+async function getOrgId(): Promise<string> {
+    const profile = await getCurrentProfile();
+    if (!profile?.org_id) throw new Error('No organization found. Please contact your administrator.');
+    return profile.org_id;
+}
+
+function getClient() {
+    return createSupabaseBrowser();
+}
+
 // =============================================
 // CUSTOMER OPERATIONS
 // =============================================
 
 export const customerApi = {
-    // Get all customers with their stats
     async getAll(): Promise<CustomerDashboardView[]> {
+        const supabase = getClient();
+        // RLS automatically filters by user's org_id
         const { data, error } = await supabase
             .from('v_customer_dashboard')
             .select('*')
@@ -32,8 +49,8 @@ export const customerApi = {
         return data || [];
     },
 
-    // Get single customer by ID
     async getById(id: string): Promise<Customer | null> {
+        const supabase = getClient();
         const { data, error } = await supabase
             .from('customers')
             .select('*')
@@ -43,8 +60,8 @@ export const customerApi = {
         return data;
     },
 
-    // Get customer with full stats
     async getByIdWithStats(id: string): Promise<CustomerDashboardView | null> {
+        const supabase = getClient();
         const { data, error } = await supabase
             .from('v_customer_dashboard')
             .select('*')
@@ -54,8 +71,9 @@ export const customerApi = {
         return data;
     },
 
-    // Create new customer
     async create(customer: CustomerFormData): Promise<Customer> {
+        const supabase = getClient();
+        const orgId = await getOrgId();
         const payload = {
             c_name: customer.c_name,
             c_mobile: customer.c_mobile,
@@ -63,6 +81,7 @@ export const customerApi = {
             c_email: customer.c_email || null,
             c_address: customer.c_address || null,
             c_dob: customer.c_dob || null,
+            org_id: orgId,
         };
         const { data, error } = await supabase
             .from('customers')
@@ -73,8 +92,8 @@ export const customerApi = {
         return data;
     },
 
-    // Update customer
     async update(id: string, customer: CustomerFormData): Promise<Customer> {
+        const supabase = getClient();
         const payload = {
             c_name: customer.c_name,
             c_mobile: customer.c_mobile,
@@ -93,14 +112,14 @@ export const customerApi = {
         return data;
     },
 
-    // Delete customer
     async delete(id: string): Promise<void> {
+        const supabase = getClient();
         const { error } = await supabase.from('customers').delete().eq('c_id', id);
         if (error) throw error;
     },
 
-    // Search customers
     async search(query: string): Promise<CustomerDashboardView[]> {
+        const supabase = getClient();
         const { data, error } = await supabase
             .from('v_customer_dashboard')
             .select('*')
@@ -116,8 +135,8 @@ export const customerApi = {
 // =============================================
 
 export const vehicleApi = {
-    // Get all vehicles with owner info
     async getAll(): Promise<VehicleWithOwner[]> {
+        const supabase = getClient();
         const { data, error } = await supabase
             .from('vehicles')
             .select(`*, customers(c_name, c_mobile)`)
@@ -126,8 +145,8 @@ export const vehicleApi = {
         return data || [];
     },
 
-    // Get vehicles by owner
     async getByOwner(ownerId: string): Promise<Vehicle[]> {
+        const supabase = getClient();
         const { data, error } = await supabase
             .from('vehicles')
             .select('*')
@@ -137,8 +156,8 @@ export const vehicleApi = {
         return data || [];
     },
 
-    // Get single vehicle
     async getById(id: string): Promise<VehicleWithOwner | null> {
+        const supabase = getClient();
         const { data, error } = await supabase
             .from('vehicles')
             .select(`*, customers(c_name, c_mobile)`)
@@ -148,8 +167,9 @@ export const vehicleApi = {
         return data;
     },
 
-    // Create vehicle
     async create(vehicle: VehicleFormData): Promise<Vehicle> {
+        const supabase = getClient();
+        const orgId = await getOrgId();
         const { data, error } = await supabase
             .from('vehicles')
             .insert([{
@@ -157,6 +177,7 @@ export const vehicleApi = {
                 v_number: vehicle.v_number.toUpperCase(),
                 v_name: vehicle.v_name || null,
                 v_type: vehicle.v_type || 'car',
+                org_id: orgId,
             }])
             .select()
             .single();
@@ -164,8 +185,8 @@ export const vehicleApi = {
         return data;
     },
 
-    // Update vehicle
     async update(id: string, vehicle: VehicleFormData): Promise<Vehicle> {
+        const supabase = getClient();
         const { data, error } = await supabase
             .from('vehicles')
             .update({
@@ -181,8 +202,8 @@ export const vehicleApi = {
         return data;
     },
 
-    // Delete vehicle
     async delete(id: string): Promise<void> {
+        const supabase = getClient();
         const { error } = await supabase.from('vehicles').delete().eq('v_id', id);
         if (error) throw error;
     },
@@ -193,8 +214,8 @@ export const vehicleApi = {
 // =============================================
 
 export const documentApi = {
-    // Get all documents with full info
     async getAll(): Promise<DocumentFullView[]> {
+        const supabase = getClient();
         const { data, error } = await supabase
             .from('v_documents_full')
             .select('*')
@@ -203,20 +224,20 @@ export const documentApi = {
         return data || [];
     },
 
-    // Get expiring documents (within X days)
     async getExpiring(withinDays: number = 30): Promise<DocumentFullView[]> {
+        const supabase = getClient();
         const { data, error } = await supabase
             .from('v_documents_full')
             .select('*')
             .lte('days_left', withinDays)
-            .gte('days_left', -30) // Include expired up to 30 days
+            .gte('days_left', -30)
             .order('days_left', { ascending: true });
         if (error) throw error;
         return data || [];
     },
 
-    // Get documents by entity
     async getByEntity(entityType: 'customer' | 'vehicle', entityId: string): Promise<DocumentFullView[]> {
+        const supabase = getClient();
         const { data, error } = await supabase
             .from('v_documents_full')
             .select('*')
@@ -227,8 +248,8 @@ export const documentApi = {
         return data || [];
     },
 
-    // Get documents by customer (including their vehicles)
     async getByCustomer(customerId: string): Promise<DocumentFullView[]> {
+        const supabase = getClient();
         const { data, error } = await supabase
             .from('v_documents_full')
             .select('*')
@@ -238,8 +259,8 @@ export const documentApi = {
         return data || [];
     },
 
-    // Get single document
     async getById(id: string): Promise<DocumentFullView | null> {
+        const supabase = getClient();
         const { data, error } = await supabase
             .from('v_documents_full')
             .select('*')
@@ -249,8 +270,9 @@ export const documentApi = {
         return data;
     },
 
-    // Create document
     async create(doc: DocumentFormData): Promise<Document> {
+        const supabase = getClient();
+        const orgId = await getOrgId();
         const { data, error } = await supabase
             .from('documents')
             .insert([{
@@ -260,6 +282,7 @@ export const documentApi = {
                 doc_number: doc.doc_number || null,
                 issue_date: doc.issue_date || null,
                 exp_date: doc.exp_date,
+                org_id: orgId,
             }])
             .select()
             .single();
@@ -267,8 +290,8 @@ export const documentApi = {
         return data;
     },
 
-    // Update document (for renewals)
     async update(id: string, doc: Partial<DocumentFormData>): Promise<Document> {
+        const supabase = getClient();
         const payload: Record<string, unknown> = {};
         if (doc.doc_number !== undefined) payload.doc_number = doc.doc_number || null;
         if (doc.issue_date !== undefined) payload.issue_date = doc.issue_date || null;
@@ -284,8 +307,8 @@ export const documentApi = {
         return data;
     },
 
-    // Delete document
     async delete(id: string): Promise<void> {
+        const supabase = getClient();
         const { error } = await supabase.from('documents').delete().eq('doc_id', id);
         if (error) throw error;
     },
@@ -297,6 +320,7 @@ export const documentApi = {
 
 export const documentTypeApi = {
     async getAll(): Promise<DocumentType[]> {
+        const supabase = getClient();
         const { data, error } = await supabase
             .from('document_types')
             .select('*')
@@ -306,6 +330,7 @@ export const documentTypeApi = {
     },
 
     async getByEntityType(entityType: 'customer' | 'vehicle'): Promise<DocumentType[]> {
+        const supabase = getClient();
         const { data, error } = await supabase
             .from('document_types')
             .select('*')
@@ -322,6 +347,7 @@ export const documentTypeApi = {
 
 export const notificationApi = {
     async getAll(): Promise<NotificationLog[]> {
+        const supabase = getClient();
         const { data, error } = await supabase
             .from('notification_logs')
             .select('*')
@@ -332,6 +358,7 @@ export const notificationApi = {
     },
 
     async getByDocument(docId: string): Promise<NotificationLog[]> {
+        const supabase = getClient();
         const { data, error } = await supabase
             .from('notification_logs')
             .select('*')
@@ -343,43 +370,57 @@ export const notificationApi = {
 };
 
 // =============================================
-// SETTINGS
+// SETTINGS (per-org)
 // =============================================
 
 export const settingsApi = {
     async getNotificationDays(): Promise<number[]> {
+        const supabase = getClient();
         const { data, error } = await supabase
             .from('app_settings')
             .select('value')
             .eq('key', 'notification_days')
             .single();
-        if (error) throw error;
+        if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows
         return (data?.value as number[]) || [30, 15, 7, 3, 1, 0];
     },
 
     async updateNotificationDays(days: number[]): Promise<void> {
+        const supabase = getClient();
+        const orgId = await getOrgId();
         const { error } = await supabase
             .from('app_settings')
-            .update({ value: days, updated_at: new Date().toISOString() })
-            .eq('key', 'notification_days');
+            .upsert({
+                key: 'notification_days',
+                value: days,
+                org_id: orgId,
+                updated_at: new Date().toISOString(),
+            }, { onConflict: 'key,org_id' });
         if (error) throw error;
     },
 
     async isNotificationEnabled(): Promise<boolean> {
+        const supabase = getClient();
         const { data, error } = await supabase
             .from('app_settings')
             .select('value')
             .eq('key', 'notification_enabled')
             .single();
-        if (error) throw error;
+        if (error && error.code !== 'PGRST116') throw error;
         return data?.value === true || data?.value === 'true';
     },
 
     async setNotificationEnabled(enabled: boolean): Promise<void> {
+        const supabase = getClient();
+        const orgId = await getOrgId();
         const { error } = await supabase
             .from('app_settings')
-            .update({ value: enabled, updated_at: new Date().toISOString() })
-            .eq('key', 'notification_enabled');
+            .upsert({
+                key: 'notification_enabled',
+                value: enabled,
+                org_id: orgId,
+                updated_at: new Date().toISOString(),
+            }, { onConflict: 'key,org_id' });
         if (error) throw error;
     },
 };
@@ -390,6 +431,8 @@ export const settingsApi = {
 
 export const dashboardApi = {
     async getStats(): Promise<DashboardStats> {
+        const supabase = getClient();
+        // RLS automatically scopes counts to user's org
         const [customersRes, vehiclesRes, docsRes, expiringRes] = await Promise.all([
             supabase.from('customers').select('*', { count: 'exact', head: true }),
             supabase.from('vehicles').select('*', { count: 'exact', head: true }),
@@ -406,6 +449,7 @@ export const dashboardApi = {
     },
 
     async getRecentCustomers(limit: number = 5): Promise<CustomerDashboardView[]> {
+        const supabase = getClient();
         const { data, error } = await supabase
             .from('v_customer_dashboard')
             .select('*')
@@ -416,6 +460,7 @@ export const dashboardApi = {
     },
 
     async getUpcomingExpirations(limit: number = 10): Promise<DocumentFullView[]> {
+        const supabase = getClient();
         const { data, error } = await supabase
             .from('v_documents_full')
             .select('*')
