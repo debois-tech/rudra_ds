@@ -7,7 +7,7 @@ import type { DocumentType, CustomerDashboardView, Vehicle } from '@/lib/types';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { ArrowLeft, Loader2, Save } from 'lucide-react';
+import { ArrowLeft, Loader2, Save, Car } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { CustomerSearchCombobox } from "@/components/ui/customer-search-combobox";
 import { toast } from "sonner";
 import Link from 'next/link';
 
@@ -49,7 +50,11 @@ function AddDocumentForm() {
   const [loading, setLoading] = useState(false);
   const [docTypes, setDocTypes] = useState<DocumentType[]>([]);
   const [customers, setCustomers] = useState<CustomerDashboardView[]>([]);
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+
+  // For vehicle mode: which customer was searched, and their vehicles
+  const [selectedVehicleOwnerId, setSelectedVehicleOwnerId] = useState<string>('');
+  const [ownerVehicles, setOwnerVehicles] = useState<Vehicle[]>([]);
+  const [vehiclesLoading, setVehiclesLoading] = useState(false);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -82,27 +87,27 @@ function AddDocumentForm() {
     loadData();
   }, []);
 
-  // Load vehicles when entity type is vehicle OR when customer changes
+  // When a customer is picked in vehicle-mode, load only their vehicles
   useEffect(() => {
-    async function loadVehicles() {
-      if (entityType === 'vehicle') {
+    async function loadOwnerVehicles() {
+      if (entityType === 'vehicle' && selectedVehicleOwnerId) {
+        setVehiclesLoading(true);
+        setOwnerVehicles([]);
+        form.setValue('entity_id', '');
         try {
-          // If a customer is preselected, only load their vehicles
-          if (preselectedCustomer) {
-            const vehs = await vehicleApi.getByOwner(preselectedCustomer);
-            setVehicles(vehs);
-          } else {
-            const allVehs = await vehicleApi.getAll();
-            setVehicles(allVehs);
-          }
+          const vehs = await vehicleApi.getByOwner(selectedVehicleOwnerId);
+          setOwnerVehicles(vehs);
         } catch (error: unknown) {
           const message = error instanceof Error ? error.message : 'Unknown error';
           toast.error("Error loading vehicles: " + message);
+        } finally {
+          setVehiclesLoading(false);
         }
       }
     }
-    loadVehicles();
-  }, [entityType, preselectedCustomer]);
+    loadOwnerVehicles();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedVehicleOwnerId, entityType]);
 
   // Filter doc types based on entity type
   const filteredDocTypes = docTypes.filter(dt => dt.entity_type === entityType);
@@ -168,6 +173,8 @@ function AddDocumentForm() {
                           field.onChange(val);
                           form.setValue('entity_id', '');
                           form.setValue('doc_type_id', '');
+                          setSelectedVehicleOwnerId('');
+                          setOwnerVehicles([]);
                         }}
                         defaultValue={field.value}
                         className="flex gap-4"
@@ -190,38 +197,95 @@ function AddDocumentForm() {
                 )}
               />
 
-              {/* Entity Selection */}
-              <FormField
-                control={form.control}
-                name="entity_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Select {entityType === 'customer' ? 'Customer' : 'Vehicle'} <span className="text-red-500">*</span></FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+              {/* ─── CUSTOMER MODE ─── */}
+              {entityType === 'customer' && (
+                <FormField
+                  control={form.control}
+                  name="entity_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Select Customer <span className="text-red-500">*</span></FormLabel>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder={`Select ${entityType}...`} />
-                        </SelectTrigger>
+                        <CustomerSearchCombobox
+                          customers={customers}
+                          value={field.value}
+                          onChange={field.onChange}
+                        />
                       </FormControl>
-                      <SelectContent>
-                        {entityType === 'customer'
-                          ? customers.map(c => (
-                            <SelectItem key={c.c_id} value={c.c_id}>
-                              {c.c_name} ({c.c_mobile})
-                            </SelectItem>
-                          ))
-                          : vehicles.map(v => (
-                            <SelectItem key={v.v_id} value={v.v_id}>
-                              {v.v_number} - {v.v_name || v.v_type}
-                            </SelectItem>
-                          ))
-                        }
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              {/* ─── VEHICLE MODE ─── */}
+              {entityType === 'vehicle' && (
+                <div className="space-y-4">
+                  {/* Step 1: Search customer */}
+                  <FormItem>
+                    <FormLabel>
+                      Owner (Customer) <span className="text-red-500">*</span>
+                    </FormLabel>
+                    <CustomerSearchCombobox
+                      customers={customers}
+                      value={selectedVehicleOwnerId}
+                      onChange={(id) => {
+                        setSelectedVehicleOwnerId(id);
+                        form.setValue('entity_id', '');
+                      }}
+                      placeholder="Search owner by name or mobile..."
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Select the owner to load their vehicles
+                    </p>
                   </FormItem>
-                )}
-              />
+
+                  {/* Step 2: Pick from that owner's vehicles */}
+                  {selectedVehicleOwnerId && (
+                    <FormField
+                      control={form.control}
+                      name="entity_id"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>
+                            Select Vehicle <span className="text-red-500">*</span>
+                          </FormLabel>
+                          {vehiclesLoading ? (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              Loading vehicles...
+                            </div>
+                          ) : ownerVehicles.length === 0 ? (
+                            <div className="flex items-center gap-2 rounded-md border border-dashed p-3 text-sm text-muted-foreground">
+                              <Car className="h-4 w-4 shrink-0" />
+                              No vehicles found for this customer.
+                            </div>
+                          ) : (
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select vehicle..." />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {ownerVehicles.map((v) => (
+                                  <SelectItem key={v.v_id} value={v.v_id}>
+                                    {v.v_number}
+                                    {v.v_name ? ` — ${v.v_name}` : ''}
+                                    {' '}
+                                    <span className="text-muted-foreground text-xs capitalize">({v.v_type})</span>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                </div>
+              )}
 
               {/* Document Type */}
               <FormField

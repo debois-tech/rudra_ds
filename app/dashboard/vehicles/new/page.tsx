@@ -26,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { CustomerSearchCombobox } from "@/components/ui/customer-search-combobox";
 import { toast } from "sonner";
 import Link from 'next/link';
 
@@ -114,27 +115,20 @@ function AddVehicleForm() {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
 
-              {/* Owner Selection */}
+              {/* Owner Selection — Searchable Combobox */}
               <FormField
                 control={form.control}
                 name="owner_id"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Owner (Customer) <span className="text-red-500">*</span></FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select customer..." />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {customers.map((c) => (
-                          <SelectItem key={c.c_id} value={c.c_id}>
-                            {c.c_name} ({c.c_mobile})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <CustomerSearchCombobox
+                        customers={customers}
+                        value={field.value}
+                        onChange={field.onChange}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
