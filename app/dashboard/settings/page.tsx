@@ -102,7 +102,7 @@ export default function SettingsPage() {
                                 notificationDays.map(day => (
                                     <span
                                         key={day}
-                                        className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-sm font-medium"
+                                        className="px-3 py-1 bg-blue-100 text-emerald-700 rounded-full text-sm font-medium"
                                     >
                                         {day === 0 ? 'On expiry day' : `${day} days before`}
                                     </span>

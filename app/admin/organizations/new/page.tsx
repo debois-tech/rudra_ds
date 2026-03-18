@@ -96,7 +96,7 @@ export default function NewOrganizationPage() {
                                 <Input
                                     value={orgName}
                                     onChange={(e) => handleNameChange(e.target.value)}
-                                    placeholder="Rudra Driving School"
+                                    placeholder="MotoAdmin"
                                     required
                                     className="bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500"
                                 />
@@ -106,7 +106,7 @@ export default function NewOrganizationPage() {
                                 <Input
                                     value={orgSlug}
                                     onChange={(e) => setOrgSlug(e.target.value)}
-                                    placeholder="rudra-ds"
+                                    placeholder="moto-admin"
                                     required
                                     className="bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500"
                                 />

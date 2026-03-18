@@ -201,7 +201,7 @@ function AddVehicleForm() {
                 )}
               />
 
-              <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700" disabled={loading}>
+              <Button type="submit" className="w-full bg-blue-600 hover:bg-emerald-700" disabled={loading}>
                 {loading ? (
                   <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</>
                 ) : (

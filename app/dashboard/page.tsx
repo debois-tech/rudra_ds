@@ -43,7 +43,7 @@ export default function DashboardPage() {
     if (days < 0) return "text-red-600 bg-red-50";
     if (days <= 7) return "text-amber-600 bg-amber-50";
     if (days <= 30) return "text-yellow-600 bg-yellow-50";
-    return "text-emerald-600 bg-emerald-50";
+    return "text-blue-600 bg-emerald-50";
   };
 
   return (

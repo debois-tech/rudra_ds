@@ -103,7 +103,7 @@ export default function ExpiringDocumentsPage() {
             {documents.length === 0 && !loading ? (
                 <Card className="p-12 text-center">
                     <div className="flex flex-col items-center gap-4">
-                        <div className="h-16 w-16 rounded-full bg-emerald-100 flex items-center justify-center">
+                        <div className="h-16 w-16 rounded-full bg-blue-100 flex items-center justify-center">
                             <Bell className="h-8 w-8 text-emerald-600" />
                         </div>
                         <div>

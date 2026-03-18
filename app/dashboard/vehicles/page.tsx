@@ -66,7 +66,7 @@ export default function VehiclesPage() {
           <p className="text-slate-500 mt-1">Manage vehicles and assign them to customers.</p>
         </div>
         <Link href="/dashboard/vehicles/new">
-          <Button className="bg-emerald-600 hover:bg-emerald-700">
+          <Button className="bg-blue-600 hover:bg-emerald-700">
             <Plus className="h-4 w-4 mr-2" /> Add Vehicle
           </Button>
         </Link>

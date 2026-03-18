@@ -65,7 +65,7 @@ export default function AdminLayout({
                     <div className="border-t border-slate-800 my-3" />
                     <Link
                         href="/dashboard"
-                        className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-slate-800 transition-colors text-emerald-400 hover:text-emerald-300"
+                        className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-slate-800 transition-colors text-blue-400 hover:text-emerald-300"
                     >
                         <ArrowLeft className="h-5 w-5" />
                         <span>Back to Dashboard</span>

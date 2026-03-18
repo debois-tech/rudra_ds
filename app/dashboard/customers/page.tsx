@@ -68,7 +68,7 @@ export default function CustomersPage() {
         </div>
 
         <Link href="/dashboard/customers/new">
-          <Button className="bg-emerald-600 hover:bg-emerald-700">
+          <Button className="bg-blue-600 hover:bg-emerald-700">
             <Plus className="h-4 w-4 mr-2" /> Add Customer
           </Button>
         </Link>

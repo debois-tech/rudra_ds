@@ -49,7 +49,7 @@ export default function AdminOverviewPage() {
                     label="Active Organizations"
                     value={loading ? '-' : stats?.activeOrgs ?? 0}
                     icon={Activity}
-                    color="emerald"
+                    color="blue"
                 />
                 <StatCard
                     label="Total Users"

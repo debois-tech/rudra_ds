@@ -257,7 +257,7 @@ export default function OrgDetailPage() {
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <span className={`px-2 py-0.5 rounded text-xs ${user.is_active ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'
+                                        <span className={`px-2 py-0.5 rounded text-xs ${user.is_active ? 'bg-blue-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'
                                             }`}>
                                             {user.is_active ? 'Active' : 'Inactive'}
                                         </span>

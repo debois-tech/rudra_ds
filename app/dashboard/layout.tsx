@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Toaster } from "@/components/ui/sonner"
 import { getAuthUser, signOut, type Profile } from '@/lib/auth'
+import Image from 'next/image'
 
 export default function DashboardLayout({
   children,
@@ -58,7 +59,7 @@ export default function DashboardLayout({
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>
     )
   }
@@ -68,7 +69,12 @@ export default function DashboardLayout({
       {/* Desktop Sidebar */}
       <div className="hidden md:flex flex-col w-64 bg-slate-950 text-white min-h-screen fixed h-full">
         <div className="p-6">
-          <h1 className="text-2xl font-bold text-emerald-400 tracking-wider">RUDRA DS</h1>
+          <div className="flex items-center gap-3">
+            <div className="relative w-10 h-10 shrink-0 bg-white rounded-lg p-1">
+              <Image src="/logo.png" alt="MotoAdmin Logo" fill className="object-contain" />
+            </div>
+            <h1 className="text-xl font-bold tracking-wider">MotoAdmin</h1>
+          </div>
           {orgName && (
             <div className="flex items-center gap-1.5 mt-2">
               <Building2 className="h-3.5 w-3.5 text-slate-400" />
@@ -94,7 +100,7 @@ export default function DashboardLayout({
         <div className="p-4 border-t border-slate-800 space-y-3">
           {profile && (
             <div className="flex items-center gap-3">
-              <div className="h-8 w-8 rounded-full bg-emerald-600/20 flex items-center justify-center text-emerald-400 text-sm font-semibold">
+              <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary text-sm font-semibold">
                 {profile.full_name?.charAt(0)?.toUpperCase() || 'U'}
               </div>
               <div className="flex-1 min-w-0">
@@ -117,8 +123,11 @@ export default function DashboardLayout({
 
       {/* Mobile Header */}
       <div className="md:hidden flex items-center justify-between p-4 bg-slate-950 text-white sticky top-0 z-50">
-        <div>
-          <span className="font-bold text-emerald-400">RUDRA DS</span>
+        <div className="flex items-center gap-2">
+          <div className="relative w-8 h-8 shrink-0 bg-white rounded-md p-0.5">
+             <Image src="/logo.png" alt="MotoAdmin Logo" fill className="object-contain" />
+          </div>
+          <span className="font-bold">MotoAdmin</span>
           {orgName && (
             <span className="text-xs text-slate-400 ml-2">• {orgName}</span>
           )}
@@ -131,7 +140,12 @@ export default function DashboardLayout({
           </SheetTrigger>
           <SheetContent side="left" className="bg-slate-950 text-white border-none w-64">
             <div className="mb-8">
-              <h2 className="text-2xl font-bold text-emerald-400">RUDRA DS</h2>
+              <div className="flex items-center gap-3">
+                <div className="relative w-8 h-8 shrink-0 bg-white rounded-md p-0.5">
+                   <Image src="/logo.png" alt="MotoAdmin Logo" fill className="object-contain" />
+                </div>
+                <h2 className="text-xl font-bold">MotoAdmin</h2>
+              </div>
               {orgName && (
                 <p className="text-xs text-slate-400 mt-1">{orgName}</p>
               )}
@@ -154,7 +168,7 @@ export default function DashboardLayout({
             <div className="absolute bottom-6 left-4 right-4 space-y-3">
               {profile && (
                 <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-full bg-emerald-600/20 flex items-center justify-center text-emerald-400 text-sm font-semibold">
+                  <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary text-sm font-semibold">
                     {profile.full_name?.charAt(0)?.toUpperCase() || 'U'}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -209,7 +223,7 @@ function NavLinks({ pathname }: { pathname: string }) {
             key={link.href}
             href={link.href}
             className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive
-                ? 'bg-emerald-600/10 text-emerald-400 font-medium'
+                ? 'bg-primary/10 text-primary font-medium'
                 : 'text-slate-300 hover:bg-slate-800 hover:text-white'
               }`}
           >

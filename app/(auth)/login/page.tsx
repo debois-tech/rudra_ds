@@ -7,13 +7,14 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Loader2, LogIn, Shield } from 'lucide-react'
+import { Loader2, LogIn } from 'lucide-react'
+import Image from 'next/image'
 
 export default function LoginPage() {
     return (
         <Suspense fallback={
             <div className="flex items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-emerald-400" />
+                <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
             </div>
         }>
             <LoginForm />
@@ -55,11 +56,11 @@ function LoginForm() {
         <Card className="bg-slate-900/80 border-slate-800 backdrop-blur-xl shadow-2xl">
             <CardHeader className="text-center space-y-4 pb-2">
                 {/* Logo / Brand */}
-                <div className="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                    <Shield className="h-8 w-8 text-white" />
+                <div className="mx-auto w-24 h-24 relative flex items-center justify-center">
+                    <Image src="/logo.png" alt="MotoAdmin Logo" fill className="object-contain" priority />
                 </div>
                 <div>
-                    <h1 className="text-2xl font-bold text-white tracking-wider">RUDRA DS</h1>
+                    <h1 className="text-2xl font-bold text-white tracking-wider">MotoAdmin</h1>
                     <p className="text-sm text-slate-400 mt-1">Driving School Management Platform</p>
                 </div>
             </CardHeader>
@@ -80,7 +81,7 @@ function LoginForm() {
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             required
-                            className="bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-emerald-500 focus:ring-emerald-500/20 h-11"
+                            className="bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-blue-500 focus:ring-blue-500/20 h-11"
                         />
                     </div>
 
@@ -93,14 +94,14 @@ function LoginForm() {
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             required
-                            className="bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-emerald-500 focus:ring-emerald-500/20 h-11"
+                            className="bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-blue-500 focus:ring-blue-500/20 h-11"
                         />
                     </div>
 
                     <Button
                         type="submit"
                         disabled={loading}
-                        className="w-full h-11 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-medium shadow-lg shadow-emerald-500/20 transition-all duration-200"
+                        className="w-full h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-medium shadow-lg shadow-blue-500/20 transition-all duration-200"
                     >
                         {loading ? (
                             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
