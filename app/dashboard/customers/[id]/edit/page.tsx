@@ -181,7 +181,7 @@ export default function EditCustomerPage() {
                                             <FormControl>
                                                 <Input placeholder="Same as mobile if empty" maxLength={10} {...field} />
                                             </FormControl>
-                                            <FormDescription className="text-xs">Used for notifications</FormDescription>
+                                            <FormDescription className="text-xs">Leave empty to use mobile number</FormDescription>
                                             <FormMessage />
                                         </FormItem>
                                     )}

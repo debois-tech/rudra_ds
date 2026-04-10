@@ -16,7 +16,7 @@ export function createSupabaseBrowser() {
 // ============================================
 // SERVICE ROLE CLIENT (for admin operations)
 // Bypasses RLS — use ONLY in server-side code
-// Used by: super admin APIs, notification scripts
+// Used by: super admin APIs, server-side operations
 // ============================================
 export function createSupabaseAdmin() {
   return createClient(

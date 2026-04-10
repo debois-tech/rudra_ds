@@ -1,4 +1,4 @@
-// TypeScript types for Rudra Driving School Database (Multi-Tenant)
+// TypeScript types for MotoAdmin Service Platform (Multi-Tenant)
 
 // =============================================
 // MULTI-TENANT TYPES
@@ -30,7 +30,7 @@ export interface Profile {
 }
 
 // =============================================
-// DATABASE TABLE TYPES
+// CUSTOMER TYPES
 // =============================================
 
 export interface Customer {
@@ -55,6 +55,27 @@ export interface CustomerFormData {
   c_address?: string;
   c_dob?: string;
 }
+
+export interface CustomerDashboardView {
+  c_id: string;
+  c_name: string;
+  c_mobile: string;
+  c_whatsapp: string | null;
+  c_email: string | null;
+  c_address: string | null;
+  c_dob: string | null;
+  c_registration_id: string;
+  org_id: string;
+  created_at: string;
+  updated_at: string;
+  vehicle_count: number;
+  service_count: number;
+  total_revenue: number;
+}
+
+// =============================================
+// VEHICLE TYPES
+// =============================================
 
 export interface Vehicle {
   v_id: string;
@@ -81,109 +102,102 @@ export interface VehicleFormData {
   v_type?: string;
 }
 
-export interface DocumentType {
-  doc_type_id: number;
-  doc_type_name: string;
-  entity_type: 'customer' | 'vehicle';
-  default_validity_days: number;
-  org_id: string | null; // null = shared/global type
+// Inline vehicle data for adding during customer creation
+export interface InlineVehicleData {
+  v_number: string;
+  v_name?: string;
+  v_type?: string;
 }
 
-export interface Document {
-  doc_id: string;
-  doc_type_id: number;
-  entity_type: 'customer' | 'vehicle';
-  entity_id: string;
-  doc_number: string | null;
-  issue_date: string | null;
-  exp_date: string;
+// =============================================
+// SERVICE TYPES
+// =============================================
+
+export type ServiceCategory = 'vehicle' | 'licence';
+export type ServiceStatus = 'active' | 'completed' | 'cancelled';
+
+export type VehicleClass = 'NT' | 'Transport' | 'Conductor';
+
+export type VehicleTypeLicence =
+  | '3W-TR' | 'Others' | 'MCWOG' | 'MCWG' | 'LMV'
+  | 'TRACTOR' | 'FLIFT' | 'LDRXCV' | 'INVCGZ'
+  | 'TRANS' | 'PSVBUS' | 'CNEQP' | 'LMV-TR' | 'CONDUCTOR';
+
+export interface ServiceType {
+  st_id: number;
+  category: ServiceCategory;
+  name: string;
+  org_id: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface Service {
+  s_id: string;
+  customer_id: string;
+  service_type_id: number;
+  category: ServiceCategory;
+  // Vehicle service fields
+  vehicle_id: string | null;
+  vehicle_type: string | null;
+  vehicle_number: string | null;
+  // Licence service fields
+  vehicle_class: VehicleClass | null;
+  vehicle_type_licence: VehicleTypeLicence | null;
+  mdl_number: string | null;
+  renewal_date: string | null;
+  // Common
+  issue_date: string;
+  expiry_date: string | null;
+  total_cost: number;
+  status: ServiceStatus;
+  notes: string | null;
   org_id: string;
   created_at: string;
   updated_at: string;
 }
 
-export interface DocumentFormData {
-  doc_type_id: number;
-  entity_type: 'customer' | 'vehicle';
-  entity_id: string;
-  doc_number?: string;
-  issue_date?: string;
-  exp_date: string;
-}
-
-export interface NotificationLog {
-  log_id: string;
-  doc_id: string;
-  customer_id: string;
-  days_before: number;
-  status: string;
-  whatsapp_message_id: string | null;
-  sent_at: string;
-  org_id: string;
-}
-
-export interface AppSetting {
-  key: string;
-  value: unknown;
-  org_id: string;
-  updated_at: string;
-}
-
-// =============================================
-// VIEW TYPES
-// =============================================
-
-export interface DocumentFullView {
-  doc_id: string;
-  doc_type_id: number;
-  doc_type_name: string;
-  entity_type: 'customer' | 'vehicle';
-  entity_id: string;
-  doc_number: string | null;
-  issue_date: string | null;
-  exp_date: string;
-  org_id: string;
-  days_left: number;
-  status: 'expired' | 'critical' | 'warning' | 'valid';
-  customer_id: string;
+export interface ServiceOverview extends Service {
+  service_name: string;
+  service_category: ServiceCategory;
   customer_name: string;
   customer_mobile: string;
-  customer_whatsapp: string;
-  vehicle_number: string | null;
-  vehicle_name: string | null;
 }
 
-export interface CustomerDashboardView {
-  c_id: string;
-  c_name: string;
-  c_mobile: string;
-  c_whatsapp: string | null;
-  c_email: string | null;
-  c_address: string | null;
-  c_dob: string | null;
-  c_registration_id: string;
-  org_id: string;
-  created_at: string;
-  updated_at: string;
-  vehicle_count: number;
-  personal_doc_count: number;
-  vehicle_doc_count: number;
-  expiring_soon_count: number;
+export interface VehicleServiceFormData {
+  customer_id: string;
+  service_type_id: number;
+  vehicle_id?: string;
+  vehicle_type: string;
+  vehicle_number: string;
+  issue_date: string;
+  expiry_date?: string;
+  total_cost: number;
+  notes?: string;
+}
+
+export interface LicenceServiceFormData {
+  customer_id: string;
+  service_type_id: number;
+  vehicle_class: VehicleClass;
+  vehicle_type_licence: VehicleTypeLicence;
+  mdl_number?: string;
+  renewal_date?: string;
+  issue_date: string;
+  expiry_date?: string;
+  total_cost: number;
+  notes?: string;
 }
 
 // =============================================
 // UTILITY TYPES
 // =============================================
 
-export type EntityType = 'customer' | 'vehicle';
-
-export type DocumentStatus = 'expired' | 'critical' | 'warning' | 'valid';
-
 export type UserRole = 'super_admin' | 'user';
 
 export interface DashboardStats {
   totalCustomers: number;
   totalVehicles: number;
-  totalDocuments: number;
-  expiringSoon: number;
+  totalServices: number;
+  totalRevenue: number;
 }

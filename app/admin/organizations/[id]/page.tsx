@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ArrowLeft, Building2, UserPlus, Trash2, Power, Loader2, Users, Car, FileText } from 'lucide-react'
+import { ArrowLeft, Building2, UserPlus, Trash2, Power, Loader2, Users, Car, Wrench } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
 
@@ -18,7 +18,7 @@ export default function OrgDetailPage() {
 
     const [org, setOrg] = useState<Organization | null>(null)
     const [orgUsers, setOrgUsers] = useState<Profile[]>([])
-    const [stats, setStats] = useState({ customerCount: 0, vehicleCount: 0, documentCount: 0 })
+    const [stats, setStats] = useState({ customerCount: 0, vehicleCount: 0, serviceCount: 0 })
     const [loading, setLoading] = useState(true)
 
     // Add user form
@@ -133,12 +133,12 @@ export default function OrgDetailPage() {
                 </Card>
                 <Card className="bg-slate-800/50 border-slate-700/50">
                     <CardContent className="pt-5 flex items-center gap-3">
-                        <div className="p-2 rounded-lg bg-slate-700/50">
-                            <FileText className="h-5 w-5 text-slate-300" />
+                        <div className="p-2 rounded-lg bg-emerald-500/20">
+                            <Wrench className="h-5 w-5 text-emerald-400" />
                         </div>
                         <div>
-                            <p className="text-xs text-slate-400">Documents</p>
-                            <p className="text-xl font-bold text-white">{stats.documentCount}</p>
+                            <p className="text-xs text-slate-400">Services</p>
+                            <p className="text-xl font-bold text-white">{stats.serviceCount}</p>
                         </div>
                     </CardContent>
                 </Card>

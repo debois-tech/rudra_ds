@@ -14,12 +14,12 @@ export async function GET(
     const { id } = await params
 
     try {
-        const [org, users, customerCount, vehicleCount, docCount] = await Promise.all([
+        const [org, users, customerCount, vehicleCount, serviceCount] = await Promise.all([
             supabase.from('organizations').select('*').eq('id', id).single(),
             supabase.from('profiles').select('*').eq('org_id', id).order('created_at', { ascending: false }),
             supabase.from('customers').select('*', { count: 'exact', head: true }).eq('org_id', id),
             supabase.from('vehicles').select('*', { count: 'exact', head: true }).eq('org_id', id),
-            supabase.from('documents').select('*', { count: 'exact', head: true }).eq('org_id', id),
+            supabase.from('services').select('*', { count: 'exact', head: true }).eq('org_id', id),
         ])
 
         if (org.error) throw org.error
@@ -30,7 +30,7 @@ export async function GET(
             stats: {
                 customerCount: customerCount.count || 0,
                 vehicleCount: vehicleCount.count || 0,
-                documentCount: docCount.count || 0,
+                serviceCount: serviceCount.count || 0,
             },
         })
     } catch (error) {

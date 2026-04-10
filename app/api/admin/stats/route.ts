@@ -10,12 +10,12 @@ export async function GET(request: NextRequest) {
     const supabase = createSupabaseAdmin()
 
     try {
-        const [orgs, activeOrgs, users, customers, docs] = await Promise.all([
+        const [orgs, activeOrgs, users, customers, services] = await Promise.all([
             supabase.from('organizations').select('*', { count: 'exact', head: true }),
             supabase.from('organizations').select('*', { count: 'exact', head: true }).eq('is_active', true),
             supabase.from('profiles').select('*', { count: 'exact', head: true }),
             supabase.from('customers').select('*', { count: 'exact', head: true }),
-            supabase.from('documents').select('*', { count: 'exact', head: true }),
+            supabase.from('services').select('*', { count: 'exact', head: true }),
         ])
 
         return NextResponse.json({
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
             activeOrgs: activeOrgs.count || 0,
             totalUsers: users.count || 0,
             totalCustomers: customers.count || 0,
-            totalDocuments: docs.count || 0,
+            totalServices: services.count || 0,
         })
     } catch (error) {
         return NextResponse.json({ error: 'Failed to fetch stats' }, { status: 500 })

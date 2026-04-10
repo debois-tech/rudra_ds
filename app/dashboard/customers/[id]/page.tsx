@@ -1,307 +1,247 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
-import { customerApi, vehicleApi, documentApi } from '@/lib/api';
-import type { CustomerDashboardView, Vehicle, DocumentFullView } from '@/lib/types';
-import { ArrowLeft, Edit, Plus, Car, FileText, Phone, Mail, MapPin, Calendar, AlertCircle, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
-import { Button } from "@/components/ui/button";
+import { useParams, useRouter } from 'next/navigation';
+import { customerApi, vehicleApi, serviceApi } from '@/lib/api';
+import type { Customer, Vehicle, ServiceOverview } from '@/lib/types';
+import { ArrowLeft, Edit2, Car, Wrench, Trash2, Loader2, Save, X, Plus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { toast } from "sonner";
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import Link from 'next/link';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 
 export default function CustomerDetailPage() {
   const params = useParams();
-  const customerId = params.id as string;
+  const router = useRouter();
+  const id = params.id as string;
 
-  const [customer, setCustomer] = useState<CustomerDashboardView | null>(null);
+  const [customer, setCustomer] = useState<Customer | null>(null);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [documents, setDocuments] = useState<DocumentFullView[]>([]);
+  const [services, setServices] = useState<ServiceOverview[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const [editForm, setEditForm] = useState({
+    c_name: '', c_mobile: '', c_whatsapp: '', c_email: '', c_address: '', c_dob: ''
+  });
 
   useEffect(() => {
-    async function fetchData() {
+    async function load() {
       try {
-        const [customerData, vehiclesData, docsData] = await Promise.all([
-          customerApi.getByIdWithStats(customerId),
-          vehicleApi.getByOwner(customerId),
-          documentApi.getByCustomer(customerId),
+        const [cust, vehs, svcs] = await Promise.all([
+          customerApi.getById(id),
+          vehicleApi.getByOwner(id),
+          serviceApi.getByCustomer(id),
         ]);
-        setCustomer(customerData);
-        setVehicles(vehiclesData);
-        setDocuments(docsData);
-      } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        toast.error("Error loading customer: " + message);
+        setCustomer(cust);
+        setVehicles(vehs);
+        setServices(svcs);
+        if (cust) {
+          setEditForm({
+            c_name: cust.c_name, c_mobile: cust.c_mobile,
+            c_whatsapp: cust.c_whatsapp || '', c_email: cust.c_email || '',
+            c_address: cust.c_address || '', c_dob: cust.c_dob || '',
+          });
+        }
+      } catch (error) {
+        console.error(error);
+        toast.error('Failed to load customer');
       }
       setLoading(false);
     }
-    fetchData();
-  }, [customerId]);
+    load();
+  }, [id]);
 
-  const getStatusColor = (days: number) => {
-    if (days < 0) return "bg-red-100 text-red-700 border-red-200";
-    if (days <= 7) return "bg-amber-100 text-amber-700 border-amber-200";
-    if (days <= 30) return "bg-yellow-50 text-yellow-700 border-yellow-200";
-    return "bg-blue-50 text-emerald-700 border-emerald-200";
-  };
-
-  const getStatusIcon = (days: number) => {
-    if (days < 0) return <XCircle className="h-4 w-4" />;
-    if (days <= 30) return <AlertTriangle className="h-4 w-4" />;
-    return <CheckCircle className="h-4 w-4" />;
-  };
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const updated = await customerApi.update(id, editForm);
+      setCustomer(updated);
+      setEditing(false);
+      toast.success('Customer updated!');
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Update failed');
+    }
+    setSaving(false);
+  }
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-slate-500">Loading customer details...</p>
+      <div className="flex justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
       </div>
     );
   }
 
   if (!customer) {
-    return (
-      <div className="flex flex-col items-center justify-center h-64 gap-4">
-        <p className="text-slate-500">Customer not found.</p>
-        <Link href="/dashboard/customers">
-          <Button>Back to Customers</Button>
-        </Link>
-      </div>
-    );
+    return <div className="text-center py-20 text-slate-500">Customer not found</div>;
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="max-w-4xl mx-auto space-y-6">
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Link href="/dashboard/customers">
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
+            <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
           </Link>
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">{customer.c_name}</h1>
-            <p className="text-slate-500 font-mono text-sm">{customer.c_registration_id}</p>
+            <h1 className="text-2xl font-bold text-slate-900">{customer.c_name}</h1>
+            <p className="text-sm text-slate-500">ID: {customer.c_registration_id}</p>
           </div>
         </div>
-        <Link href={`/dashboard/customers/${customerId}/edit`}>
-          <Button variant="outline">
-            <Edit className="h-4 w-4 mr-2" /> Edit Customer
-          </Button>
-        </Link>
-      </div>
-
-      {/* Customer Info Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Customer Information</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div className="flex items-center gap-3">
-              <Phone className="h-5 w-5 text-slate-400" />
-              <div>
-                <p className="text-sm text-slate-500">Mobile</p>
-                <p className="font-medium">{customer.c_mobile}</p>
-              </div>
-            </div>
-            {customer.c_whatsapp && customer.c_whatsapp !== customer.c_mobile && (
-              <div className="flex items-center gap-3">
-                <Phone className="h-5 w-5 text-green-500" />
-                <div>
-                  <p className="text-sm text-slate-500">WhatsApp</p>
-                  <p className="font-medium">{customer.c_whatsapp}</p>
-                </div>
-              </div>
-            )}
-            {customer.c_email && (
-              <div className="flex items-center gap-3">
-                <Mail className="h-5 w-5 text-slate-400" />
-                <div>
-                  <p className="text-sm text-slate-500">Email</p>
-                  <p className="font-medium">{customer.c_email}</p>
-                </div>
-              </div>
-            )}
-            {customer.c_address && (
-              <div className="flex items-center gap-3">
-                <MapPin className="h-5 w-5 text-slate-400" />
-                <div>
-                  <p className="text-sm text-slate-500">Address</p>
-                  <p className="font-medium">{customer.c_address}</p>
-                </div>
-              </div>
-            )}
-            {customer.c_dob && (
-              <div className="flex items-center gap-3">
-                <Calendar className="h-5 w-5 text-slate-400" />
-                <div>
-                  <p className="text-sm text-slate-500">Date of Birth</p>
-                  <p className="font-medium">{format(new Date(customer.c_dob), 'dd MMM yyyy')}</p>
-                </div>
-              </div>
-            )}
-            <div className="flex items-center gap-3">
-              <Calendar className="h-5 w-5 text-slate-400" />
-              <div>
-                <p className="text-sm text-slate-500">Customer Since</p>
-                <p className="font-medium">{format(new Date(customer.created_at), 'dd MMM yyyy')}</p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Stats Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <Car className="h-8 w-8 text-blue-500" />
-            <div>
-              <p className="text-2xl font-bold">{customer.vehicle_count}</p>
-              <p className="text-sm text-slate-500">Vehicles</p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <FileText className="h-8 w-8 text-purple-500" />
-            <div>
-              <p className="text-2xl font-bold">{customer.personal_doc_count}</p>
-              <p className="text-sm text-slate-500">Personal Docs</p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <FileText className="h-8 w-8 text-slate-500" />
-            <div>
-              <p className="text-2xl font-bold">{customer.vehicle_doc_count}</p>
-              <p className="text-sm text-slate-500">Vehicle Docs</p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <AlertCircle className="h-8 w-8 text-orange-500" />
-            <div>
-              <p className="text-2xl font-bold">{customer.expiring_soon_count}</p>
-              <p className="text-sm text-slate-500">Expiring Soon</p>
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      {/* Vehicles Section */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <Car className="h-5 w-5" /> Vehicles
-          </CardTitle>
-          <Link href={`/dashboard/vehicles/new?owner=${customerId}`}>
-            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700">
-              <Plus className="h-4 w-4 mr-1" /> Add Vehicle
+        <div className="flex gap-2">
+          <Link href={`/dashboard/services?customer=${customer.c_id}`}>
+            <Button className="bg-emerald-600 hover:bg-emerald-700">
+              <Wrench className="h-4 w-4 mr-2" /> Give Service
             </Button>
           </Link>
+          {!editing && (
+            <Button variant="outline" onClick={() => setEditing(true)}>
+              <Edit2 className="h-4 w-4 mr-2" /> Edit
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Personal Details */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Personal Details</CardTitle>
         </CardHeader>
         <CardContent>
-          {vehicles.length === 0 ? (
-            <p className="text-slate-500 text-center py-8">No vehicles registered yet.</p>
+          {editing ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium">Full Name</label>
+                  <Input value={editForm.c_name} onChange={e => setEditForm({ ...editForm, c_name: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Mobile</label>
+                  <Input value={editForm.c_mobile} onChange={e => setEditForm({ ...editForm, c_mobile: e.target.value })} maxLength={10} />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">WhatsApp</label>
+                  <Input value={editForm.c_whatsapp} onChange={e => setEditForm({ ...editForm, c_whatsapp: e.target.value })} maxLength={10} />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Email</label>
+                  <Input value={editForm.c_email} onChange={e => setEditForm({ ...editForm, c_email: e.target.value })} type="email" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Date of Birth</label>
+                  <Input value={editForm.c_dob} onChange={e => setEditForm({ ...editForm, c_dob: e.target.value })} type="date" />
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Address</label>
+                <Textarea value={editForm.c_address} onChange={e => setEditForm({ ...editForm, c_address: e.target.value })} rows={2} />
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={handleSave} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />} Save
+                </Button>
+                <Button variant="ghost" onClick={() => setEditing(false)}><X className="h-4 w-4 mr-2" /> Cancel</Button>
+              </div>
+            </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {vehicles.map((vehicle) => (
-                <Card key={vehicle.v_id} className="p-4 hover:shadow-md transition-shadow">
-                  <div className="flex items-center gap-3">
-                    <Car className="h-8 w-8 text-slate-400" />
-                    <div>
-                      <p className="font-bold text-lg bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded inline-block">
-                        {vehicle.v_number}
-                      </p>
-                      <p className="text-sm text-slate-500">{vehicle.v_name || vehicle.v_type}</p>
-                    </div>
-                  </div>
-                </Card>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {[
+                { label: 'Mobile', value: customer.c_mobile },
+                { label: 'WhatsApp', value: customer.c_whatsapp || '—' },
+                { label: 'Email', value: customer.c_email || '—' },
+                { label: 'Address', value: customer.c_address || '—' },
+                { label: 'Date of Birth', value: customer.c_dob ? format(new Date(customer.c_dob), 'dd MMM yyyy') : '—' },
+                { label: 'Joined', value: format(new Date(customer.created_at), 'dd MMM yyyy') },
+              ].map(item => (
+                <div key={item.label}>
+                  <p className="text-xs text-slate-500 uppercase tracking-wide">{item.label}</p>
+                  <p className="text-sm font-medium text-slate-900 mt-1">{item.value}</p>
+                </div>
               ))}
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Documents Section */}
+      {/* Vehicles */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" /> All Documents
-          </CardTitle>
-          <Link href={`/dashboard/documents/new?customer=${customerId}`}>
-            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700">
-              <Plus className="h-4 w-4 mr-1" /> Add Document
-            </Button>
+          <CardTitle className="flex items-center gap-2"><Car className="h-5 w-5" /> Vehicles ({vehicles.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {vehicles.length === 0 ? (
+            <p className="text-sm text-slate-500 text-center py-4">No vehicles registered</p>
+          ) : (
+            <div className="grid gap-3">
+              {vehicles.map(v => (
+                <div key={v.v_id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border">
+                  <div>
+                    <p className="font-medium text-slate-900">{v.v_number}</p>
+                    <p className="text-xs text-slate-500">{v.v_name || 'Unnamed'} · {v.v_type}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Services History */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-2"><Wrench className="h-5 w-5" /> Services ({services.length})</CardTitle>
+          <Link href={`/dashboard/services?customer=${customer.c_id}`}>
+            <Button variant="outline" size="sm"><Plus className="h-4 w-4 mr-1" /> New Service</Button>
           </Link>
         </CardHeader>
         <CardContent>
-          {documents.length === 0 ? (
-            <p className="text-slate-500 text-center py-8">No documents added yet.</p>
+          {services.length === 0 ? (
+            <p className="text-sm text-slate-500 text-center py-4">No services yet</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Document</TableHead>
-                  <TableHead>For</TableHead>
-                  <TableHead>Expiry Date</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {documents.map((doc) => (
-                  <TableRow key={doc.doc_id}>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{doc.doc_type_name}</p>
-                        {doc.doc_number && (
-                          <p className="text-xs text-slate-500 font-mono">{doc.doc_number}</p>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {doc.entity_type === 'customer' ? (
-                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">Personal</span>
-                      ) : (
-                        <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded">{doc.vehicle_number}</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {format(new Date(doc.exp_date), 'dd MMM yyyy')}
-                    </TableCell>
-                    <TableCell>
-                      <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusColor(doc.days_left)}`}>
-                        {getStatusIcon(doc.days_left)}
-                        {doc.days_left < 0 ? `${Math.abs(doc.days_left)}d overdue` : `${doc.days_left}d left`}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Link href={`/dashboard/documents/${doc.doc_id}/edit`}>
-                        <Button variant="ghost" size="sm" className="text-blue-600">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </Link>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-slate-50">
+                    <th className="text-left py-2 px-3 font-medium text-slate-600">Service</th>
+                    <th className="text-left py-2 px-3 font-medium text-slate-600">Type</th>
+                    <th className="text-left py-2 px-3 font-medium text-slate-600">Issued</th>
+                    <th className="text-left py-2 px-3 font-medium text-slate-600">Expiry</th>
+                    <th className="text-right py-2 px-3 font-medium text-slate-600">Cost</th>
+                    <th className="text-center py-2 px-3 font-medium text-slate-600">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {services.map(s => (
+                    <tr key={s.s_id} className="border-b hover:bg-slate-50">
+                      <td className="py-2 px-3 font-medium">{s.service_name}</td>
+                      <td className="py-2 px-3">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                          s.category === 'vehicle' ? 'bg-blue-50 text-blue-700' : 'bg-purple-50 text-purple-700'
+                        }`}>
+                          {s.category === 'vehicle' ? 'Vehicle' : 'Licence'}
+                        </span>
+                      </td>
+                      <td className="py-2 px-3 text-slate-600">{format(new Date(s.issue_date), 'dd MMM yyyy')}</td>
+                      <td className="py-2 px-3 text-slate-600">{s.expiry_date ? format(new Date(s.expiry_date), 'dd MMM yyyy') : '—'}</td>
+                      <td className="py-2 px-3 text-right font-medium">₹{Number(s.total_cost).toLocaleString()}</td>
+                      <td className="py-2 px-3 text-center">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                          s.status === 'active' ? 'bg-emerald-50 text-emerald-700' :
+                          s.status === 'completed' ? 'bg-slate-100 text-slate-600' : 'bg-red-50 text-red-600'
+                        }`}>
+                          {s.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </CardContent>
       </Card>

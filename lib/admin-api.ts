@@ -30,7 +30,7 @@ export const adminOrgApi = {
     async getById(id: string): Promise<{
         organization: Organization;
         users: Profile[];
-        stats: { customerCount: number; vehicleCount: number; documentCount: number };
+        stats: { customerCount: number; vehicleCount: number; serviceCount: number };
     }> {
         return adminFetch(`/api/admin/organizations/${id}`);
     },
@@ -103,7 +103,7 @@ export const adminStatsApi = {
         activeOrgs: number;
         totalUsers: number;
         totalCustomers: number;
-        totalDocuments: number;
+        totalServices: number;
     }> {
         return adminFetch('/api/admin/stats');
     },

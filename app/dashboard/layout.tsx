@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from "next/link"
 import { useRouter, usePathname } from 'next/navigation'
-import { Users, Car, FileText, Bell, BarChart3, Menu, Zap, LogOut, Building2, ShieldCheck } from "lucide-react"
+import { Users, Wrench, ClipboardList, BarChart3, Menu, LogOut, Building2, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Toaster } from "@/components/ui/sonner"
@@ -31,7 +31,6 @@ export default function DashboardLayout({
         }
         setProfile(authUser.profile)
 
-        // Fetch org name
         if (authUser.profile.org_id) {
           const { createSupabaseBrowser } = await import('@/lib/supabase')
           const supabase = createSupabaseBrowser()
@@ -196,7 +195,6 @@ export default function DashboardLayout({
         {children}
       </main>
 
-      {/* Toast Notification Provider */}
       <Toaster />
     </div>
   )
@@ -206,17 +204,15 @@ function NavLinks({ pathname }: { pathname: string }) {
   const links = [
     { href: "/dashboard", label: "Dashboard", icon: BarChart3 },
     { href: "/dashboard/customers", label: "Customers", icon: Users },
-    { href: "/dashboard/vehicles", label: "Vehicles", icon: Car },
-    { href: "/dashboard/documents", label: "All Documents", icon: FileText },
-    { href: "/dashboard/documents/expiring", label: "Expiring Docs", icon: Bell },
-    { href: "/dashboard/settings", label: "Settings", icon: Zap },
+    { href: "/dashboard/services", label: "New Service", icon: Wrench },
+    { href: "/dashboard/services/overview", label: "Service Overview", icon: ClipboardList },
   ]
 
   return (
     <>
       {links.map((link) => {
         const isActive = pathname === link.href ||
-          (link.href !== '/dashboard' && pathname.startsWith(link.href))
+          (link.href !== '/dashboard' && link.href !== '/dashboard/services' && pathname.startsWith(link.href))
 
         return (
           <Link

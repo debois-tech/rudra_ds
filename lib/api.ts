@@ -1,4 +1,4 @@
-// Centralized API functions for Rudra Driving School (Multi-Tenant)
+// Centralized API functions for MotoAdmin Service Platform (Multi-Tenant)
 // RLS handles tenant scoping automatically on SELECT/UPDATE/DELETE.
 // For INSERT, we must include org_id in the payload.
 
@@ -11,18 +11,16 @@ import type {
     Vehicle,
     VehicleWithOwner,
     VehicleFormData,
-    Document,
-    DocumentFormData,
-    DocumentFullView,
-    DocumentType,
-    NotificationLog,
+    InlineVehicleData,
+    ServiceType,
+    Service,
+    ServiceOverview,
+    VehicleServiceFormData,
+    LicenceServiceFormData,
     DashboardStats,
 } from './types';
 
-// Helper to get the current user's org_id.
-// NOTE: No module-level caching here — a stale cache could leak one user's
-// org_id into another user's session if they share the same browser tab.
-// getCurrentProfile() uses the live Supabase auth session, which is safe.
+// Helper to get the current user's org_id
 async function getOrgId(): Promise<string> {
     const profile = await getCurrentProfile();
     if (!profile?.org_id) throw new Error('No organization found. Please contact your administrator.');
@@ -40,7 +38,6 @@ function getClient() {
 export const customerApi = {
     async getAll(): Promise<CustomerDashboardView[]> {
         const supabase = getClient();
-        // RLS automatically filters by user's org_id
         const { data, error } = await supabase
             .from('v_customer_dashboard')
             .select('*')
@@ -71,7 +68,7 @@ export const customerApi = {
         return data;
     },
 
-    async create(customer: CustomerFormData): Promise<Customer> {
+    async create(customer: CustomerFormData, vehicles?: InlineVehicleData[]): Promise<Customer> {
         const supabase = getClient();
         const orgId = await getOrgId();
         const payload = {
@@ -89,6 +86,22 @@ export const customerApi = {
             .select()
             .single();
         if (error) throw error;
+
+        // Create vehicles if provided
+        if (vehicles && vehicles.length > 0) {
+            const vehiclePayloads = vehicles.map(v => ({
+                owner_id: data.c_id,
+                v_number: v.v_number.toUpperCase(),
+                v_name: v.v_name || null,
+                v_type: v.v_type || 'car',
+                org_id: orgId,
+            }));
+            const { error: vError } = await supabase
+                .from('vehicles')
+                .insert(vehiclePayloads);
+            if (vError) throw vError;
+        }
+
         return data;
     },
 
@@ -135,16 +148,6 @@ export const customerApi = {
 // =============================================
 
 export const vehicleApi = {
-    async getAll(): Promise<VehicleWithOwner[]> {
-        const supabase = getClient();
-        const { data, error } = await supabase
-            .from('vehicles')
-            .select(`*, customers(c_name, c_mobile)`)
-            .order('created_at', { ascending: false });
-        if (error) throw error;
-        return data || [];
-    },
-
     async getByOwner(ownerId: string): Promise<Vehicle[]> {
         const supabase = getClient();
         const { data, error } = await supabase
@@ -210,78 +213,87 @@ export const vehicleApi = {
 };
 
 // =============================================
-// DOCUMENT OPERATIONS
+// SERVICE TYPE OPERATIONS
 // =============================================
 
-export const documentApi = {
-    async getAll(): Promise<DocumentFullView[]> {
+export const serviceTypeApi = {
+    async getAll(): Promise<ServiceType[]> {
         const supabase = getClient();
         const { data, error } = await supabase
-            .from('v_documents_full')
+            .from('service_types')
             .select('*')
-            .order('days_left', { ascending: true });
+            .eq('is_active', true)
+            .order('name');
         if (error) throw error;
         return data || [];
     },
 
-    async getExpiring(withinDays: number = 30): Promise<DocumentFullView[]> {
+    async getByCategory(category: 'vehicle' | 'licence'): Promise<ServiceType[]> {
         const supabase = getClient();
         const { data, error } = await supabase
-            .from('v_documents_full')
+            .from('service_types')
             .select('*')
-            .lte('days_left', withinDays)
-            .gte('days_left', -30)
-            .order('days_left', { ascending: true });
+            .eq('category', category)
+            .eq('is_active', true)
+            .order('name');
+        if (error) throw error;
+        return data || [];
+    },
+};
+
+// =============================================
+// SERVICE OPERATIONS
+// =============================================
+
+export const serviceApi = {
+    async getAll(): Promise<ServiceOverview[]> {
+        const supabase = getClient();
+        const { data, error } = await supabase
+            .from('v_services_overview')
+            .select('*')
+            .order('created_at', { ascending: false });
         if (error) throw error;
         return data || [];
     },
 
-    async getByEntity(entityType: 'customer' | 'vehicle', entityId: string): Promise<DocumentFullView[]> {
+    async getByCustomer(customerId: string): Promise<ServiceOverview[]> {
         const supabase = getClient();
         const { data, error } = await supabase
-            .from('v_documents_full')
-            .select('*')
-            .eq('entity_type', entityType)
-            .eq('entity_id', entityId)
-            .order('days_left', { ascending: true });
-        if (error) throw error;
-        return data || [];
-    },
-
-    async getByCustomer(customerId: string): Promise<DocumentFullView[]> {
-        const supabase = getClient();
-        const { data, error } = await supabase
-            .from('v_documents_full')
+            .from('v_services_overview')
             .select('*')
             .eq('customer_id', customerId)
-            .order('days_left', { ascending: true });
+            .order('created_at', { ascending: false });
         if (error) throw error;
         return data || [];
     },
 
-    async getById(id: string): Promise<DocumentFullView | null> {
+    async getById(id: string): Promise<ServiceOverview | null> {
         const supabase = getClient();
         const { data, error } = await supabase
-            .from('v_documents_full')
+            .from('v_services_overview')
             .select('*')
-            .eq('doc_id', id)
+            .eq('s_id', id)
             .single();
         if (error) throw error;
         return data;
     },
 
-    async create(doc: DocumentFormData): Promise<Document> {
+    async createVehicleService(formData: VehicleServiceFormData): Promise<Service> {
         const supabase = getClient();
         const orgId = await getOrgId();
         const { data, error } = await supabase
-            .from('documents')
+            .from('services')
             .insert([{
-                doc_type_id: doc.doc_type_id,
-                entity_type: doc.entity_type,
-                entity_id: doc.entity_id,
-                doc_number: doc.doc_number || null,
-                issue_date: doc.issue_date || null,
-                exp_date: doc.exp_date,
+                customer_id: formData.customer_id,
+                service_type_id: formData.service_type_id,
+                category: 'vehicle' as const,
+                vehicle_id: formData.vehicle_id || null,
+                vehicle_type: formData.vehicle_type,
+                vehicle_number: formData.vehicle_number,
+                issue_date: formData.issue_date,
+                expiry_date: formData.expiry_date || null,
+                total_cost: formData.total_cost,
+                notes: formData.notes || null,
                 org_id: orgId,
             }])
             .select()
@@ -290,17 +302,37 @@ export const documentApi = {
         return data;
     },
 
-    async update(id: string, doc: Partial<DocumentFormData>): Promise<Document> {
+    async createLicenceService(formData: LicenceServiceFormData): Promise<Service> {
         const supabase = getClient();
-        const payload: Record<string, unknown> = {};
-        if (doc.doc_number !== undefined) payload.doc_number = doc.doc_number || null;
-        if (doc.issue_date !== undefined) payload.issue_date = doc.issue_date || null;
-        if (doc.exp_date !== undefined) payload.exp_date = doc.exp_date;
-
+        const orgId = await getOrgId();
         const { data, error } = await supabase
-            .from('documents')
-            .update(payload)
-            .eq('doc_id', id)
+            .from('services')
+            .insert([{
+                customer_id: formData.customer_id,
+                service_type_id: formData.service_type_id,
+                category: 'licence' as const,
+                vehicle_class: formData.vehicle_class,
+                vehicle_type_licence: formData.vehicle_type_licence,
+                mdl_number: formData.mdl_number || null,
+                renewal_date: formData.renewal_date || null,
+                issue_date: formData.issue_date,
+                expiry_date: formData.expiry_date || null,
+                total_cost: formData.total_cost,
+                notes: formData.notes || null,
+                org_id: orgId,
+            }])
+            .select()
+            .single();
+        if (error) throw error;
+        return data;
+    },
+
+    async updateStatus(id: string, status: 'active' | 'completed' | 'cancelled'): Promise<Service> {
+        const supabase = getClient();
+        const { data, error } = await supabase
+            .from('services')
+            .update({ status })
+            .eq('s_id', id)
             .select()
             .single();
         if (error) throw error;
@@ -309,118 +341,7 @@ export const documentApi = {
 
     async delete(id: string): Promise<void> {
         const supabase = getClient();
-        const { error } = await supabase.from('documents').delete().eq('doc_id', id);
-        if (error) throw error;
-    },
-};
-
-// =============================================
-// DOCUMENT TYPES
-// =============================================
-
-export const documentTypeApi = {
-    async getAll(): Promise<DocumentType[]> {
-        const supabase = getClient();
-        const { data, error } = await supabase
-            .from('document_types')
-            .select('*')
-            .order('doc_type_name');
-        if (error) throw error;
-        return data || [];
-    },
-
-    async getByEntityType(entityType: 'customer' | 'vehicle'): Promise<DocumentType[]> {
-        const supabase = getClient();
-        const { data, error } = await supabase
-            .from('document_types')
-            .select('*')
-            .eq('entity_type', entityType)
-            .order('doc_type_name');
-        if (error) throw error;
-        return data || [];
-    },
-};
-
-// =============================================
-// NOTIFICATION LOGS
-// =============================================
-
-export const notificationApi = {
-    async getAll(): Promise<NotificationLog[]> {
-        const supabase = getClient();
-        const { data, error } = await supabase
-            .from('notification_logs')
-            .select('*')
-            .order('sent_at', { ascending: false })
-            .limit(100);
-        if (error) throw error;
-        return data || [];
-    },
-
-    async getByDocument(docId: string): Promise<NotificationLog[]> {
-        const supabase = getClient();
-        const { data, error } = await supabase
-            .from('notification_logs')
-            .select('*')
-            .eq('doc_id', docId)
-            .order('sent_at', { ascending: false });
-        if (error) throw error;
-        return data || [];
-    },
-};
-
-// =============================================
-// SETTINGS (per-org)
-// =============================================
-
-export const settingsApi = {
-    async getNotificationDays(): Promise<number[]> {
-        const supabase = getClient();
-        const { data, error } = await supabase
-            .from('app_settings')
-            .select('value')
-            .eq('key', 'notification_days')
-            .single();
-        if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows
-        return (data?.value as number[]) || [30, 15, 7, 3, 1, 0];
-    },
-
-    async updateNotificationDays(days: number[]): Promise<void> {
-        const supabase = getClient();
-        const orgId = await getOrgId();
-        const { error } = await supabase
-            .from('app_settings')
-            .upsert({
-                key: 'notification_days',
-                value: days,
-                org_id: orgId,
-                updated_at: new Date().toISOString(),
-            }, { onConflict: 'key,org_id' });
-        if (error) throw error;
-    },
-
-    async isNotificationEnabled(): Promise<boolean> {
-        const supabase = getClient();
-        const { data, error } = await supabase
-            .from('app_settings')
-            .select('value')
-            .eq('key', 'notification_enabled')
-            .single();
-        if (error && error.code !== 'PGRST116') throw error;
-        return data?.value === true || data?.value === 'true';
-    },
-
-    async setNotificationEnabled(enabled: boolean): Promise<void> {
-        const supabase = getClient();
-        const orgId = await getOrgId();
-        const { error } = await supabase
-            .from('app_settings')
-            .upsert({
-                key: 'notification_enabled',
-                value: enabled,
-                org_id: orgId,
-                updated_at: new Date().toISOString(),
-            }, { onConflict: 'key,org_id' });
+        const { error } = await supabase.from('services').delete().eq('s_id', id);
         if (error) throw error;
     },
 };
@@ -432,19 +353,22 @@ export const settingsApi = {
 export const dashboardApi = {
     async getStats(): Promise<DashboardStats> {
         const supabase = getClient();
-        // RLS automatically scopes counts to user's org
-        const [customersRes, vehiclesRes, docsRes, expiringRes] = await Promise.all([
+        const [customersRes, vehiclesRes, servicesRes, revenueRes] = await Promise.all([
             supabase.from('customers').select('*', { count: 'exact', head: true }),
             supabase.from('vehicles').select('*', { count: 'exact', head: true }),
-            supabase.from('documents').select('*', { count: 'exact', head: true }),
-            supabase.from('v_documents_full').select('*', { count: 'exact', head: true }).lte('days_left', 30).gte('days_left', 0),
+            supabase.from('services').select('*', { count: 'exact', head: true }),
+            supabase.from('services').select('total_cost'),
         ]);
+
+        const totalRevenue = (revenueRes.data || []).reduce(
+            (sum, row) => sum + (Number(row.total_cost) || 0), 0
+        );
 
         return {
             totalCustomers: customersRes.count || 0,
             totalVehicles: vehiclesRes.count || 0,
-            totalDocuments: docsRes.count || 0,
-            expiringSoon: expiringRes.count || 0,
+            totalServices: servicesRes.count || 0,
+            totalRevenue,
         };
     },
 
@@ -459,14 +383,12 @@ export const dashboardApi = {
         return data || [];
     },
 
-    async getUpcomingExpirations(limit: number = 10): Promise<DocumentFullView[]> {
+    async getRecentServices(limit: number = 10): Promise<ServiceOverview[]> {
         const supabase = getClient();
         const { data, error } = await supabase
-            .from('v_documents_full')
+            .from('v_services_overview')
             .select('*')
-            .gte('days_left', 0)
-            .lte('days_left', 30)
-            .order('days_left', { ascending: true })
+            .order('created_at', { ascending: false })
             .limit(limit);
         if (error) throw error;
         return data || [];

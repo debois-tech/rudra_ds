@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { adminStatsApi } from '@/lib/admin-api'
-import { Building2, Users, FileText, Activity, TrendingUp } from 'lucide-react'
+import { Building2, Users, Wrench, Activity, TrendingUp } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 interface PlatformStats {
@@ -10,7 +10,7 @@ interface PlatformStats {
     activeOrgs: number
     totalUsers: number
     totalCustomers: number
-    totalDocuments: number
+    totalServices: number
 }
 
 export default function AdminOverviewPage() {
@@ -64,10 +64,10 @@ export default function AdminOverviewPage() {
                     color="purple"
                 />
                 <StatCard
-                    label="Total Documents"
-                    value={loading ? '-' : stats?.totalDocuments ?? 0}
-                    icon={FileText}
-                    color="slate"
+                    label="Total Services"
+                    value={loading ? '-' : stats?.totalServices ?? 0}
+                    icon={Wrench}
+                    color="emerald"
                 />
             </div>
         </div>
