@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { customerApi, vehicleApi, serviceApi } from '@/lib/api';
 import type { Customer, Vehicle, ServiceOverview } from '@/lib/types';
-import { ArrowLeft, Edit2, Car, Wrench, Trash2, Loader2, Save, X, Plus } from 'lucide-react';
+import { ArrowLeft, Edit2, Car, Wrench, Trash2, Loader2, Save, X, Plus, User, Phone, Mail, MapPin, Calendar, Clock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -71,180 +71,208 @@ export default function CustomerDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-20">
-        <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+      <div className="flex justify-center items-center py-40">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
       </div>
     );
   }
 
   if (!customer) {
-    return <div className="text-center py-20 text-slate-500">Customer not found</div>;
+    return (
+      <div className="text-center py-40 bg-white rounded-2xl shadow-sm border border-slate-200">
+         <User className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+         <h2 className="text-xl font-bold text-slate-700">Customer not found</h2>
+      </div>
+    );
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="max-w-5xl mx-auto space-y-6">
+      {/* Header View */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 py-2 border-b border-slate-200 pb-6">
         <div className="flex items-center gap-4">
           <Link href="/dashboard/customers">
-            <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
+            <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-slate-200 text-slate-500 hover:text-slate-900 shadow-sm">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">{customer.c_name}</h1>
-            <p className="text-sm text-slate-500">ID: {customer.c_registration_id}</p>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900">{customer.c_name}</h1>
+            <p className="text-sm font-medium text-slate-500 mt-1 uppercase tracking-wide">ID: <span className="font-mono text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded">{customer.c_registration_id}</span></p>
           </div>
         </div>
         <div className="flex gap-2">
+          {!editing && (
+            <Button variant="outline" onClick={() => setEditing(true)} className="rounded-xl h-10 px-5 font-medium border-slate-200 hover:bg-slate-50">
+              <Edit2 className="h-4 w-4 mr-2" /> Edit Profile
+            </Button>
+          )}
           <Link href={`/dashboard/services?customer=${customer.c_id}`}>
-            <Button className="bg-emerald-600 hover:bg-emerald-700">
+            <Button className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl h-10 px-5 font-medium shadow-sm border border-purple-700/20">
               <Wrench className="h-4 w-4 mr-2" /> Give Service
             </Button>
           </Link>
-          {!editing && (
-            <Button variant="outline" onClick={() => setEditing(true)}>
-              <Edit2 className="h-4 w-4 mr-2" /> Edit
-            </Button>
-          )}
         </div>
       </div>
 
-      {/* Personal Details */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Personal Details</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {editing ? (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium">Full Name</label>
-                  <Input value={editForm.c_name} onChange={e => setEditForm({ ...editForm, c_name: e.target.value })} />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Mobile</label>
-                  <Input value={editForm.c_mobile} onChange={e => setEditForm({ ...editForm, c_mobile: e.target.value })} maxLength={10} />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">WhatsApp</label>
-                  <Input value={editForm.c_whatsapp} onChange={e => setEditForm({ ...editForm, c_whatsapp: e.target.value })} maxLength={10} />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Email</label>
-                  <Input value={editForm.c_email} onChange={e => setEditForm({ ...editForm, c_email: e.target.value })} type="email" />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Date of Birth</label>
-                  <Input value={editForm.c_dob} onChange={e => setEditForm({ ...editForm, c_dob: e.target.value })} type="date" />
-                </div>
-              </div>
-              <div>
-                <label className="text-sm font-medium">Address</label>
-                <Textarea value={editForm.c_address} onChange={e => setEditForm({ ...editForm, c_address: e.target.value })} rows={2} />
-              </div>
-              <div className="flex gap-2">
-                <Button onClick={handleSave} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
-                  {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />} Save
-                </Button>
-                <Button variant="ghost" onClick={() => setEditing(false)}><X className="h-4 w-4 mr-2" /> Cancel</Button>
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {[
-                { label: 'Mobile', value: customer.c_mobile },
-                { label: 'WhatsApp', value: customer.c_whatsapp || '—' },
-                { label: 'Email', value: customer.c_email || '—' },
-                { label: 'Address', value: customer.c_address || '—' },
-                { label: 'Date of Birth', value: customer.c_dob ? format(new Date(customer.c_dob), 'dd MMM yyyy') : '—' },
-                { label: 'Joined', value: format(new Date(customer.created_at), 'dd MMM yyyy') },
-              ].map(item => (
-                <div key={item.label}>
-                  <p className="text-xs text-slate-500 uppercase tracking-wide">{item.label}</p>
-                  <p className="text-sm font-medium text-slate-900 mt-1">{item.value}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Vehicles */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2"><Car className="h-5 w-5" /> Vehicles ({vehicles.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {vehicles.length === 0 ? (
-            <p className="text-sm text-slate-500 text-center py-4">No vehicles registered</p>
-          ) : (
-            <div className="grid gap-3">
-              {vehicles.map(v => (
-                <div key={v.v_id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border">
-                  <div>
-                    <p className="font-medium text-slate-900">{v.v_number}</p>
-                    <p className="text-xs text-slate-500">{v.v_name || 'Unnamed'} · {v.v_type}</p>
+      <div className="grid md:grid-cols-3 gap-6">
+        {/* Personal Details - LHS */}
+        <div className="md:col-span-1 space-y-6">
+          <Card className="rounded-2xl shadow-sm border-slate-200 overflow-hidden">
+            <CardHeader className="bg-white border-b border-slate-100 pb-3 pt-5 px-6">
+              <CardTitle className="text-lg">Contact Info</CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              {editing ? (
+                <div className="space-y-4">
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-[11px] uppercase tracking-wider font-semibold text-slate-500">Full Name</label>
+                      <Input className="mt-1 bg-slate-50 focus-visible:ring-purple-200 border-slate-200 rounded-lg" value={editForm.c_name} onChange={e => setEditForm({ ...editForm, c_name: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className="text-[11px] uppercase tracking-wider font-semibold text-slate-500">Mobile</label>
+                      <Input className="mt-1 bg-slate-50 focus-visible:ring-purple-200 border-slate-200 rounded-lg" value={editForm.c_mobile} onChange={e => setEditForm({ ...editForm, c_mobile: e.target.value })} maxLength={10} />
+                    </div>
+                    <div>
+                      <label className="text-[11px] uppercase tracking-wider font-semibold text-slate-500">WhatsApp</label>
+                      <Input className="mt-1 bg-slate-50 focus-visible:ring-purple-200 border-slate-200 rounded-lg" value={editForm.c_whatsapp} onChange={e => setEditForm({ ...editForm, c_whatsapp: e.target.value })} maxLength={10} />
+                    </div>
+                    <div>
+                      <label className="text-[11px] uppercase tracking-wider font-semibold text-slate-500">Email</label>
+                      <Input className="mt-1 bg-slate-50 focus-visible:ring-purple-200 border-slate-200 rounded-lg" value={editForm.c_email} onChange={e => setEditForm({ ...editForm, c_email: e.target.value })} type="email" />
+                    </div>
+                    <div>
+                      <label className="text-[11px] uppercase tracking-wider font-semibold text-slate-500">Date of Birth</label>
+                      <Input className="mt-1 bg-slate-50 focus-visible:ring-purple-200 border-slate-200 rounded-lg" value={editForm.c_dob} onChange={e => setEditForm({ ...editForm, c_dob: e.target.value })} type="date" />
+                    </div>
+                    <div>
+                      <label className="text-[11px] uppercase tracking-wider font-semibold text-slate-500">Address</label>
+                      <Textarea className="mt-1 bg-slate-50 focus-visible:ring-purple-200 border-slate-200 rounded-lg" value={editForm.c_address} onChange={e => setEditForm({ ...editForm, c_address: e.target.value })} rows={2} />
+                    </div>
+                  </div>
+                  <div className="flex gap-2 pt-2">
+                    <Button onClick={handleSave} disabled={saving} className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg flex-1 shadow-sm">
+                      {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />} Save
+                    </Button>
+                    <Button variant="outline" onClick={() => setEditing(false)} className="rounded-lg"><X className="h-4 w-4 mr-1" /> Cancel</Button>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Services History */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2"><Wrench className="h-5 w-5" /> Services ({services.length})</CardTitle>
-          <Link href={`/dashboard/services?customer=${customer.c_id}`}>
-            <Button variant="outline" size="sm"><Plus className="h-4 w-4 mr-1" /> New Service</Button>
-          </Link>
-        </CardHeader>
-        <CardContent>
-          {services.length === 0 ? (
-            <p className="text-sm text-slate-500 text-center py-4">No services yet</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-slate-50">
-                    <th className="text-left py-2 px-3 font-medium text-slate-600">Service</th>
-                    <th className="text-left py-2 px-3 font-medium text-slate-600">Type</th>
-                    <th className="text-left py-2 px-3 font-medium text-slate-600">Issued</th>
-                    <th className="text-left py-2 px-3 font-medium text-slate-600">Expiry</th>
-                    <th className="text-right py-2 px-3 font-medium text-slate-600">Cost</th>
-                    <th className="text-center py-2 px-3 font-medium text-slate-600">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {services.map(s => (
-                    <tr key={s.s_id} className="border-b hover:bg-slate-50">
-                      <td className="py-2 px-3 font-medium">{s.service_name}</td>
-                      <td className="py-2 px-3">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                          s.category === 'vehicle' ? 'bg-blue-50 text-blue-700' : 'bg-purple-50 text-purple-700'
-                        }`}>
-                          {s.category === 'vehicle' ? 'Vehicle' : 'Licence'}
-                        </span>
-                      </td>
-                      <td className="py-2 px-3 text-slate-600">{format(new Date(s.issue_date), 'dd MMM yyyy')}</td>
-                      <td className="py-2 px-3 text-slate-600">{s.expiry_date ? format(new Date(s.expiry_date), 'dd MMM yyyy') : '—'}</td>
-                      <td className="py-2 px-3 text-right font-medium">₹{Number(s.total_cost).toLocaleString()}</td>
-                      <td className="py-2 px-3 text-center">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                          s.status === 'active' ? 'bg-emerald-50 text-emerald-700' :
-                          s.status === 'completed' ? 'bg-slate-100 text-slate-600' : 'bg-red-50 text-red-600'
-                        }`}>
-                          {s.status}
-                        </span>
-                      </td>
-                    </tr>
+              ) : (
+                <div className="space-y-4">
+                  {[
+                    { icon: Phone, label: 'Mobile', value: customer.c_mobile, isLink: true, prefix: 'tel:' },
+                    { icon: Phone, label: 'WhatsApp', value: customer.c_whatsapp || '—', isLink: !!customer.c_whatsapp, prefix: 'https://wa.me/91' },
+                    { icon: Mail, label: 'Email', value: customer.c_email || '—', isLink: !!customer.c_email, prefix: 'mailto:' },
+                    { icon: MapPin, label: 'Address', value: customer.c_address || '—' },
+                    { icon: Calendar, label: 'Birthday', value: customer.c_dob ? format(new Date(customer.c_dob), 'dd MMM yyyy') : '—' },
+                    { icon: Clock, label: 'Joined', value: format(new Date(customer.created_at), 'dd MMM yyyy') },
+                  ].map((item, i) => (
+                    <div key={i} className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                      <div className="p-1.5 bg-white rounded-md border border-slate-200">
+                        <item.icon className="h-4 w-4 text-slate-500" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400">{item.label}</p>
+                        {item.isLink ? (
+                          <a href={`${item.prefix}${item.value}`} className="text-sm font-semibold text-purple-600 hover:underline truncate block">
+                            {item.value}
+                          </a>
+                        ) : (
+                          <p className="text-sm font-semibold text-slate-900 break-words">{item.value}</p>
+                        )}
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Vehicles and Services - RHS */}
+        <div className="md:col-span-2 space-y-6">
+          {/* Vehicles List */}
+          <Card className="rounded-2xl shadow-sm border-slate-200 overflow-hidden">
+            <CardHeader className="bg-white border-b border-slate-100 pb-3 pt-5 px-6 flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-lg"><Car className="h-5 w-5 text-indigo-500" /> Vehicles <span className="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full">{vehicles.length}</span></CardTitle>
+            </CardHeader>
+            <CardContent className="p-0 bg-slate-50/30">
+              {vehicles.length === 0 ? (
+                <div className="p-8 text-center bg-white">
+                  <Car className="h-8 w-8 text-slate-200 mx-auto mb-2" />
+                  <p className="text-sm text-slate-500 font-medium">No vehicles registered</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {vehicles.map(v => (
+                    <div key={v.v_id} className="flex items-center justify-between p-4 bg-white hover:bg-indigo-50/30 transition-colors">
+                      <div className="flex items-center gap-4">
+                        <div className="h-10 w-10 flex items-center justify-center bg-indigo-50 rounded-lg border border-indigo-100 text-indigo-600 font-bold tracking-tight">
+                          {v.v_type.slice(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-900 tracking-wide font-mono text-sm">{v.v_number}</p>
+                          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{v.v_name || 'Unnamed'} · {v.v_type}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Services List */}
+          <Card className="rounded-2xl shadow-sm border-slate-200 overflow-hidden">
+            <CardHeader className="bg-white border-b border-slate-100 pb-3 pt-5 px-6 flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-lg"><Wrench className="h-5 w-5 text-purple-500" /> Service History <span className="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full">{services.length}</span></CardTitle>
+              <Link href={`/dashboard/services?customer=${customer.c_id}`}>
+                <Button variant="outline" size="sm" className="h-8 rounded-lg border-slate-200 text-slate-600 text-xs font-semibold hover:bg-purple-50 hover:text-purple-700 hover:border-purple-200"><Plus className="h-3 w-3 mr-1" /> Add Record</Button>
+              </Link>
+            </CardHeader>
+            <CardContent className="p-0">
+              {services.length === 0 ? (
+                <div className="p-8 text-center bg-white">
+                 <Wrench className="h-8 w-8 text-slate-200 mx-auto mb-2" />
+                 <p className="text-sm text-slate-500 font-medium">No services recorded</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead>
+                      <tr className="border-b border-slate-100 bg-slate-50/50">
+                        <th className="py-3 px-4 font-semibold text-slate-500 text-[11px] uppercase tracking-wider">Service</th>
+                        <th className="py-3 px-4 font-semibold text-slate-500 text-[11px] uppercase tracking-wider hidden sm:table-cell">Dates (Iss - Exp)</th>
+                        <th className="py-3 px-4 font-semibold text-slate-500 text-[11px] uppercase tracking-wider text-right">Cost</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 bg-white">
+                      {services.map(s => (
+                        <tr key={s.s_id} className="hover:bg-purple-50/20 transition-colors">
+                          <td className="py-3 px-4">
+                            <p className="font-semibold text-slate-900">{s.service_name}</p>
+                            <span className={`inline-block mt-0.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                              s.category === 'vehicle' ? 'bg-indigo-50 text-indigo-700' : 'bg-purple-50 text-purple-700'
+                            }`}>
+                              {s.category}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 hidden sm:table-cell">
+                            <p className="text-xs font-semibold text-slate-700">{format(new Date(s.issue_date), 'dd MMM yyyy')}</p>
+                            <p className="text-xs text-slate-500">{s.expiry_date ? format(new Date(s.expiry_date), 'dd MMM yyyy') : 'No Expiry'}</p>
+                          </td>
+                          <td className="py-3 px-4 text-right font-bold text-slate-900">₹{Number(s.total_cost).toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }

@@ -3,10 +3,9 @@
 import { useEffect, useState } from 'react';
 import { serviceApi } from '@/lib/api';
 import type { ServiceOverview } from '@/lib/types';
-import { FileText, Loader2, Download, Search } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FileText, Loader2, Download, Search, Wrench, Car } from 'lucide-react';
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -19,18 +18,24 @@ export default function ServiceOverviewPage() {
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
+    let cancelled = false;
     async function load() {
       try {
         const data = await serviceApi.getAll();
-        setServices(data);
-        setFiltered(data);
+        if (!cancelled) {
+          setServices(data);
+          setFiltered(data);
+        }
       } catch (error) {
-        console.error(error);
-        toast.error('Failed to load services');
+        if (!cancelled) {
+          console.error(error);
+          toast.error('Failed to load services');
+        }
       }
-      setLoading(false);
+      if (!cancelled) setLoading(false);
     }
     load();
+    return () => { cancelled = true; };
   }, []);
 
   function handleSearch(query: string) {
@@ -58,114 +63,98 @@ export default function ServiceOverviewPage() {
     }
   }
 
-  const getStatusStyle = (status: string) => {
-    switch (status) {
-      case 'active': return 'bg-emerald-50 text-emerald-700';
-      case 'completed': return 'bg-slate-100 text-slate-600';
-      case 'cancelled': return 'bg-red-50 text-red-600';
-      default: return 'bg-slate-100 text-slate-600';
-    }
-  };
-
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="space-y-6 max-w-7xl mx-auto">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 py-2">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Service Overview</h1>
-          <p className="text-slate-500 mt-1">{services.length} total services</p>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Services</h1>
+          <p className="text-slate-500 mt-1 font-medium">{services.length} total services</p>
         </div>
         <Link href="/dashboard/services">
-          <Button className="bg-emerald-600 hover:bg-emerald-700">
-            <FileText className="h-4 w-4 mr-2" /> New Service
+          <Button className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl h-10 px-5 font-medium shadow-sm border border-purple-700/20">
+            <Wrench className="h-4 w-4 mr-2" /> New Service
           </Button>
         </Link>
       </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-3">
+      <Card className="rounded-2xl shadow-sm border-slate-200 overflow-hidden">
+        <CardHeader className="bg-white border-b border-slate-100 pb-4 pt-5 px-6">
+          <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 max-w-sm focus-within:ring-2 focus-within:ring-purple-100 focus-within:border-purple-300 transition-all">
             <Search className="h-4 w-4 text-slate-400" />
-            <Input
+            <input
               placeholder="Search by customer, service, vehicle..."
               value={searchQuery}
               onChange={e => handleSearch(e.target.value)}
-              className="max-w-sm"
+              className="bg-transparent border-none outline-none w-full text-sm text-slate-900 placeholder:text-slate-400"
             />
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {loading ? (
-            <div className="flex justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+            <div className="flex justify-center py-20">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
             </div>
           ) : filtered.length === 0 ? (
-            <div className="text-center py-12">
-              <FileText className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-500 mb-4">{searchQuery ? 'No services found' : 'No services yet'}</p>
+            <div className="text-center py-20">
+              <div className="h-16 w-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                 <FileText className="h-8 w-8 text-slate-300" />
+              </div>
+              <p className="text-slate-500 font-medium mb-4">{searchQuery ? 'No services found matching that query' : 'No services yet'}</p>
               {!searchQuery && (
                 <Link href="/dashboard/services">
-                  <Button>Create First Service</Button>
+                  <Button variant="outline" className="rounded-xl font-medium">Create First Service</Button>
                 </Link>
               )}
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              {/* Issue 4 Fix: Removed "Status" column — not necessary for end users */}
+              <table className="w-full text-sm text-left whitespace-nowrap">
                 <thead>
-                  <tr className="border-b bg-slate-50">
-                    <th className="text-left py-3 px-3 font-medium text-slate-600">Customer</th>
-                    <th className="text-left py-3 px-3 font-medium text-slate-600">Service</th>
-                    <th className="text-left py-3 px-3 font-medium text-slate-600 hidden md:table-cell">Vehicle Type</th>
-                    <th className="text-left py-3 px-3 font-medium text-slate-600 hidden md:table-cell">Vehicle No.</th>
-                    <th className="text-left py-3 px-3 font-medium text-slate-600 hidden lg:table-cell">Issued</th>
-                    <th className="text-left py-3 px-3 font-medium text-slate-600 hidden lg:table-cell">Expiry</th>
-                    <th className="text-right py-3 px-3 font-medium text-slate-600">Amount</th>
-                    <th className="text-center py-3 px-3 font-medium text-slate-600">Status</th>
-                    <th className="text-center py-3 px-3 font-medium text-slate-600">Invoice</th>
+                  <tr className="border-b border-slate-100 bg-slate-50/50">
+                    <th className="py-4 px-6 font-semibold text-slate-500 text-xs uppercase tracking-wider">Customer</th>
+                    <th className="py-4 px-6 font-semibold text-slate-500 text-xs uppercase tracking-wider">Service Details</th>
+                    <th className="py-4 px-6 font-semibold text-slate-500 text-xs uppercase tracking-wider hidden md:table-cell">Vehicle / Licence ID</th>
+                    <th className="py-4 px-6 font-semibold text-slate-500 text-xs uppercase tracking-wider hidden lg:table-cell">Dates</th>
+                    <th className="py-4 px-6 font-semibold text-slate-500 text-xs uppercase tracking-wider text-right">Amount</th>
+                    <th className="py-4 px-6 font-semibold text-slate-500 text-xs uppercase tracking-wider text-right">Invoice</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-slate-100">
                   {filtered.map(s => (
-                    <tr key={s.s_id} className="border-b hover:bg-slate-50 transition-colors">
-                      <td className="py-3 px-3">
-                        <Link href={`/dashboard/customers/${s.customer_id}`} className="hover:text-blue-600">
-                          <p className="font-medium text-slate-900">{s.customer_name}</p>
+                    <tr key={s.s_id} className="hover:bg-purple-50/30 transition-colors">
+                      <td className="py-4 px-6">
+                        <Link href={`/dashboard/customers/${s.customer_id}`} className="block hover:opacity-80 transition-opacity">
+                          <p className="font-semibold text-slate-900">{s.customer_name}</p>
                           <p className="text-xs text-slate-500">{s.customer_mobile}</p>
                         </Link>
                       </td>
-                      <td className="py-3 px-3">
-                        <p className="font-medium">{s.service_name}</p>
-                        <span className={`text-xs px-1.5 py-0.5 rounded ${
-                          s.category === 'vehicle' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'
+                      <td className="py-4 px-6">
+                        <p className="font-semibold text-slate-800">{s.service_name}</p>
+                        <span className={`inline-flex items-center gap-1 mt-1 text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full ${
+                          s.category === 'vehicle' ? 'bg-indigo-50 text-indigo-700' : 'bg-purple-50 text-purple-700'
                         }`}>
+                          {s.category === 'vehicle' ? <Car className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
                           {s.category}
                         </span>
                       </td>
-                      <td className="py-3 px-3 text-slate-600 hidden md:table-cell">
-                        {s.category === 'vehicle' ? (s.vehicle_type || '—') : (s.vehicle_type_licence || '—')}
+                      <td className="py-4 px-6 hidden md:table-cell">
+                        <p className="font-medium text-slate-700">{s.category === 'vehicle' ? (s.vehicle_type || '—') : (s.vehicle_type_licence || '—')}</p>
+                        <p className="text-xs font-mono text-slate-500">{s.vehicle_number || s.mdl_number || '—'}</p>
                       </td>
-                      <td className="py-3 px-3 text-slate-600 hidden md:table-cell font-mono text-xs">
-                        {s.vehicle_number || s.mdl_number || '—'}
+                      <td className="py-4 px-6 hidden lg:table-cell">
+                        <p className="text-sm font-medium text-slate-700">{format(new Date(s.issue_date), 'dd MMM yy')}</p>
+                        <p className="text-xs text-slate-500">Exp: {s.expiry_date ? format(new Date(s.expiry_date), 'dd MMM yy') : '—'}</p>
                       </td>
-                      <td className="py-3 px-3 text-slate-600 hidden lg:table-cell">
-                        {format(new Date(s.issue_date), 'dd MMM yyyy')}
-                      </td>
-                      <td className="py-3 px-3 text-slate-600 hidden lg:table-cell">
-                        {s.expiry_date ? format(new Date(s.expiry_date), 'dd MMM yyyy') : '—'}
-                      </td>
-                      <td className="py-3 px-3 text-right font-semibold text-slate-900">
+                      <td className="py-4 px-6 text-right font-semibold text-slate-900 text-base">
                         ₹{Number(s.total_cost).toLocaleString()}
                       </td>
-                      <td className="py-3 px-3 text-center">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusStyle(s.status)}`}>
-                          {s.status}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-center">
+                      {/* Issue 7 Fix: Always visible download button — removed hover-reveal opacity */}
+                      <td className="py-4 px-6 text-right">
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
-                          className="h-8 w-8 p-0 text-blue-600 hover:text-blue-800"
+                          className="h-8 w-8 p-0 border-slate-200 text-slate-600 hover:text-purple-600 hover:border-purple-200 hover:bg-purple-50 rounded-lg"
                           onClick={() => handleInvoice(s)}
                           title="Download Invoice"
                         >

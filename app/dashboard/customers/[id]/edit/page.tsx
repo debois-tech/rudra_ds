@@ -7,7 +7,7 @@ import type { Customer } from '@/lib/types';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { ArrowLeft, Loader2, Save } from 'lucide-react';
+import { ArrowLeft, Loader2, Save, User } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -82,7 +82,6 @@ export default function EditCustomerPage() {
 
     async function onSubmit(values: FormData) {
         setLoading(true);
-
         try {
             await customerApi.update(customerId, {
                 c_name: values.c_name,
@@ -103,69 +102,75 @@ export default function EditCustomerPage() {
 
     if (fetching) {
         return (
-            <div className="flex items-center justify-center h-64">
-                <p className="text-slate-500">Loading customer...</p>
+            <div className="flex items-center justify-center py-40">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
             </div>
         );
     }
 
     if (!customer) {
         return (
-            <div className="flex flex-col items-center justify-center h-64 gap-4">
-                <p className="text-slate-500">Customer not found.</p>
+            <div className="text-center py-40 bg-white rounded-2xl shadow-sm border border-slate-200">
+                <User className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                <h2 className="text-xl font-bold text-slate-700 mb-4">Customer not found</h2>
                 <Link href="/dashboard/customers">
-                    <Button>Back to Customers</Button>
+                    <Button variant="outline" className="rounded-xl">Back to Customers</Button>
                 </Link>
             </div>
         );
     }
 
     return (
-        <div className="max-w-2xl mx-auto space-y-6">
-            <div className="flex items-center gap-4">
+        <div className="max-w-3xl mx-auto space-y-6">
+            {/* Header */}
+            <div className="flex items-center gap-4 py-2 border-b border-slate-200 pb-6">
                 <Link href={`/dashboard/customers/${customerId}`}>
-                    <Button variant="ghost" size="icon">
-                        <ArrowLeft className="h-4 w-4" />
+                    <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-slate-200 text-slate-500 hover:text-slate-900 shadow-sm">
+                        <ArrowLeft className="h-5 w-5" />
                     </Button>
                 </Link>
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900">Edit Customer</h1>
-                    <p className="text-slate-500 text-sm font-mono">{customer.c_registration_id}</p>
+                    <h1 className="text-3xl font-bold tracking-tight text-slate-900">Edit Customer</h1>
+                    <p className="text-slate-500 text-sm font-medium mt-1">
+                        ID: <span className="font-mono text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded">{customer.c_registration_id}</span>
+                    </p>
                 </div>
             </div>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Customer Details</CardTitle>
-                    <CardDescription>Update customer information below.</CardDescription>
+            <Card className="rounded-2xl shadow-sm border-slate-200 overflow-hidden">
+                <CardHeader className="bg-white border-b border-slate-100 pb-4 pt-5 px-6">
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                        <User className="h-5 w-5 text-purple-600" /> Customer Details
+                    </CardTitle>
+                    <CardDescription>Update the customer&apos;s information below.</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-6 bg-slate-50/30">
                     <Form {...form}>
-                        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
 
                             <FormField
                                 control={form.control}
                                 name="c_name"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Full Name <span className="text-red-500">*</span></FormLabel>
+                                        <FormLabel className="text-xs font-semibold uppercase tracking-wider text-slate-500">Full Name <span className="text-red-500">*</span></FormLabel>
                                         <FormControl>
-                                            <Input placeholder="e.g. Rahul Sharma" {...field} />
+                                            <Input placeholder="e.g. Rahul Sharma" className="bg-white rounded-xl focus-visible:ring-purple-200 h-11" {...field} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}
                             />
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                 <FormField
                                     control={form.control}
                                     name="c_mobile"
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>Mobile Number <span className="text-red-500">*</span></FormLabel>
+                                            <FormLabel className="text-xs font-semibold uppercase tracking-wider text-slate-500">Mobile Number <span className="text-red-500">*</span></FormLabel>
                                             <FormControl>
-                                                <Input placeholder="9876543210" maxLength={10} {...field} />
+                                                <Input placeholder="9876543210" maxLength={10} className="bg-white rounded-xl focus-visible:ring-purple-200 h-11" {...field} />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -177,11 +182,11 @@ export default function EditCustomerPage() {
                                     name="c_whatsapp"
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>WhatsApp Number</FormLabel>
+                                            <FormLabel className="text-xs font-semibold uppercase tracking-wider text-slate-500">WhatsApp Number</FormLabel>
                                             <FormControl>
-                                                <Input placeholder="Same as mobile if empty" maxLength={10} {...field} />
+                                                <Input placeholder="Same as mobile if empty" maxLength={10} className="bg-white rounded-xl focus-visible:ring-purple-200 h-11" {...field} />
                                             </FormControl>
-                                            <FormDescription className="text-xs">Leave empty to use mobile number</FormDescription>
+                                            <FormDescription className="text-[10px] uppercase font-semibold">Leave empty to use mobile number</FormDescription>
                                             <FormMessage />
                                         </FormItem>
                                     )}
@@ -193,9 +198,9 @@ export default function EditCustomerPage() {
                                 name="c_email"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Email Address</FormLabel>
+                                        <FormLabel className="text-xs font-semibold uppercase tracking-wider text-slate-500">Email Address</FormLabel>
                                         <FormControl>
-                                            <Input placeholder="rahul@example.com" type="email" {...field} />
+                                            <Input placeholder="rahul@example.com" type="email" className="bg-white rounded-xl focus-visible:ring-purple-200 h-11" {...field} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -207,9 +212,9 @@ export default function EditCustomerPage() {
                                 name="c_address"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Address</FormLabel>
+                                        <FormLabel className="text-xs font-semibold uppercase tracking-wider text-slate-500">Address</FormLabel>
                                         <FormControl>
-                                            <Textarea placeholder="Full address" className="resize-none" rows={2} {...field} />
+                                            <Textarea placeholder="Full residential address" className="resize-none bg-white rounded-xl focus-visible:ring-purple-200" rows={3} {...field} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -221,25 +226,31 @@ export default function EditCustomerPage() {
                                 name="c_dob"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Date of Birth</FormLabel>
+                                        <FormLabel className="text-xs font-semibold uppercase tracking-wider text-slate-500">Date of Birth</FormLabel>
                                         <FormControl>
-                                            <Input type="date" {...field} />
+                                            <Input type="date" className="bg-white rounded-xl focus-visible:ring-purple-200 h-11" {...field} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}
                             />
 
-                            <div className="flex gap-4">
-                                <Button type="submit" className="flex-1 bg-blue-600 hover:bg-emerald-700" disabled={loading}>
+                            <div className="flex gap-4 pt-4">
+                                <Button
+                                    type="submit"
+                                    className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-2xl h-14 text-base font-bold shadow-md tracking-wide border border-purple-700/20"
+                                    disabled={loading}
+                                >
                                     {loading ? (
-                                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</>
+                                        <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Saving Changes...</>
                                     ) : (
-                                        <><Save className="mr-2 h-4 w-4" /> Save Changes</>
+                                        <><Save className="mr-2 h-5 w-5" /> Save Changes</>
                                     )}
                                 </Button>
                                 <Link href={`/dashboard/customers/${customerId}`}>
-                                    <Button type="button" variant="outline">Cancel</Button>
+                                    <Button type="button" variant="outline" className="h-14 px-8 rounded-2xl font-bold">
+                                        Cancel
+                                    </Button>
                                 </Link>
                             </div>
                         </form>
