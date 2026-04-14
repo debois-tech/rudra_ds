@@ -44,7 +44,11 @@ export async function middleware(request: NextRequest) {
     const isPublicRoute =
         pathname === '/' ||
         pathname.startsWith('/login') ||
-        pathname.startsWith('/auth')
+        pathname.startsWith('/auth') ||
+        pathname === '/robots.txt' ||
+        pathname === '/sitemap.xml' ||
+        pathname === '/og-image.png' ||
+        pathname === '/apple-touch-icon.png'
 
     // ============================================
     // NOT LOGGED IN → redirect to /login
@@ -119,12 +123,14 @@ export async function middleware(request: NextRequest) {
 export const config = {
     matcher: [
         /*
-         * Match all request paths except:
+         * Match all request paths EXCEPT:
          * - _next/static (static files)
-         * - _next/image (image optimization files)
-         * - favicon.ico (favicon file)
-         * - public files (images, etc.)
+         * - _next/image (image optimization)
+         * - favicon.ico
+         * - robots.txt, sitemap.xml (SEO crawlers must reach these)
+         * - public image files (svg, png, jpg, jpeg, gif, webp)
+         * - og-image.png, apple-touch-icon.png (SEO/social assets)
          */
-        '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+        '/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|og-image.png|apple-touch-icon.png|.*\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
     ],
 }
