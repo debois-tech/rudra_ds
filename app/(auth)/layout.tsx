@@ -4,14 +4,30 @@ export default function AuthLayout({
     children: React.ReactNode
 }) {
     return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-950 relative overflow-hidden">
-            {/* Background gradient effects */}
-            <div className="absolute inset-0 overflow-hidden">
-                <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl" />
-                <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl" />
+        <div className="min-h-screen flex items-center justify-center bg-[#fafbfc] relative overflow-hidden">
+            {/* Subtle ambient background shapes */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                <div className="absolute -top-[300px] -right-[200px] w-[600px] h-[600px] rounded-full bg-violet-100/40 blur-3xl" />
+                <div className="absolute -bottom-[200px] -left-[200px] w-[500px] h-[500px] rounded-full bg-indigo-100/30 blur-3xl" />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full bg-slate-100/50 blur-3xl" />
             </div>
-            <div className="relative z-10 w-full max-w-md px-4">
+
+            {/* Minimal grid pattern */}
+            <div
+                className="absolute inset-0 opacity-[0.03]"
+                style={{
+                    backgroundImage: `linear-gradient(rgba(0,0,0,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.1) 1px, transparent 1px)`,
+                    backgroundSize: '64px 64px',
+                }}
+            />
+
+            <div className="relative z-10 w-full max-w-[400px] px-5">
                 {children}
+
+                {/* Bottom brand mark */}
+                <p className="text-center text-[11px] text-slate-400 mt-8 tracking-wide">
+                    Powered by <span className="font-semibold text-slate-500">MotoAdmin</span>
+                </p>
             </div>
         </div>
     )

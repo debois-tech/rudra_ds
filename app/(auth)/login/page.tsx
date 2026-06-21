@@ -4,17 +4,16 @@ import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { signIn } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Loader2, LogIn } from 'lucide-react'
+import { Loader2, AlertCircle } from 'lucide-react'
 import Image from 'next/image'
 
 export default function LoginPage() {
     return (
         <Suspense fallback={
-            <div className="flex items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+            <div className="flex items-center justify-center py-20">
+                <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
             </div>
         }>
             <LoginForm />
@@ -27,8 +26,7 @@ function LoginForm() {
     const searchParams = useSearchParams()
     const raw = searchParams.get('redirect') || '/dashboard'
     // Security: Only allow relative paths to prevent open redirect attacks.
-    // e.g. ?redirect=https://evil.com would be rejected and fall back to /dashboard
-    const redirectTo = raw.startsWith('/') ? raw : '/dashboard'
+    const redirectTo = raw.startsWith('/') && !raw.startsWith('//') ? raw : '/dashboard'
 
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
@@ -53,69 +51,83 @@ function LoginForm() {
     }
 
     return (
-        <Card className="bg-slate-900/80 border-slate-800 backdrop-blur-xl shadow-2xl">
-            <CardHeader className="text-center space-y-4 pb-2">
-                {/* Logo / Brand */}
-                <div className="mx-auto w-24 h-24 relative flex items-center justify-center">
+        <div className="animate-fade-in">
+            {/* Header */}
+            <div className="text-center mb-8">
+                <div className="mx-auto w-14 h-14 relative mb-5">
                     <Image src="/logo.png" alt="MotoAdmin Logo" fill className="object-contain" priority />
                 </div>
-                <div>
-                    <h1 className="text-2xl font-bold text-white tracking-wider">MotoAdmin</h1>
-                    <p className="text-sm text-slate-400 mt-1">Driving School Management Platform</p>
-                </div>
-            </CardHeader>
-            <CardContent className="pt-6">
+                <h1 className="text-[22px] font-bold text-slate-900 tracking-tight">
+                    Welcome back
+                </h1>
+                <p className="text-sm text-slate-500 mt-1.5">
+                    Sign in to your MotoAdmin account
+                </p>
+            </div>
+
+            {/* Form Card */}
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-7">
                 <form onSubmit={handleLogin} className="space-y-5">
                     {error && (
-                        <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm text-center">
-                            {error}
+                        <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-red-50 border border-red-100 text-red-600 text-sm">
+                            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                            <span>{error}</span>
                         </div>
                     )}
 
                     <div className="space-y-2">
-                        <Label htmlFor="email" className="text-slate-300 text-sm">Email</Label>
+                        <Label htmlFor="login-email" className="text-slate-700 text-[13px] font-medium">
+                            Email address
+                        </Label>
                         <Input
-                            id="email"
+                            id="login-email"
                             type="email"
                             placeholder="you@example.com"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             required
-                            className="bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-blue-500 focus:ring-blue-500/20 h-11"
+                            autoComplete="email"
+                            className="h-11 bg-slate-50/50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-violet-300 focus:ring-2 focus:ring-violet-100 rounded-xl transition-all"
                         />
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="password" className="text-slate-300 text-sm">Password</Label>
+                        <Label htmlFor="login-password" className="text-slate-700 text-[13px] font-medium">
+                            Password
+                        </Label>
                         <Input
-                            id="password"
+                            id="login-password"
                             type="password"
                             placeholder="••••••••"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             required
-                            className="bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-blue-500 focus:ring-blue-500/20 h-11"
+                            autoComplete="current-password"
+                            className="h-11 bg-slate-50/50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-violet-300 focus:ring-2 focus:ring-violet-100 rounded-xl transition-all"
                         />
                     </div>
 
                     <Button
                         type="submit"
                         disabled={loading}
-                        className="w-full h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-medium shadow-lg shadow-blue-500/20 transition-all duration-200"
+                        className="w-full h-11 bg-slate-900 hover:bg-slate-800 text-white font-medium rounded-xl shadow-sm transition-all duration-200 disabled:opacity-50 cursor-pointer"
                     >
                         {loading ? (
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Signing in…
+                            </>
                         ) : (
-                            <LogIn className="h-4 w-4 mr-2" />
+                            'Sign in'
                         )}
-                        {loading ? 'Signing in...' : 'Sign In'}
                     </Button>
                 </form>
+            </div>
 
-                <p className="text-center text-xs text-slate-500 mt-6">
-                    Account access is managed by your administrator
-                </p>
-            </CardContent>
-        </Card>
+            {/* Footer note */}
+            <p className="text-center text-[12px] text-slate-400 mt-5">
+                Account access is managed by your administrator
+            </p>
+        </div>
     )
 }

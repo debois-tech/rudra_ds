@@ -64,50 +64,48 @@ export async function middleware(request: NextRequest) {
     }
 
     // ============================================
-    // LOGGED IN but on public page (e.g. login) → redirect based on role
+    // LOGGED IN — fetch profile ONCE for all checks
     // ============================================
-    if (user && (pathname === '/login' || pathname === '/')) {
+    if (user) {
         const { data: profile } = await supabase
             .from('profiles')
-            .select('role')
+            .select('role, is_active')
             .eq('id', user.id)
             .single()
 
-        const url = request.nextUrl.clone()
-        url.pathname = profile?.role === 'super_admin' ? '/admin' : '/dashboard'
-        return NextResponse.redirect(url)
-    }
+        // ── Deactivated user → sign out and redirect to login ──
+        if (profile && !profile.is_active) {
+            await supabase.auth.signOut()
+            if (pathname.startsWith('/api/')) {
+                return NextResponse.json(
+                    { error: 'Account deactivated. Contact your administrator.' },
+                    { status: 403 }
+                )
+            }
+            const url = request.nextUrl.clone()
+            url.pathname = '/login'
+            return NextResponse.redirect(url)
+        }
 
-    // ============================================
-    // ISOLATE SUPER ADMIN FROM DASHBOARD
-    // ============================================
-    if (user && pathname.startsWith('/dashboard')) {
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
-            .single()
+        const role = profile?.role
 
-        if (profile?.role === 'super_admin') {
+        // ── Logged in on public page → redirect based on role ──
+        if (pathname === '/login' || pathname === '/') {
+            const url = request.nextUrl.clone()
+            url.pathname = role === 'super_admin' ? '/admin' : '/dashboard'
+            return NextResponse.redirect(url)
+        }
+
+        // ── Super admin on /dashboard → redirect to /admin ──
+        if (role === 'super_admin' && pathname.startsWith('/dashboard')) {
             const url = request.nextUrl.clone()
             url.pathname = '/admin'
             return NextResponse.redirect(url)
         }
-    }
 
-    // ============================================
-    // ADMIN ROUTES → check if super_admin
-    // ============================================
-    const isAdminRoute = pathname.startsWith('/admin') || pathname.startsWith('/api/admin')
-
-    if (user && isAdminRoute) {
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
-            .single()
-
-        if (!profile || profile.role !== 'super_admin') {
+        // ── Admin routes → require super_admin role ──
+        const isAdminRoute = pathname.startsWith('/admin') || pathname.startsWith('/api/admin')
+        if (isAdminRoute && role !== 'super_admin') {
             if (pathname.startsWith('/api/')) {
                 return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
             }
@@ -131,6 +129,6 @@ export const config = {
          * - public image files (svg, png, jpg, jpeg, gif, webp)
          * - og-image.png, apple-touch-icon.png (SEO/social assets)
          */
-        '/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|og-image.png|apple-touch-icon.png|.*\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+        '/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|og-image.png|apple-touch-icon.png|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
     ],
 }
