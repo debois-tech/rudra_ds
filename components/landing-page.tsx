@@ -115,44 +115,44 @@ export default function LandingPage() {
       <div className="min-h-screen bg-[#050505] text-white font-sans selection:bg-amber-400/30 selection:text-amber-200">
         
         {/* Navbar */}
-        <nav className={`fixed top-0 w-full z-50 transition-all duration-300 ${scrolled ? "bg-black/80 backdrop-blur-md border-b border-white/10 py-3" : "bg-transparent py-5"}`}>
-          <div className="max-w-7xl mx-auto px-6 md:px-12 flex items-center justify-between">
+        <nav className={`fixed left-1/2 -translate-x-1/2 w-[96%] max-w-7xl z-50 transition-all duration-500 rounded-2xl border ${scrolled ? "top-4 bg-[#fdfbf7]/95 backdrop-blur-md shadow-xl border-slate-200 py-3" : "top-6 bg-[#fdfbf7] shadow-lg border-transparent py-4"}`}>
+          <div className="px-6 md:px-8 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="relative h-10 w-[160px]">
-                 <Image src="/icon.png" alt="MotoAdmin" fill className="object-contain object-left brightness-0 invert" priority />
+              <div className="relative h-14 w-[200px]">
+                 <Image src="/icon.png" alt="MotoAdmin" fill className="object-contain object-left" priority />
               </div>
             </div>
 
             {/* Desktop Nav */}
             <div className="hidden md:flex items-center gap-8">
-              <a href="#features" className="text-sm font-medium text-gray-300 hover:text-amber-400 transition-colors">Features</a>
-              <a href="#pricing" className="text-sm font-medium text-gray-300 hover:text-amber-400 transition-colors">Pricing</a>
-              <a href="#faq" className="text-sm font-medium text-gray-300 hover:text-amber-400 transition-colors">FAQ</a>
+              <a href="#features" className="text-sm font-semibold text-slate-600 hover:text-amber-600 transition-colors">Features</a>
+              <a href="#pricing" className="text-sm font-semibold text-slate-600 hover:text-amber-600 transition-colors">Pricing</a>
+              <a href="#faq" className="text-sm font-semibold text-slate-600 hover:text-amber-600 transition-colors">FAQ</a>
             </div>
 
             <div className="hidden md:flex items-center gap-4">
-              <Link href="/login" className="text-sm font-medium text-white hover:text-amber-400 transition-colors">
+              <Link href="/login" className="text-sm font-bold text-slate-900 hover:text-amber-600 transition-colors">
                 Log In
               </Link>
-              <Link href="/login" className="px-5 py-2.5 rounded-full text-sm font-semibold bg-gradient-to-r from-amber-400 to-amber-500 text-black shadow-[0_0_15px_rgba(251,191,36,0.4)] hover:shadow-[0_0_25px_rgba(251,191,36,0.6)] transition-all hover:-translate-y-0.5">
+              <Link href="/login" className="px-5 py-2.5 rounded-full text-sm font-semibold bg-gradient-to-r from-amber-400 to-amber-500 text-black shadow-[0_0_10px_rgba(251,191,36,0.2)] hover:shadow-[0_0_20px_rgba(251,191,36,0.4)] transition-all hover:-translate-y-0.5">
                 Get Started Free
               </Link>
             </div>
 
             {/* Mobile Menu Toggle */}
-            <button className="md:hidden text-white" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+            <button className="md:hidden text-slate-900" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
               {mobileMenuOpen ? <X /> : <Menu />}
             </button>
           </div>
 
           {/* Mobile Nav */}
           {mobileMenuOpen && (
-            <div className="md:hidden absolute top-full left-0 w-full bg-[#0a0a0a] border-b border-white/10 p-6 flex flex-col gap-4 shadow-2xl">
-              <a href="#features" onClick={() => setMobileMenuOpen(false)} className="text-lg font-medium text-gray-300 hover:text-amber-400">Features</a>
-              <a href="#pricing" onClick={() => setMobileMenuOpen(false)} className="text-lg font-medium text-gray-300 hover:text-amber-400">Pricing</a>
-              <a href="#faq" onClick={() => setMobileMenuOpen(false)} className="text-lg font-medium text-gray-300 hover:text-amber-400">FAQ</a>
-              <div className="h-px bg-white/10 my-2"></div>
-              <Link href="/login" className="text-lg font-medium text-white">Log In</Link>
+            <div className="md:hidden absolute top-full left-0 w-full bg-[#fdfbf7] border-b border-slate-200 p-6 flex flex-col gap-4 shadow-2xl rounded-b-2xl mt-4">
+              <a href="#features" onClick={() => setMobileMenuOpen(false)} className="text-lg font-semibold text-slate-600 hover:text-amber-600">Features</a>
+              <a href="#pricing" onClick={() => setMobileMenuOpen(false)} className="text-lg font-semibold text-slate-600 hover:text-amber-600">Pricing</a>
+              <a href="#faq" onClick={() => setMobileMenuOpen(false)} className="text-lg font-semibold text-slate-600 hover:text-amber-600">FAQ</a>
+              <div className="h-px bg-slate-200 my-2"></div>
+              <Link href="/login" className="text-lg font-bold text-slate-900">Log In</Link>
               <Link href="/login" className="mt-2 text-center py-3 rounded-xl font-semibold bg-gradient-to-r from-amber-400 to-amber-500 text-black">
                 Get Started Free
               </Link>
@@ -402,7 +402,7 @@ export default function LandingPage() {
           <div className="max-w-7xl mx-auto px-6 md:px-12">
             <div className="flex flex-col md:flex-row justify-between items-center gap-8 mb-12">
               <div className="flex items-center gap-3">
-                 <div className="relative h-8 w-[130px]">
+                 <div className="relative h-12 w-[180px]">
                    <Image src="/icon.png" alt="MotoAdmin" fill className="object-contain object-left brightness-0 invert opacity-90" />
                  </div>
               </div>
