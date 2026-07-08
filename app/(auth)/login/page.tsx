@@ -55,7 +55,7 @@ function LoginForm() {
             {/* Header */}
             <div className="text-center mb-8">
                 <div className="mx-auto w-[420px] h-32 relative mb-6">
-                    <Image src="/icon.png" alt="MotoAdmin Logo" fill className="object-cover" priority />
+                    <Image src="/logo_icon.png" alt="MotoAdmin Logo" fill className="object-cover" priority />
                 </div>
                 <h1 className="text-[22px] font-bold text-slate-900 tracking-tight">
                     Welcome back

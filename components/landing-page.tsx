@@ -119,7 +119,7 @@ export default function LandingPage() {
           <div className="px-6 md:px-10 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="relative h-24 w-[360px]">
-                 <Image src="/icon.png" alt="MotoAdmin" fill className="object-cover object-left" priority />
+                 <Image src="/logo_icon.png" alt="MotoAdmin" fill className="object-cover object-left" priority />
               </div>
             </div>
 
@@ -403,7 +403,7 @@ export default function LandingPage() {
             <div className="flex flex-col md:flex-row justify-between items-center gap-8 mb-12">
               <div className="flex items-center gap-3">
                  <div className="relative h-20 w-[300px]">
-                   <Image src="/icon.png" alt="MotoAdmin" fill className="object-cover object-left opacity-90" />
+                   <Image src="/logo_icon.png" alt="MotoAdmin" fill className="object-cover object-left opacity-90" />
                  </div>
               </div>
               <div className="flex gap-6 text-sm font-medium text-gray-400">
