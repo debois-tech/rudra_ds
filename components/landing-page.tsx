@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import { 
   ChevronDown, CheckCircle2, Shield, Users, Car, CreditCard, 
   LayoutDashboard, Building2, Menu, X, ArrowRight, TrendingUp
@@ -166,27 +167,52 @@ export default function LandingPage() {
           <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-amber-500/20 rounded-full blur-[120px] pointer-events-none"></div>
           <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-amber-300/10 rounded-full blur-[100px] pointer-events-none"></div>
 
-          <div className="relative max-w-7xl mx-auto px-6 md:px-12 text-center z-10">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-amber-400/30 bg-amber-400/10 text-amber-400 text-xs md:text-sm font-semibold tracking-wide mb-8 animate-fade-in-up">
+          <motion.div 
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+            className="relative max-w-7xl mx-auto px-6 md:px-12 text-center z-10"
+          >
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-amber-400/30 bg-amber-400/10 text-amber-400 text-xs md:text-sm font-semibold tracking-wide mb-8"
+            >
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
               </span>
               India&apos;s #1 Driving School Management Platform
-            </div>
+            </motion.div>
 
-            <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-6 leading-tight">
+            <motion.h1 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.3 }}
+              className="text-5xl md:text-7xl font-extrabold tracking-tight mb-6 leading-tight"
+            >
               The Smartest Way to Run <br className="hidden md:block" />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-400 to-amber-500">
                 Your Driving School
               </span>
-            </h1>
+            </motion.h1>
 
-            <p className="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed">
+            <motion.p 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.6, delay: 0.5 }}
+              className="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed"
+            >
               Manage students, vehicles, documents, services & revenue — all from one powerful, modern dashboard. Built for scale, designed for simplicity.
-            </p>
+            </motion.p>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.7 }}
+              className="flex flex-col sm:flex-row items-center justify-center gap-4"
+            >
               <Link href="/login" className="w-full sm:w-auto px-8 py-4 rounded-full font-bold bg-amber-400 text-black hover:bg-amber-300 shadow-[0_0_20px_rgba(251,191,36,0.3)] hover:shadow-[0_0_30px_rgba(251,191,36,0.5)] transition-all hover:-translate-y-1 flex items-center justify-center gap-2">
                 Start for Free
                 <ArrowRight className="w-5 h-5" />
@@ -194,18 +220,29 @@ export default function LandingPage() {
               <a href="#features" className="w-full sm:w-auto px-8 py-4 rounded-full font-bold border border-white/20 text-white hover:bg-white/5 transition-all flex items-center justify-center">
                 See Features
               </a>
-            </div>
+            </motion.div>
             
-            <p className="mt-6 text-sm text-gray-500 flex items-center justify-center gap-4 flex-wrap">
+            <motion.p 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.6, delay: 0.9 }}
+              className="mt-6 text-sm text-gray-500 flex items-center justify-center gap-4 flex-wrap"
+            >
               <span className="flex items-center gap-1"><CheckCircle2 className="w-4 h-4 text-amber-400"/> Free forever plan</span>
               <span className="flex items-center gap-1"><CheckCircle2 className="w-4 h-4 text-amber-400"/> No setup fees</span>
               <span className="flex items-center gap-1"><CheckCircle2 className="w-4 h-4 text-amber-400"/> Cancel anytime</span>
-            </p>
-          </div>
+            </motion.p>
+          </motion.div>
         </section>
 
         {/* Stats Section */}
-        <section className="border-y border-white/10 bg-[#0a0a0a]">
+        <motion.section 
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-100px" }}
+          transition={{ duration: 0.6 }}
+          className="border-y border-white/10 bg-[#0a0a0a]"
+        >
           <div className="max-w-7xl mx-auto px-6 md:px-12 py-12">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center divide-x divide-white/5">
               {stats.map((s, i) => (
@@ -216,21 +253,33 @@ export default function LandingPage() {
               ))}
             </div>
           </div>
-        </section>
+        </motion.section>
 
         {/* Features Section */}
-        <section id="features" className="py-24 relative">
+        <section id="features" className="py-24 relative overflow-hidden">
           <div className="max-w-7xl mx-auto px-6 md:px-12">
-            <div className="text-center max-w-3xl mx-auto mb-16">
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="text-center max-w-3xl mx-auto mb-16"
+            >
               <h2 className="text-3xl md:text-5xl font-bold mb-6">Everything Your <span className="text-amber-400">School Needs</span></h2>
               <p className="text-gray-400 text-lg">
                 We&apos;ve built the ultimate platform for driving schools to manage customers, track expiring documents, and grow revenue.
               </p>
-            </div>
+            </motion.div>
 
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {features.map((f, i) => (
-                <div key={i} className="group p-8 rounded-2xl bg-[#0f0f0f] border border-white/5 hover:border-amber-400/30 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_10px_30px_rgba(251,191,36,0.05)] relative overflow-hidden">
+                <motion.div 
+                  key={i} 
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.1, duration: 0.5 }}
+                  className="group p-8 rounded-2xl bg-[#0f0f0f] border border-white/5 hover:border-amber-400/30 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_10px_30px_rgba(251,191,36,0.05)] relative overflow-hidden"
+                >
                   <div className="absolute top-0 right-0 w-32 h-32 bg-amber-400/5 rounded-full blur-3xl group-hover:bg-amber-400/10 transition-colors"></div>
                   <div className="mb-6 inline-flex p-3 rounded-xl bg-[#1a1a1a] border border-white/5 group-hover:scale-110 transition-transform">
                     {f.icon}
@@ -239,7 +288,7 @@ export default function LandingPage() {
                   <p className="text-gray-400 leading-relaxed">
                     {f.desc}
                   </p>
-                </div>
+                </motion.div>
               ))}
             </div>
           </div>
@@ -251,12 +300,17 @@ export default function LandingPage() {
            <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(#d4af37 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
            
            <div className="max-w-7xl mx-auto px-6 md:px-12 relative z-10">
-            <div className="text-center mb-16">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              className="text-center mb-16"
+            >
               <h2 className="text-3xl md:text-5xl font-bold mb-6">Up and Running in <span className="text-amber-400">Minutes</span></h2>
               <p className="text-gray-400 text-lg max-w-2xl mx-auto">
                 No IT team needed. No complex setup. Just sign up and start managing.
               </p>
-            </div>
+            </motion.div>
 
             <div className="grid md:grid-cols-3 gap-8 relative">
               {/* Desktop connecting line */}
@@ -267,31 +321,49 @@ export default function LandingPage() {
                 { step: "02", title: "Add Students & Fleet", desc: "Import or manually add your active students, vehicles, and documents." },
                 { step: "03", title: "Manage & Grow", desc: "Track services, receive alerts, and monitor revenue from your dashboard." },
               ].map((s, i) => (
-                <div key={i} className="relative text-center pt-4">
+                <motion.div 
+                  key={i} 
+                  initial={{ opacity: 0, x: -30 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.2, duration: 0.6 }}
+                  className="relative text-center pt-4"
+                >
                   <div className="w-16 h-16 mx-auto rounded-full bg-[#141414] border-2 border-amber-400 flex items-center justify-center text-xl font-bold text-amber-400 mb-6 shadow-[0_0_20px_rgba(251,191,36,0.2)]">
                     {s.step}
                   </div>
                   <h3 className="text-xl font-bold text-white mb-3">{s.title}</h3>
                   <p className="text-gray-400">{s.desc}</p>
-                </div>
+                </motion.div>
               ))}
             </div>
            </div>
         </section>
 
         {/* Pricing Section */}
-        <section id="pricing" className="py-24 relative">
+        <section id="pricing" className="py-24 relative overflow-hidden">
           <div className="max-w-7xl mx-auto px-6 md:px-12">
-            <div className="text-center max-w-3xl mx-auto mb-16">
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="text-center max-w-3xl mx-auto mb-16"
+            >
               <h2 className="text-3xl md:text-5xl font-bold mb-6">Simple, Transparent <span className="text-amber-400">Pricing</span></h2>
               <p className="text-gray-400 text-lg">
                 Start for free. Upgrade when you need more power. No hidden fees.
               </p>
-            </div>
+            </motion.div>
 
             <div className="grid md:grid-cols-3 gap-8 items-center max-w-5xl mx-auto">
               {/* Starter */}
-              <div className="p-8 rounded-3xl bg-[#0f0f0f] border border-white/10">
+              <motion.div 
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5 }}
+                className="p-8 rounded-3xl bg-[#0f0f0f] border border-white/10"
+              >
                 <h3 className="text-gray-400 font-semibold tracking-wider uppercase mb-2">Starter</h3>
                 <div className="text-4xl font-black text-white mb-4">Free</div>
                 <p className="text-sm text-gray-500 mb-8">Perfect for single driving schools getting started.</p>
@@ -305,10 +377,16 @@ export default function LandingPage() {
                 <Link href="/login" className="block w-full py-3 px-4 text-center rounded-xl font-semibold bg-white/5 hover:bg-white/10 text-white transition-colors">
                   Get Started Free
                 </Link>
-              </div>
+              </motion.div>
 
               {/* Pro */}
-              <div className="p-8 rounded-3xl bg-gradient-to-b from-[#1a1a1a] to-[#0a0a0a] border-2 border-amber-400 shadow-[0_0_40px_rgba(251,191,36,0.15)] relative transform md:-translate-y-4">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95, y: 30 }}
+                whileInView={{ opacity: 1, scale: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.1, duration: 0.5 }}
+                className="p-8 rounded-3xl bg-gradient-to-b from-[#1a1a1a] to-[#0a0a0a] border-2 border-amber-400 shadow-[0_0_40px_rgba(251,191,36,0.15)] relative transform md:-translate-y-4"
+              >
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-amber-400 text-black text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
                   Most Popular
                 </div>
@@ -325,10 +403,16 @@ export default function LandingPage() {
                 <Link href="/login" className="block w-full py-4 px-4 text-center rounded-xl font-bold bg-gradient-to-r from-amber-400 to-amber-500 text-black shadow-[0_0_15px_rgba(251,191,36,0.3)] hover:shadow-[0_0_25px_rgba(251,191,36,0.5)] transition-all hover:-translate-y-1">
                   Start Pro Trial
                 </Link>
-              </div>
+              </motion.div>
 
               {/* Enterprise */}
-              <div className="p-8 rounded-3xl bg-[#0f0f0f] border border-white/10">
+              <motion.div 
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.2, duration: 0.5 }}
+                className="p-8 rounded-3xl bg-[#0f0f0f] border border-white/10"
+              >
                 <h3 className="text-gray-400 font-semibold tracking-wider uppercase mb-2">Enterprise</h3>
                 <div className="text-4xl font-black text-white mb-4">Custom</div>
                 <p className="text-sm text-gray-500 mb-8">For chains managing multiple branches.</p>
@@ -342,7 +426,7 @@ export default function LandingPage() {
                 <Link href="/login" className="block w-full py-3 px-4 text-center rounded-xl font-semibold bg-white/5 hover:bg-white/10 text-white transition-colors">
                   Contact Sales
                 </Link>
-              </div>
+              </motion.div>
             </div>
           </div>
         </section>
@@ -383,7 +467,13 @@ export default function LandingPage() {
            <div className="absolute inset-0 bg-gradient-to-b from-[#141414] to-black"></div>
            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl h-[300px] bg-amber-500/10 rounded-full blur-[100px] pointer-events-none"></div>
 
-           <div className="relative max-w-4xl mx-auto px-6 text-center z-10">
+           <motion.div 
+             initial={{ opacity: 0, scale: 0.9 }}
+             whileInView={{ opacity: 1, scale: 1 }}
+             viewport={{ once: true }}
+             transition={{ duration: 0.6 }}
+             className="relative max-w-4xl mx-auto px-6 text-center z-10"
+           >
              <h2 className="text-4xl md:text-6xl font-black mb-6 text-white">
                Ready to Transform Your <br/> <span className="text-amber-400">Driving School?</span>
              </h2>
@@ -394,7 +484,7 @@ export default function LandingPage() {
                Get Started Free Today
                <ArrowRight className="w-6 h-6" />
              </Link>
-           </div>
+           </motion.div>
         </section>
 
         {/* Footer */}
