@@ -65,7 +65,7 @@ export function DashboardShell({ profile, orgName, children }: DashboardShellPro
                     <div className="flex items-center gap-8">
                         <Link href="/dashboard" className="flex items-center gap-3 shrink-0">
                             <div className="relative h-9 w-[130px]">
-                                <Image src="/icon.png" alt="MotoAdmin" fill className="object-contain object-left" priority />
+                                <Image src="/icon.png" alt="MotoAdmin" fill className="object-contain object-left brightness-0 invert" priority />
                             </div>
                             {orgName && (
                                 <span className="text-[11px] font-medium text-amber-400/80 bg-amber-400/10 border border-amber-400/20 px-2.5 py-0.5 rounded-md">
@@ -142,8 +142,8 @@ export function DashboardShell({ profile, orgName, children }: DashboardShellPro
             {/* ── Mobile Header — dark theme ── */}
             <header className="md:hidden flex h-14 items-center justify-between px-4 bg-[#0a0a0a] border-b border-white/10 sticky top-0 z-50">
                 <Link href="/dashboard" className="flex items-center gap-2">
-                    <div className="relative h-8 w-[110px]">
-                        <Image src="/icon.png" alt="MotoAdmin" fill className="object-contain object-left" />
+                    <div className="relative h-8 w-[120px]">
+                        <Image src="/icon.png" alt="MotoAdmin" fill className="object-contain object-left brightness-0 invert" priority />
                     </div>
                 </Link>
 
