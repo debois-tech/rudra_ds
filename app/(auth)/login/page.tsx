@@ -13,7 +13,7 @@ export default function LoginPage() {
     return (
         <Suspense fallback={
             <div className="flex items-center justify-center py-20">
-                <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+                <Loader2 className="h-5 w-5 animate-spin text-amber-400" />
             </div>
         }>
             <LoginForm />
@@ -54,14 +54,14 @@ function LoginForm() {
         <div className="animate-fade-in">
             {/* Header */}
             <div className="text-center mb-8">
-                <div className="mx-auto w-14 h-14 relative mb-5">
-                    <Image src="/logo.png" alt="MotoAdmin Logo" fill className="object-contain" priority />
+                <div className="mx-auto w-[180px] h-16 relative mb-5">
+                    <Image src="/icon.png" alt="MotoAdmin Logo" fill className="object-contain" priority />
                 </div>
                 <h1 className="text-[22px] font-bold text-slate-900 tracking-tight">
                     Welcome back
                 </h1>
                 <p className="text-sm text-slate-500 mt-1.5">
-                    Sign in to your MotoAdmin account
+                    Sign in to your account
                 </p>
             </div>
 
@@ -87,7 +87,7 @@ function LoginForm() {
                             onChange={(e) => setEmail(e.target.value)}
                             required
                             autoComplete="email"
-                            className="h-11 bg-slate-50/50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-violet-300 focus:ring-2 focus:ring-violet-100 rounded-xl transition-all"
+                            className="h-11 bg-slate-50/50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-amber-300 focus:ring-2 focus:ring-amber-100 rounded-xl transition-all"
                         />
                     </div>
 
@@ -103,14 +103,14 @@ function LoginForm() {
                             onChange={(e) => setPassword(e.target.value)}
                             required
                             autoComplete="current-password"
-                            className="h-11 bg-slate-50/50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-violet-300 focus:ring-2 focus:ring-violet-100 rounded-xl transition-all"
+                            className="h-11 bg-slate-50/50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-amber-300 focus:ring-2 focus:ring-amber-100 rounded-xl transition-all"
                         />
                     </div>
 
                     <Button
                         type="submit"
                         disabled={loading}
-                        className="w-full h-11 bg-slate-900 hover:bg-slate-800 text-white font-medium rounded-xl shadow-sm transition-all duration-200 disabled:opacity-50 cursor-pointer"
+                        className="w-full h-11 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-black font-semibold rounded-xl shadow-sm shadow-amber-400/20 transition-all duration-200 disabled:opacity-50 cursor-pointer"
                     >
                         {loading ? (
                             <>

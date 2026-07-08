@@ -54,8 +54,8 @@
   --card-foreground: oklch(0.145 0.035 264);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0.035 264);
-  --primary: oklch(0.38 0.14 265);
-  --primary-foreground: oklch(0.985 0.002 247);
+  --primary: oklch(0.75 0.18 75);
+  --primary-foreground: oklch(0.15 0.02 75);
   --secondary: oklch(0.965 0.005 260);
   --secondary-foreground: oklch(0.25 0.035 265);
   --muted: oklch(0.965 0.005 260);
@@ -65,7 +65,7 @@
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.925 0.008 260);
   --input: oklch(0.925 0.008 260);
-  --ring: oklch(0.38 0.14 265);
+  --ring: oklch(0.75 0.18 75);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -177,7 +177,7 @@
 
 /* Subtle gradient text */
 .gradient-text {
-  background: linear-gradient(135deg, #6d28d9, #4f46e5);
+  background: linear-gradient(135deg, #f59e0b, #d97706);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;

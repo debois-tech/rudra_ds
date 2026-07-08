@@ -118,12 +118,9 @@ export default function LandingPage() {
         <nav className={`fixed top-0 w-full z-50 transition-all duration-300 ${scrolled ? "bg-black/80 backdrop-blur-md border-b border-white/10 py-3" : "bg-transparent py-5"}`}>
           <div className="max-w-7xl mx-auto px-6 md:px-12 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="relative w-10 h-10 bg-white rounded-full p-1 flex items-center justify-center">
-                 <Image src="/dashboard/icon.png" alt="MotoAdmin" width={32} height={32} className="object-contain" />
+              <div className="relative h-10 w-[160px]">
+                 <Image src="/icon.png" alt="MotoAdmin" fill className="object-contain object-left" priority />
               </div>
-              <span className="font-bold text-xl tracking-tight text-white">
-                moto<span className="text-amber-400">admin</span>
-              </span>
             </div>
 
             {/* Desktop Nav */}
@@ -175,7 +172,7 @@ export default function LandingPage() {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
               </span>
-              India's #1 Driving School Management Platform
+              India&apos;s #1 Driving School Management Platform
             </div>
 
             <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-6 leading-tight">
@@ -227,7 +224,7 @@ export default function LandingPage() {
             <div className="text-center max-w-3xl mx-auto mb-16">
               <h2 className="text-3xl md:text-5xl font-bold mb-6">Everything Your <span className="text-amber-400">School Needs</span></h2>
               <p className="text-gray-400 text-lg">
-                One platform. Zero complexity. Replace your spreadsheets and notebooks with a modern, automated system.
+                We&apos;ve built the ultimate platform for driving schools to manage customers, track expiring documents, and grow revenue.
               </p>
             </div>
 
@@ -405,12 +402,9 @@ export default function LandingPage() {
           <div className="max-w-7xl mx-auto px-6 md:px-12">
             <div className="flex flex-col md:flex-row justify-between items-center gap-8 mb-12">
               <div className="flex items-center gap-3">
-                 <div className="relative w-8 h-8 bg-white rounded-full p-1 flex items-center justify-center">
-                   <Image src="/dashboard/icon.png" alt="MotoAdmin" width={24} height={24} className="object-contain" />
+                 <div className="relative h-8 w-[130px]">
+                   <Image src="/icon.png" alt="MotoAdmin" fill className="object-contain object-left" />
                  </div>
-                 <span className="font-bold text-xl tracking-tight text-white">
-                   moto<span className="text-amber-400">admin</span>
-                 </span>
               </div>
               <div className="flex gap-6 text-sm font-medium text-gray-400">
                 <a href="#features" className="hover:text-amber-400 transition-colors">Features</a>
@@ -421,8 +415,8 @@ export default function LandingPage() {
             </div>
             
             <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-gray-600 border-t border-white/5 pt-8">
-              <p>© {year} MotoAdmin. All rights reserved.</p>
-              <p>India's Premium Driving School Management Platform</p>
+              <p>© {year} MotoAdmin. All rights reserved. <br className="md:hidden" />Made with ♥ for India&apos;s driving schools.</p>
+              <p>India&apos;s Premium Driving School Management Platform</p>
             </div>
           </div>
         </footer>

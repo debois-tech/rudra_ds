@@ -78,10 +78,10 @@ export async function signIn(email: string, password: string) {
     return data
 }
 
-/** Sign out */
+/** Sign out — global scope invalidates all sessions across devices */
 export async function signOut() {
     const supabase = createSupabaseBrowser()
-    const { error } = await supabase.auth.signOut()
+    const { error } = await supabase.auth.signOut({ scope: 'global' })
     if (error) throw error
 }
 

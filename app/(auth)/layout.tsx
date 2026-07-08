@@ -5,10 +5,10 @@ export default function AuthLayout({
 }) {
     return (
         <div className="min-h-screen flex items-center justify-center bg-[#fafbfc] relative overflow-hidden">
-            {/* Subtle ambient background shapes */}
+            {/* Subtle ambient background shapes — amber/gold tones matching brand */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute -top-[300px] -right-[200px] w-[600px] h-[600px] rounded-full bg-violet-100/40 blur-3xl" />
-                <div className="absolute -bottom-[200px] -left-[200px] w-[500px] h-[500px] rounded-full bg-indigo-100/30 blur-3xl" />
+                <div className="absolute -top-[300px] -right-[200px] w-[600px] h-[600px] rounded-full bg-amber-100/40 blur-3xl" />
+                <div className="absolute -bottom-[200px] -left-[200px] w-[500px] h-[500px] rounded-full bg-amber-50/50 blur-3xl" />
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full bg-slate-100/50 blur-3xl" />
             </div>
 
@@ -26,7 +26,7 @@ export default function AuthLayout({
 
                 {/* Bottom brand mark */}
                 <p className="text-center text-[11px] text-slate-400 mt-8 tracking-wide">
-                    Powered by <span className="font-semibold text-slate-500">MotoAdmin</span>
+                    Powered by <span className="font-semibold text-amber-600">MotoAdmin</span>
                 </p>
             </div>
         </div>

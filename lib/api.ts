@@ -18,6 +18,10 @@ import type {
     VehicleServiceFormData,
     LicenceServiceFormData,
     DashboardStats,
+    ExpiringDocument,
+    ServiceBreakdown,
+    MonthlyRevenue,
+    StatusBreakdown,
 } from './types';
 
 // Helper to get the current user's org_id
@@ -392,5 +396,119 @@ export const dashboardApi = {
             .limit(limit);
         if (error) throw error;
         return data || [];
+    },
+
+    /**
+     * Get services with expiry dates within the next N days.
+     * Used for the "Documents Expiring Soon" alert panel.
+     */
+    async getExpiringDocuments(daysThreshold: number = 15): Promise<ExpiringDocument[]> {
+        const supabase = getClient();
+        const today = new Date();
+        const futureDate = new Date();
+        futureDate.setDate(today.getDate() + daysThreshold);
+
+        const todayStr = today.toISOString().split('T')[0];
+        const futureStr = futureDate.toISOString().split('T')[0];
+
+        const { data, error } = await supabase
+            .from('v_services_overview')
+            .select('s_id, customer_id, customer_name, service_name, category, expiry_date, vehicle_number')
+            .not('expiry_date', 'is', null)
+            .gte('expiry_date', todayStr)
+            .lte('expiry_date', futureStr)
+            .eq('status', 'active')
+            .order('expiry_date', { ascending: true });
+
+        if (error) throw error;
+
+        return (data || []).map((row: {
+            s_id: string;
+            customer_id: string;
+            customer_name: string;
+            service_name: string;
+            category: 'vehicle' | 'licence';
+            expiry_date: string;
+            vehicle_number: string | null;
+        }) => {
+            const expiry = new Date(row.expiry_date);
+            const diffMs = expiry.getTime() - today.getTime();
+            const daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+            return {
+                ...row,
+                days_remaining: daysRemaining,
+            };
+        });
+    },
+
+    /**
+     * Get service counts grouped by category (vehicle vs licence).
+     */
+    async getServiceBreakdown(): Promise<ServiceBreakdown[]> {
+        const supabase = getClient();
+        const { data, error } = await supabase
+            .from('v_services_overview')
+            .select('category');
+        if (error) throw error;
+
+        const counts: Record<string, number> = {};
+        (data || []).forEach((row: { category: string }) => {
+            counts[row.category] = (counts[row.category] || 0) + 1;
+        });
+
+        return Object.entries(counts).map(([category, count]) => ({ category, count }));
+    },
+
+    /**
+     * Get service counts grouped by status.
+     */
+    async getStatusBreakdown(): Promise<StatusBreakdown[]> {
+        const supabase = getClient();
+        const { data, error } = await supabase
+            .from('v_services_overview')
+            .select('status');
+        if (error) throw error;
+
+        const counts: Record<string, number> = {};
+        (data || []).forEach((row: { status: string }) => {
+            counts[row.status] = (counts[row.status] || 0) + 1;
+        });
+
+        return Object.entries(counts).map(([status, count]) => ({ status, count }));
+    },
+
+    /**
+     * Get monthly revenue for the last 6 months.
+     */
+    async getRevenueByMonth(): Promise<MonthlyRevenue[]> {
+        const supabase = getClient();
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+        const sinceStr = sixMonthsAgo.toISOString().split('T')[0];
+
+        const { data, error } = await supabase
+            .from('services')
+            .select('issue_date, total_cost')
+            .gte('issue_date', sinceStr);
+        if (error) throw error;
+
+        const monthMap: Record<string, number> = {};
+        (data || []).forEach((row: { issue_date: string; total_cost: number }) => {
+            const d = new Date(row.issue_date);
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            monthMap[key] = (monthMap[key] || 0) + (Number(row.total_cost) || 0);
+        });
+
+        // Build last 6 months in order
+        const result: MonthlyRevenue[] = [];
+        const now = new Date();
+        for (let i = 5; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            const label = d.toLocaleDateString('en-IN', { month: 'short' });
+            result.push({ month: label, revenue: monthMap[key] || 0 });
+        }
+
+        return result;
     },
 };

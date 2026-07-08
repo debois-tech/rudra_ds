@@ -201,3 +201,33 @@ export interface DashboardStats {
   totalServices: number;
   totalRevenue: number;
 }
+
+// =============================================
+// ANALYTICAL DASHBOARD TYPES
+// =============================================
+
+export interface ExpiringDocument {
+  s_id: string;
+  customer_name: string;
+  customer_id: string;
+  service_name: string;
+  category: ServiceCategory;
+  expiry_date: string;
+  days_remaining: number;
+  vehicle_number: string | null;
+}
+
+export interface ServiceBreakdown {
+  category: string;
+  count: number;
+}
+
+export interface MonthlyRevenue {
+  month: string;
+  revenue: number;
+}
+
+export interface StatusBreakdown {
+  status: string;
+  count: number;
+}

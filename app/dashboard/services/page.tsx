@@ -207,8 +207,8 @@ export default function NewServicePage() {
         ].map(s => (
           <div key={s.n} className="flex items-center gap-2">
             <div className={`h-8 w-8 rounded-full flex items-center justify-center text-sm font-bold shadow-sm transition-colors ${
-              step > s.n ? 'bg-indigo-500 text-white border border-indigo-600' :
-              step === s.n ? 'bg-purple-600 text-white border border-purple-700' : 'bg-slate-100 text-slate-400 border border-slate-200'
+              step > s.n ? 'bg-amber-500 text-black border border-amber-600' :
+              step === s.n ? 'bg-amber-400 text-black border border-amber-500' : 'bg-slate-100 text-slate-400 border border-slate-200'
             }`}>
               {step > s.n ? <Check className="h-4 w-4" /> : s.n}
             </div>
@@ -222,9 +222,9 @@ export default function NewServicePage() {
 
       {/* Selected customer banner */}
       {selectedCustomer && step >= 2 && (
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-purple-50/50 rounded-2xl border border-purple-100">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-amber-50/50 rounded-2xl border border-amber-100">
           <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 font-bold border border-purple-200 shadow-sm">
+            <div className="h-12 w-12 rounded-full bg-amber-100 flex items-center justify-center text-amber-700 font-bold border border-amber-200 shadow-sm">
               {selectedCustomer.c_name.charAt(0).toUpperCase()}
             </div>
             <div>
@@ -232,7 +232,7 @@ export default function NewServicePage() {
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{selectedCustomer.c_mobile} · {selectedCustomer.c_registration_id}</p>
             </div>
           </div>
-          <Button variant="ghost" size="sm" className="hidden sm:inline-flex text-purple-600 hover:text-purple-700 hover:bg-purple-100 rounded-lg" onClick={() => { setStep(1); setSelectedCustomer(null); setCategory(null); }}>
+          <Button variant="ghost" size="sm" className="hidden sm:inline-flex text-amber-600 hover:text-amber-700 hover:bg-amber-100 rounded-lg" onClick={() => { setStep(1); setSelectedCustomer(null); setCategory(null); }}>
             Change Customer
           </Button>
         </div>
@@ -252,11 +252,11 @@ export default function NewServicePage() {
                 placeholder="Type customer name or mobile..."
                 value={searchQuery}
                 onChange={e => handleSearch(e.target.value)}
-                className="pl-12 h-12 rounded-xl border-slate-200 focus-visible:ring-purple-200 text-base"
+                className="pl-12 h-12 rounded-xl border-slate-200 focus-visible:ring-amber-200 text-base"
                 autoFocus
               />
             </div>
-            {searching && <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-purple-600" /></div>}
+            {searching && <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-amber-600" /></div>}
             {searchResults.length > 0 && (
               <div className="mt-4 border border-slate-200 rounded-xl divide-y divide-slate-100 max-h-72 overflow-y-auto bg-white shadow-sm overflow-hidden">
                 {searchResults.map(c => (
@@ -297,11 +297,11 @@ export default function NewServicePage() {
           <CardContent className="p-6 bg-slate-50/30">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <button
-                className="flex flex-col items-center justify-center gap-4 p-8 bg-white border-2 border-slate-200 rounded-2xl hover:border-indigo-500 hover:shadow-md transition-all group"
+                className="flex flex-col items-center justify-center gap-4 p-8 bg-white border-2 border-slate-200 rounded-2xl hover:border-amber-400 hover:shadow-md transition-all group"
                 onClick={() => selectCategory('vehicle')}
               >
-                <div className="h-16 w-16 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center group-hover:bg-indigo-100 group-hover:scale-110 transition-all">
-                  <Car className="h-8 w-8 text-indigo-600" />
+                <div className="h-16 w-16 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center group-hover:bg-amber-100 group-hover:scale-110 transition-all">
+                  <Car className="h-8 w-8 text-amber-600" />
                 </div>
                 <div className="text-center">
                   <p className="font-bold text-slate-900 text-lg">Vehicle Service</p>
@@ -310,11 +310,11 @@ export default function NewServicePage() {
               </button>
 
               <button
-                className="flex flex-col items-center justify-center gap-4 p-8 bg-white border-2 border-slate-200 rounded-2xl hover:border-purple-500 hover:shadow-md transition-all group"
+                className="flex flex-col items-center justify-center gap-4 p-8 bg-white border-2 border-slate-200 rounded-2xl hover:border-amber-400 hover:shadow-md transition-all group"
                 onClick={() => selectCategory('licence')}
               >
-                <div className="h-16 w-16 rounded-full bg-purple-50 border border-purple-100 flex items-center justify-center group-hover:bg-purple-100 group-hover:scale-110 transition-all">
-                  <FileText className="h-8 w-8 text-purple-600" />
+                <div className="h-16 w-16 rounded-full bg-violet-50 border border-violet-100 flex items-center justify-center group-hover:bg-violet-100 group-hover:scale-110 transition-all">
+                  <FileText className="h-8 w-8 text-violet-600" />
                 </div>
                 <div className="text-center">
                   <p className="font-bold text-slate-900 text-lg">Licence Service</p>
@@ -500,7 +500,7 @@ export default function NewServicePage() {
               </div>
 
               <div className="flex gap-4 pt-4">
-                <Button type="submit" className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-2xl h-14 text-base font-bold shadow-md tracking-wide" disabled={submitting}>
+                <Button type="submit" className="flex-1 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-black rounded-2xl h-14 text-base font-bold shadow-md tracking-wide" disabled={submitting}>
                   {submitting ? <><Loader2 className="h-5 w-5 animate-spin mr-2" /> Creating Record...</> : <><Check className="h-6 w-6 mr-2" /> Confirm & Create Service</>}
                 </Button>
                 <Button type="button" variant="outline" className="h-14 px-8 rounded-2xl font-bold bg-white" onClick={() => { setStep(2); setCategory(null); }}>

@@ -1,6 +1,14 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+/**
+ * Security-hardened middleware:
+ * - Server-side auth validation on every request (Supabase getUser() verifies JWT with server)
+ * - Deactivated users are force-signed-out globally (all sessions/devices)
+ * - Protected pages served with Cache-Control: no-store to prevent back-button exposure
+ * - Role-based routing (super_admin → /admin, user → /dashboard)
+ * - Open redirect prevention on login redirect
+ */
 export async function middleware(request: NextRequest) {
     let supabaseResponse = NextResponse.next({
         request,
@@ -59,7 +67,10 @@ export async function middleware(request: NextRequest) {
         }
         const url = request.nextUrl.clone()
         url.pathname = '/login'
-        url.searchParams.set('redirect', pathname)
+        // Only set redirect for safe relative paths (no protocol-relative or absolute URLs)
+        if (pathname.startsWith('/') && !pathname.startsWith('//') && !pathname.includes('://')) {
+            url.searchParams.set('redirect', pathname)
+        }
         return NextResponse.redirect(url)
     }
 
@@ -75,7 +86,9 @@ export async function middleware(request: NextRequest) {
 
         // ── Deactivated user → sign out and redirect to login ──
         if (profile && !profile.is_active) {
-            await supabase.auth.signOut()
+            // Global scope: invalidate ALL sessions across devices so deactivated users
+            // cannot continue accessing from any previously-authenticated browser/device
+            await supabase.auth.signOut({ scope: 'global' })
             if (pathname.startsWith('/api/')) {
                 return NextResponse.json(
                     { error: 'Account deactivated. Contact your administrator.' },
@@ -113,6 +126,12 @@ export async function middleware(request: NextRequest) {
             url.pathname = '/dashboard'
             return NextResponse.redirect(url)
         }
+    }
+
+    // Prevent browsers from caching protected pages (back-button exposure)
+    if (!isPublicRoute) {
+        supabaseResponse.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+        supabaseResponse.headers.set('Pragma', 'no-cache')
     }
 
     return supabaseResponse
