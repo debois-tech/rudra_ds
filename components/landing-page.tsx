@@ -115,11 +115,11 @@ export default function LandingPage() {
       <div className="min-h-screen bg-[#050505] text-white font-sans selection:bg-amber-400/30 selection:text-amber-200">
         
         {/* Navbar */}
-        <nav className={`fixed left-1/2 -translate-x-1/2 w-[96%] max-w-7xl z-50 transition-all duration-500 rounded-2xl border ${scrolled ? "top-4 bg-[#fdfbf7]/95 backdrop-blur-md shadow-xl border-slate-200 py-3" : "top-6 bg-[#fdfbf7] shadow-lg border-transparent py-4"}`}>
-          <div className="px-6 md:px-8 flex items-center justify-between">
+        <nav className={`fixed left-1/2 -translate-x-1/2 w-[96%] max-w-7xl z-50 transition-all duration-500 rounded-2xl border ${scrolled ? "top-4 bg-[#fdfbf7]/95 backdrop-blur-md shadow-xl border-slate-200 py-5" : "top-6 bg-[#fdfbf7] shadow-lg border-transparent py-6"}`}>
+          <div className="px-6 md:px-10 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="relative h-20 w-[280px] -my-2">
-                 <Image src="/icon.png" alt="MotoAdmin" fill className="object-contain object-left" priority />
+              <div className="relative h-24 w-[360px]">
+                 <Image src="/icon.png" alt="MotoAdmin" fill className="object-cover object-left" priority />
               </div>
             </div>
 
@@ -402,8 +402,8 @@ export default function LandingPage() {
           <div className="max-w-7xl mx-auto px-6 md:px-12">
             <div className="flex flex-col md:flex-row justify-between items-center gap-8 mb-12">
               <div className="flex items-center gap-3">
-                 <div className="relative h-16 w-[240px]">
-                   <Image src="/icon.png" alt="MotoAdmin" fill className="object-contain object-left opacity-90" />
+                 <div className="relative h-20 w-[300px]">
+                   <Image src="/icon.png" alt="MotoAdmin" fill className="object-cover object-left opacity-90" />
                  </div>
               </div>
               <div className="flex gap-6 text-sm font-medium text-gray-400">
