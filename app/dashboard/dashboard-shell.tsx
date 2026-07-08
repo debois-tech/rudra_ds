@@ -60,11 +60,11 @@ export function DashboardShell({ profile, orgName, children }: DashboardShellPro
         <div className="min-h-screen flex flex-col bg-[#f8f9fb]">
             {/* ── Desktop Header — warm ivory light theme ── */}
             <header className="hidden md:block sticky top-0 z-50 bg-[#fdfbf7] border-b border-slate-200 shadow-sm">
-                <div className="flex h-24 items-center justify-between px-6 max-w-[1440px] mx-auto">
+                <div className="flex h-14 items-center justify-between px-6 max-w-[1440px] mx-auto">
                     {/* Left: Logo + Nav */}
                     <div className="flex items-center gap-10">
                         <Link href="/dashboard" className="flex items-center gap-3 shrink-0">
-                            <div className="relative h-20 w-[320px]">
+                            <div className="relative h-10 w-[320px]">
                                 <Image src="/logo_icon.png" alt="MotoAdmin" fill className="object-cover object-left" priority />
                             </div>
                             {orgName && (
@@ -140,9 +140,9 @@ export function DashboardShell({ profile, orgName, children }: DashboardShellPro
             </header>
 
             {/* ── Mobile Header — warm ivory theme ── */}
-            <header className="md:hidden flex h-24 items-center justify-between px-5 bg-[#fdfbf7] border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+            <header className="md:hidden flex h-16 items-center justify-between px-5 bg-[#fdfbf7] border-b border-slate-200 sticky top-0 z-50 shadow-sm">
                 <Link href="/dashboard" className="flex items-center gap-2">
-                    <div className="relative h-16 w-[260px]">
+                    <div className="relative h-10 w-[260px]">
                         <Image src="/logo_icon.png" alt="MotoAdmin" fill className="object-cover object-left" priority />
                     </div>
                 </Link>
