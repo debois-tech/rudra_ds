@@ -118,8 +118,8 @@ export default function LandingPage() {
         <nav className={`fixed left-1/2 -translate-x-1/2 w-[96%] max-w-7xl z-50 transition-all duration-500 rounded-2xl border ${scrolled ? "top-4 bg-[#fdfbf7]/95 backdrop-blur-md shadow-xl border-slate-200 py-2.5" : "top-6 bg-[#fdfbf7] shadow-lg border-transparent py-3"}`}>
           <div className="px-6 md:px-10 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="relative h-12 w-[360px]">
-                 <Image src="/logo_icon.png" alt="MotoAdmin" fill className="object-cover object-left" priority />
+              <div className="relative h-12 w-[180px]">
+                 <Image src="/logo_icon.png" alt="MotoAdmin" fill className="object-contain object-left scale-[1.8] origin-left" priority />
               </div>
             </div>
 
@@ -402,8 +402,8 @@ export default function LandingPage() {
           <div className="max-w-7xl mx-auto px-6 md:px-12">
             <div className="flex flex-col md:flex-row justify-between items-center gap-8 mb-12">
               <div className="flex items-center gap-3">
-                 <div className="relative h-10 w-[300px]">
-                   <Image src="/logo_icon.png" alt="MotoAdmin" fill className="object-cover object-left opacity-90" priority />
+                 <div className="relative h-10 w-[180px]">
+                   <Image src="/logo_icon.png" alt="MotoAdmin" fill className="object-contain object-left scale-[1.8] origin-left opacity-90" priority />
                  </div>
               </div>
               <div className="flex gap-6 text-sm font-medium text-gray-400">
