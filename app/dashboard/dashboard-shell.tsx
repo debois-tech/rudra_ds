@@ -142,8 +142,8 @@ export function DashboardShell({ profile, orgName, children }: DashboardShellPro
             {/* ── Mobile Header — warm ivory theme ── */}
             <header className="md:hidden flex h-16 items-center justify-between px-5 bg-[#fdfbf7] border-b border-slate-200 sticky top-0 z-50 shadow-sm">
                 <Link href="/dashboard" className="flex items-center gap-2">
-                    <div className="relative h-10 w-[150px]">
-                        <Image src="/logo_icon.png" alt="MotoAdmin" fill className="object-contain object-left scale-[1.8] origin-left" priority />
+                    <div className="relative h-10 w-[120px]">
+                        <Image src="/logo_icon.png" alt="MotoAdmin" fill className="object-contain object-left scale-[1.4] origin-left" priority />
                     </div>
                 </Link>
 
