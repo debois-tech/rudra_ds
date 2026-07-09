@@ -119,6 +119,9 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    scroll-behavior: smooth;
+  }
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
@@ -181,6 +184,89 @@
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+/* Hero light background glow */
+@keyframes heroGlowLight {
+  0%, 100% { transform: translate(-50%, -40%) scale(1); opacity: 0.35; }
+  50%       { transform: translate(-50%, -40%) scale(1.08); opacity: 0.5; }
+}
+
+@keyframes heroGlowLight2 {
+  0%, 100% { transform: translate(20%, -40%) scale(1); opacity: 0.2; }
+  50%       { transform: translate(20%, -40%) scale(1.1); opacity: 0.35; }
+}
+
+.hero-bg-light {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.hero-bg-light::before {
+  content: "";
+  position: absolute;
+  top: 55%;
+  left: 50%;
+  width: 700px;
+  height: 500px;
+  background: radial-gradient(ellipse, #fef3c7 0%, #fde68a 30%, transparent 70%);
+  border-radius: 50%;
+  filter: blur(60px);
+  animation: heroGlowLight 10s ease-in-out infinite;
+}
+
+.hero-bg-light::after {
+  content: "";
+  position: absolute;
+  top: 20%;
+  right: -5%;
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, #fed7aa 0%, transparent 70%);
+  border-radius: 50%;
+  filter: blur(40px);
+  animation: heroGlowLight2 14s ease-in-out infinite;
+}
+
+/* Animated gradient shimmer for hero text */
+@keyframes gradientShimmer {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.gradient-shimmer {
+  background-size: 200% auto;
+  animation: gradientShimmer 6s ease-in-out infinite;
+}
+
+/* Scroll-to-top button */
+.scroll-to-top {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  z-index: 40;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: white;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+.scroll-to-top:hover {
+  box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+  transform: translateY(-2px);
+  color: #d97706;
+  border-color: #fde68a;
 }
 
 /* Smooth scrollbar */
