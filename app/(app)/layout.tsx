@@ -1,14 +1,9 @@
 import { cookies } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
 import { redirect } from 'next/navigation'
-import { DashboardShell } from './dashboard-shell'
+import { AppShell } from './app-shell'
 
-/**
- * Dashboard Layout — Server Component
- * Verifies authentication on the server before rendering any content.
- * This prevents "flash of unauthorized content" that occurs with client-only auth.
- */
-export default async function DashboardLayout({
+export default async function AppLayout({
     children,
 }: {
     children: React.ReactNode
@@ -21,7 +16,7 @@ export default async function DashboardLayout({
         {
             cookies: {
                 getAll() { return cookieStore.getAll() },
-                setAll() { /* no-op in server component */ },
+                setAll() { },
             },
         }
     )
@@ -32,7 +27,6 @@ export default async function DashboardLayout({
         redirect('/login')
     }
 
-    // Fetch profile data on server to pass down
     const { data: profile } = await supabase
         .from('profiles')
         .select('id, org_id, role, full_name, email, avatar_url, is_active')
@@ -43,7 +37,6 @@ export default async function DashboardLayout({
         redirect('/login')
     }
 
-    // Fetch org name if user has an org
     let orgName = ''
     if (profile.org_id) {
         const { data: org } = await supabase
@@ -55,7 +48,7 @@ export default async function DashboardLayout({
     }
 
     return (
-        <DashboardShell
+        <AppShell
             profile={{
                 id: profile.id,
                 org_id: profile.org_id,
@@ -68,6 +61,6 @@ export default async function DashboardLayout({
             orgName={orgName}
         >
             {children}
-        </DashboardShell>
+        </AppShell>
     )
 }

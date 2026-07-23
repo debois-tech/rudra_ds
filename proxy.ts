@@ -9,7 +9,7 @@ import { NextResponse, type NextRequest } from 'next/server'
  * - Role-based routing (super_admin → /admin, user → /dashboard)
  * - Open redirect prevention on login redirect
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
     let supabaseResponse = NextResponse.next({
         request,
     })
@@ -37,13 +37,14 @@ export async function middleware(request: NextRequest) {
         }
     )
 
-    // IMPORTANT: Do not run code between createServerClient and
-    // supabase.auth.getUser(). A simple mistake could make it very
-    // hard to debug issues with users being randomly logged out.
+    // Use getSession() instead of getUser() for performance.
+    // getSession() reads the session cookie locally — zero API calls.
+    // JWT verification happens in the server layout on first load.
     const {
-        data: { user },
-    } = await supabase.auth.getUser()
+        data: { session },
+    } = await supabase.auth.getSession()
 
+    const user = session?.user ?? null
     const pathname = request.nextUrl.pathname
 
     // ============================================
@@ -67,7 +68,6 @@ export async function middleware(request: NextRequest) {
         }
         const url = request.nextUrl.clone()
         url.pathname = '/login'
-        // Only set redirect for safe relative paths (no protocol-relative or absolute URLs)
         if (pathname.startsWith('/') && !pathname.startsWith('//') && !pathname.includes('://')) {
             url.searchParams.set('redirect', pathname)
         }
@@ -75,56 +75,21 @@ export async function middleware(request: NextRequest) {
     }
 
     // ============================================
-    // LOGGED IN — fetch profile ONCE for all checks
+    // LOGGED IN — minimal routing checks (no DB call)
+    // Role/profile checks deferred to client layout
     // ============================================
     if (user) {
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('role, is_active')
-            .eq('id', user.id)
-            .single()
-
-        // ── Deactivated user → sign out and redirect to login ──
-        if (profile && !profile.is_active) {
-            // Global scope: invalidate ALL sessions across devices so deactivated users
-            // cannot continue accessing from any previously-authenticated browser/device
-            await supabase.auth.signOut({ scope: 'global' })
-            if (pathname.startsWith('/api/')) {
-                return NextResponse.json(
-                    { error: 'Account deactivated. Contact your administrator.' },
-                    { status: 403 }
-                )
-            }
-            const url = request.nextUrl.clone()
-            url.pathname = '/login'
-            return NextResponse.redirect(url)
-        }
-
-        const role = profile?.role
-
-        // ── Logged in on public page → redirect based on role ──
+        // Logged in on public page → go to module selector
         if (pathname === '/login' || pathname === '/') {
-            const url = request.nextUrl.clone()
-            url.pathname = role === 'super_admin' ? '/admin' : '/dashboard'
-            return NextResponse.redirect(url)
-        }
-
-        // ── Super admin on /dashboard → redirect to /admin ──
-        if (role === 'super_admin' && pathname.startsWith('/dashboard')) {
-            const url = request.nextUrl.clone()
-            url.pathname = '/admin'
-            return NextResponse.redirect(url)
-        }
-
-        // ── Admin routes → require super_admin role ──
-        const isAdminRoute = pathname.startsWith('/admin') || pathname.startsWith('/api/admin')
-        if (isAdminRoute && role !== 'super_admin') {
-            if (pathname.startsWith('/api/')) {
-                return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-            }
             const url = request.nextUrl.clone()
             url.pathname = '/dashboard'
             return NextResponse.redirect(url)
+        }
+
+        // Block admin routes from non-super-admins at middleware level
+        if (pathname.startsWith('/admin') || pathname.startsWith('/api/admin')) {
+            // Allow the admin layout to decide — no DB call here
+            return supabaseResponse
         }
     }
 

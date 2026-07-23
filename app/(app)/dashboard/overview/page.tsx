@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useContext } from 'react';
+import { DashboardOrgContext } from '../../app-shell';
 import { dashboardApi } from '@/lib/api';
 import type {
     DashboardStats, CustomerDashboardView, ServiceOverview,
@@ -345,6 +346,7 @@ function getGreeting(): string {
 // ═══════════════════════════════════════════
 
 export default function DashboardPage() {
+    const orgName = useContext(DashboardOrgContext)
     const [stats, setStats] = useState<DashboardStats>({
         totalCustomers: 0, totalVehicles: 0, totalServices: 0, totalRevenue: 0,
     });
@@ -420,6 +422,9 @@ export default function DashboardPage() {
             {/* ── Page Header ── */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
+                    {orgName && (
+                        <p className="text-[13px] font-semibold text-amber-600 mb-1">{orgName}</p>
+                    )}
                     <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
                         {getGreeting()} 👋
                     </h1>

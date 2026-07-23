@@ -162,10 +162,10 @@ export default function CustomerDetailPage() {
                 <div className="space-y-4">
                   {[
                     { icon: Phone, label: 'Mobile', value: customer.c_mobile, isLink: true, prefix: 'tel:' },
-                    { icon: Phone, label: 'WhatsApp', value: customer.c_whatsapp || '—', isLink: !!customer.c_whatsapp, prefix: 'https://wa.me/91' },
-                    { icon: Mail, label: 'Email', value: customer.c_email || '—', isLink: !!customer.c_email, prefix: 'mailto:' },
-                    { icon: MapPin, label: 'Address', value: customer.c_address || '—' },
-                    { icon: Calendar, label: 'Birthday', value: customer.c_dob ? format(new Date(customer.c_dob), 'dd MMM yyyy') : '—' },
+                    { icon: Phone, label: 'WhatsApp', value: customer.c_whatsapp || 'â€”', isLink: !!customer.c_whatsapp, prefix: 'https://wa.me/91' },
+                    { icon: Mail, label: 'Email', value: customer.c_email || 'â€”', isLink: !!customer.c_email, prefix: 'mailto:' },
+                    { icon: MapPin, label: 'Address', value: customer.c_address || 'â€”' },
+                    { icon: Calendar, label: 'Birthday', value: customer.c_dob ? format(new Date(customer.c_dob), 'dd MMM yyyy') : 'â€”' },
                     { icon: Clock, label: 'Joined', value: format(new Date(customer.created_at), 'dd MMM yyyy') },
                   ].map((item, i) => (
                     <div key={i} className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
@@ -213,7 +213,7 @@ export default function CustomerDetailPage() {
                         </div>
                         <div>
                           <p className="font-bold text-slate-900 tracking-wide font-mono text-sm">{v.v_number}</p>
-                          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{v.v_name || 'Unnamed'} · {v.v_type}</p>
+                          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{v.v_name || 'Unnamed'} Â· {v.v_type}</p>
                         </div>
                       </div>
                     </div>
@@ -262,7 +262,7 @@ export default function CustomerDetailPage() {
                             <p className="text-xs font-semibold text-slate-700">{format(new Date(s.issue_date), 'dd MMM yyyy')}</p>
                             <p className="text-xs text-slate-500">{s.expiry_date ? format(new Date(s.expiry_date), 'dd MMM yyyy') : 'No Expiry'}</p>
                           </td>
-                          <td className="py-3 px-4 text-right font-bold text-slate-900">₹{Number(s.total_cost).toLocaleString()}</td>
+                          <td className="py-3 px-4 text-right font-bold text-slate-900">â‚¹{Number(s.total_cost).toLocaleString()}</td>
                         </tr>
                       ))}
                     </tbody>
