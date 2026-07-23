@@ -49,14 +49,60 @@
 ### 7e. Route Fix
 - Moved new service wizard from `/dashboard/services` → `/dashboard/services/new`.
 
-### 7f. Driving School Pages (all with static/mock data — no DB calls yet)
-| Route | Page |
-|-------|------|
-| `/driving-school` | Overview with 4 stat cards + 3 quick-link cards |
-| `/driving-school/instructors` | Searchable list with status badges |
-| `/driving-school/fleet` | Filterable list with Available/In Use/Maintenance badges |
-| `/driving-school/logs` | Daily logs table with date picker and Release action |
-| `/driving-school/students` | Student list with fee progress bars |
-| `/driving-school/students/new` | Enrollment form (course type, fee, personal info) |
-| `/driving-school/students/[id]` | Profile with Overview/Fees/Attendance tabs |
-| `/driving-school/attendance` | Date-filtered attendance records |
+### 7f. Initial DS Pages (static/mock data - later wired to DB)
+- All 8 Driving School pages created with mock data: Overview, Instructors, Fleet, Daily Logs, Students (list + enroll + profile), Attendance.
+
+---
+
+## 8. Phase 2 — Driving School Database Layer
+
+### 8a. Schema (`supabase/ds_schema.sql`)
+- 6 new tables: `ds_instructors`, `ds_fleet_vehicles`, `ds_driving_logs`, `ds_students`, `ds_fee_payments`, `ds_attendance`
+- All with UUID PKs, `org_id` FK → organizations, `created_at`/`updated_at` triggers, indexes.
+
+### 8b. RLS (`supabase/ds_rls.sql`)
+- Super admin: full access via `sa_all_*` policies.
+- Users: org-scoped CRUD via `user_crud_*` policies using existing `get_user_org_id()` helper.
+
+### 8c. Views (`supabase/ds_views.sql`)
+- `v_ds_driving_logs` — logs with instructor name + vehicle number
+- `v_ds_attendance` — attendance with student, instructor, vehicle info
+- `v_ds_student_dashboard` — students with total paid, pending balance, attendance count
+
+---
+
+## 9. Phase 3 — Types & API Layer
+
+### 9a. TypeScript Types (`lib/types.ts`)
+- Added 15+ new interfaces: `DsInstructor`, `DsFleetVehicle`, `DsDrivingLog`, `DsStudent`, `DsFeePayment`, `DsAttendance` + their `FormData` and `View` variants + `DsDashboardStats`.
+
+### 9b. API Client (`lib/ds-api.ts`)
+- 7 API objects following the existing `lib/api.ts` pattern:
+  - `instructorApi` — CRUD for instructors
+  - `fleetVehicleApi` — CRUD for fleet vehicles
+  - `drivingLogApi` — getByDate, getByDateRange, create, release
+  - `studentApi` — CRUD + search + getByIdWithStats
+  - `feePaymentApi` — getByStudent, create
+  - `attendanceApi` — getByDate, getByStudent, mark (auto-resolves vehicle from log), delete
+  - `dsDashboardApi` — getStats (active logs, students, monthly fees, pending)
+
+---
+
+## 10. Phase 4 — Frontend Pages Wired to DB + CRUD Dialogs
+
+All 8 DS pages migrated from mock data to live Supabase queries:
+
+| Page | Key changes |
+|------|-------------|
+| Overview | Replaced hardcoded stats with `dsDashboardApi.getStats()` |
+| Instructors | List from DB + Add/Edit Sheet dialog + Deactivate/Activate toggle + Delete with confirm |
+| Fleet | List from DB + Add/Edit Sheet dialog + Deactivate/Activate toggle + Delete with confirm |
+| Daily Logs | Live table via `drivingLogApi.getByDate()` + Release button calls API |
+| Students List | `studentApi.getAll()` with fee progress + hover Delete button with confirm |
+| Enroll Student | Form submits via `studentApi.create()` (was static redirect) |
+| Student Profile | All 3 tabs load from DB: `studentApi.getByIdWithStats()`, `feePaymentApi.getByStudent()`, `attendanceApi.getByStudent()` |
+| Attendance | `attendanceApi.getByDate()` on date change |
+
+### Type fixes
+- Added `is_active` to `DsInstructorFormData` and `DsFleetVehicleFormData`
+- Updated `instructorApi.update()` and `fleetVehicleApi.update()` to use partial payloads (only send defined fields)

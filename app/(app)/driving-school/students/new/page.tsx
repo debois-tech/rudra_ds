@@ -6,6 +6,7 @@ import { GraduationCap, ArrowLeft, IndianRupee } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
+import { studentApi } from '@/lib/ds-api'
 import Link from 'next/link'
 
 const courseTypes = ['LMV', 'MCWG', 'HMV', 'Transport', 'Conductor', 'Others']
@@ -19,11 +20,26 @@ export default function EnrollStudentPage() {
     const [dob, setDob] = useState('')
     const [course, setCourse] = useState('LMV')
     const [fee, setFee] = useState('')
+    const [submitting, setSubmitting] = useState(false)
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        // Static: just show a success and redirect
-        router.push('/driving-school/students')
+        setSubmitting(true)
+        try {
+            await studentApi.create({
+                name,
+                phone,
+                email: email || undefined,
+                address: address || undefined,
+                dob: dob || undefined,
+                course_type: course,
+                total_fee: Number(fee) || 0,
+            })
+            router.push('/driving-school/students')
+        } catch (err) {
+            console.error(err)
+            setSubmitting(false)
+        }
     }
 
     return (
@@ -98,8 +114,8 @@ export default function EnrollStudentPage() {
                                     Cancel
                                 </Button>
                             </Link>
-                            <Button type="submit" className="rounded-xl h-9 px-6 text-[13px] font-medium bg-amber-500 hover:bg-amber-600 text-black cursor-pointer">
-                                Enroll Student
+                            <Button type="submit" disabled={submitting} className="rounded-xl h-9 px-6 text-[13px] font-medium bg-amber-500 hover:bg-amber-600 text-black cursor-pointer disabled:opacity-50">
+                                {submitting ? 'Enrolling...' : 'Enroll Student'}
                             </Button>
                         </div>
                     </form>

@@ -1,16 +1,24 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { GraduationCap, Car, CalendarClock, IndianRupee, Users, Plus, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
-
-const stats = [
-    { label: 'Today\'s Active Logs', value: '3', icon: CalendarClock, color: 'bg-amber-50 text-amber-600' },
-    { label: 'Active Students', value: '12', icon: GraduationCap, color: 'bg-emerald-50 text-emerald-600' },
-    { label: 'Fee Collection (Month)', value: '₹18,500', icon: IndianRupee, color: 'bg-blue-50 text-blue-600' },
-    { label: 'Pending Fees Total', value: '₹24,000', icon: Users, color: 'bg-red-50 text-red-600' },
-]
+import { dsDashboardApi } from '@/lib/ds-api'
 
 export default function DrivingSchoolOverview() {
+    const [stats, setStats] = useState({ activeLogsToday: 0, activeStudents: 0, feeCollectionThisMonth: 0, pendingFeesTotal: 0 })
+
+    useEffect(() => {
+        dsDashboardApi.getStats().then(setStats).catch(console.error)
+    }, [])
+
+    const statCards = [
+        { label: 'Today\'s Active Logs', value: stats.activeLogsToday.toString(), icon: CalendarClock, color: 'bg-amber-50 text-amber-600' },
+        { label: 'Active Students', value: stats.activeStudents.toString(), icon: GraduationCap, color: 'bg-emerald-50 text-emerald-600' },
+        { label: 'Fee Collection (Month)', value: `₹${stats.feeCollectionThisMonth.toLocaleString('en-IN')}`, icon: IndianRupee, color: 'bg-blue-50 text-blue-600' },
+        { label: 'Pending Fees Total', value: `₹${stats.pendingFeesTotal.toLocaleString('en-IN')}`, icon: Users, color: 'bg-red-50 text-red-600' },
+    ]
+
     return (
         <div className="space-y-8 animate-fade-in">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -35,7 +43,7 @@ export default function DrivingSchoolOverview() {
             </div>
 
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                {stats.map((stat) => (
+                {statCards.map((stat) => (
                     <div key={stat.label} className="bg-white rounded-2xl border border-slate-100 p-5 card-hover group">
                         <div className="flex items-center justify-between mb-3.5">
                             <span className="text-[13px] font-medium text-slate-400 uppercase tracking-wide">{stat.label}</span>

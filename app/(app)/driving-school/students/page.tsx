@@ -1,19 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Plus, Search, GraduationCap, Phone, IndianRupee, ChevronRight } from 'lucide-react'
+import { Plus, Search, GraduationCap, Phone, IndianRupee, ChevronRight, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
-
-const mockStudents = [
-    { id: '1', name: 'Rohan Deshmukh', phone: '9876543210', course: 'LMV', total_fee: 8000, paid: 5000, status: 'active' as const },
-    { id: '2', name: 'Priya Sharma', phone: '9876543211', course: 'MCWG', total_fee: 10000, paid: 10000, status: 'active' as const },
-    { id: '3', name: 'Amit Verma', phone: '9876543212', course: 'LMV', total_fee: 7000, paid: 2000, status: 'active' as const },
-    { id: '4', name: 'Sneha Patel', phone: '9876543213', course: 'HMV', total_fee: 12000, paid: 12000, status: 'completed' as const },
-    { id: '5', name: 'Vikas Yadav', phone: '9876543214', course: 'LMV', total_fee: 8000, paid: 0, status: 'dropped' as const },
-]
+import { studentApi } from '@/lib/ds-api'
+import type { DsStudentDashboardView } from '@/lib/types'
+import { toast } from 'sonner'
 
 const statusStyles: Record<string, string> = {
     active: 'bg-emerald-50 text-emerald-600',
@@ -22,12 +17,37 @@ const statusStyles: Record<string, string> = {
 }
 
 export default function StudentsPage() {
+    const [students, setStudents] = useState<DsStudentDashboardView[]>([])
     const [search, setSearch] = useState('')
-    const filtered = mockStudents.filter(s =>
-        s.name.toLowerCase().includes(search.toLowerCase()) ||
-        s.phone.includes(search) ||
-        s.course.toLowerCase().includes(search.toLowerCase())
-    )
+    const [loading, setLoading] = useState(true)
+
+    const fetchList = () => {
+        studentApi.getAll()
+            .then(data => { setStudents(data); setLoading(false) })
+            .catch(() => toast.error('Failed to load students'))
+    }
+
+    useEffect(() => { fetchList() }, [])
+
+    const handleDelete = async (e: React.MouseEvent, id: string, name: string) => {
+        e.preventDefault()
+        e.stopPropagation()
+        if (!confirm(`Delete student "${name}"? This will also remove their fee records and attendance.`)) return
+        try {
+            await studentApi.delete(id)
+            toast.success('Student deleted')
+            fetchList()
+        } catch { toast.error('Failed to delete student') }
+    }
+
+    const filtered = search
+        ? students.filter(s =>
+            s.name.toLowerCase().includes(search.toLowerCase()) ||
+            s.phone.includes(search) ||
+            s.course_type.toLowerCase().includes(search.toLowerCase()))
+        : students
+
+    if (loading) return <div className="text-center py-12 text-slate-400 text-sm">Loading...</div>
 
     return (
         <div className="space-y-6 animate-fade-in">
@@ -56,51 +76,59 @@ export default function StudentsPage() {
 
             <div className="grid gap-3">
                 {filtered.map((student) => {
-                    const pending = student.total_fee - student.paid
-                    const pct = student.total_fee > 0 ? (student.paid / student.total_fee) * 100 : 0
+                    const pct = student.total_fee > 0 ? (student.total_paid / student.total_fee) * 100 : 0
                     return (
-                        <Link key={student.id} href={`/driving-school/students/${student.id}`}>
-                            <Card className="bg-white border-slate-100 hover:border-amber-200 transition-colors cursor-pointer">
-                                <CardContent className="py-4">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-4">
-                                            <div className="h-10 w-10 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white text-sm font-bold">
-                                                {student.name.charAt(0)}
+                        <div key={student.id} className="group relative">
+                            <Link href={`/driving-school/students/${student.id}`}>
+                                <Card className="bg-white border-slate-100 hover:border-amber-200 transition-colors cursor-pointer">
+                                    <CardContent className="py-4">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-4">
+                                                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white text-sm font-bold">
+                                                    {student.name.charAt(0)}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="text-[14px] font-semibold text-slate-900">{student.name}</p>
+                                                        <span className={`px-2 py-0.5 rounded text-[11px] font-medium capitalize ${statusStyles[student.status]}`}>
+                                                            {student.status}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center gap-4 mt-0.5">
+                                                        <span className="text-[12px] text-slate-400 flex items-center gap-1">
+                                                            <Phone className="h-3 w-3" /> {student.phone}
+                                                        </span>
+                                                        <span className="text-[12px] text-slate-400">{student.course_type}</span>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2">
-                                                    <p className="text-[14px] font-semibold text-slate-900">{student.name}</p>
-                                                    <span className={`px-2 py-0.5 rounded text-[11px] font-medium capitalize ${statusStyles[student.status]}`}>
-                                                        {student.status}
-                                                    </span>
+                                            <div className="flex items-center gap-6">
+                                                <div className="text-right">
+                                                    <p className="text-[13px] font-semibold text-slate-900">₹{student.total_paid.toLocaleString('en-IN')}</p>
+                                                    <p className="text-[11px] text-slate-400">of ₹{student.total_fee.toLocaleString('en-IN')}</p>
                                                 </div>
-                                                <div className="flex items-center gap-4 mt-0.5">
-                                                    <span className="text-[12px] text-slate-400 flex items-center gap-1">
-                                                        <Phone className="h-3 w-3" /> {student.phone}
-                                                    </span>
-                                                    <span className="text-[12px] text-slate-400">{student.course}</span>
+                                                <div className="w-20">
+                                                    <div className="h-1.5 rounded-full bg-slate-100">
+                                                        <div className="h-1.5 rounded-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} />
+                                                    </div>
+                                                    {student.pending_balance > 0 && (
+                                                        <p className="text-[10px] text-red-500 mt-0.5 text-right">₹{student.pending_balance.toLocaleString('en-IN')} pending</p>
+                                                    )}
                                                 </div>
+                                                <ChevronRight className="h-4 w-4 text-slate-300" />
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-6">
-                                            <div className="text-right">
-                                                <p className="text-[13px] font-semibold text-slate-900">₹{student.paid.toLocaleString('en-IN')}</p>
-                                                <p className="text-[11px] text-slate-400">of ₹{student.total_fee.toLocaleString('en-IN')}</p>
-                                            </div>
-                                            <div className="w-20">
-                                                <div className="h-1.5 rounded-full bg-slate-100">
-                                                    <div className="h-1.5 rounded-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} />
-                                                </div>
-                                                {pending > 0 && (
-                                                    <p className="text-[10px] text-red-500 mt-0.5 text-right">₹{pending.toLocaleString('en-IN')} pending</p>
-                                                )}
-                                            </div>
-                                            <ChevronRight className="h-4 w-4 text-slate-300" />
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </Link>
+                                    </CardContent>
+                                </Card>
+                            </Link>
+                            <button
+                                onClick={(e) => handleDelete(e, student.id, student.name)}
+                                className="absolute top-2 right-2 h-8 w-8 rounded-lg bg-white/80 hover:bg-red-50 text-slate-300 hover:text-red-500 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer border border-slate-100"
+                                title="Delete student"
+                            >
+                                <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                        </div>
                     )
                 })}
             </div>

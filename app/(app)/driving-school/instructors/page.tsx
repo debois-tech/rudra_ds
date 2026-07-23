@@ -1,26 +1,97 @@
 'use client'
 
-import { useState } from 'react'
-import { Plus, Search, UserCircle, Phone, IdCard, MoreVertical } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Plus, Search, UserCircle, Phone, IdCard, MoreVertical, Pencil, Power, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
-
-const mockInstructors = [
-    { id: '1', name: 'Rajesh Kumar', phone: '9876543210', licence_no: 'MH12 20230012345', is_active: true },
-    { id: '2', name: 'Suresh Patel', phone: '9876543211', licence_no: 'MH12 20230012346', is_active: true },
-    { id: '3', name: 'Amit Singh', phone: '9876543212', licence_no: 'MH12 20230012347', is_active: false },
-    { id: '4', name: 'Vijay Sharma', phone: '9876543213', licence_no: 'MH12 20230012348', is_active: true },
-    { id: '5', name: 'Ravi Verma', phone: '9876543214', licence_no: 'MH12 20230012349', is_active: true },
-]
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetClose } from '@/components/ui/sheet'
+import { instructorApi } from '@/lib/ds-api'
+import type { DsInstructor } from '@/lib/types'
+import { toast } from 'sonner'
 
 export default function InstructorsPage() {
+    const [instructors, setInstructors] = useState<DsInstructor[]>([])
     const [search, setSearch] = useState('')
-    const filtered = mockInstructors.filter(i =>
+    const [loading, setLoading] = useState(true)
+
+    const [sheetOpen, setSheetOpen] = useState(false)
+    const [editTarget, setEditTarget] = useState<DsInstructor | null>(null)
+    const [formName, setFormName] = useState('')
+    const [formPhone, setFormPhone] = useState('')
+    const [formLicence, setFormLicence] = useState('')
+    const [saving, setSaving] = useState(false)
+
+    const [menuOpen, setMenuOpen] = useState<string | null>(null)
+
+    const fetchList = () => {
+        instructorApi.getAll()
+            .then(data => { setInstructors(data); setLoading(false) })
+            .catch(() => toast.error('Failed to load instructors'))
+    }
+
+    useEffect(() => { fetchList() }, [])
+
+    const openAdd = () => {
+        setEditTarget(null)
+        setFormName('')
+        setFormPhone('')
+        setFormLicence('')
+        setSheetOpen(true)
+    }
+
+    const openEdit = (i: DsInstructor) => {
+        setEditTarget(i)
+        setFormName(i.name)
+        setFormPhone(i.phone)
+        setFormLicence(i.licence_no || '')
+        setSheetOpen(true)
+        setMenuOpen(null)
+    }
+
+    const handleSave = async (e: React.FormEvent) => {
+        e.preventDefault()
+        setSaving(true)
+        try {
+            if (editTarget) {
+                await instructorApi.update(editTarget.id, { name: formName, phone: formPhone, licence_no: formLicence || undefined })
+                toast.success('Instructor updated')
+            } else {
+                await instructorApi.create({ name: formName, phone: formPhone, licence_no: formLicence || undefined })
+                toast.success('Instructor added')
+            }
+            setSheetOpen(false)
+            fetchList()
+        } catch { toast.error('Failed to save instructor') }
+        finally { setSaving(false) }
+    }
+
+    const toggleActive = async (i: DsInstructor) => {
+        try {
+            await instructorApi.update(i.id, { name: i.name, phone: i.phone, licence_no: i.licence_no || undefined, is_active: !i.is_active })
+            toast.success(`Instructor ${i.is_active ? 'deactivated' : 'activated'}`)
+            fetchList()
+        } catch { toast.error('Failed to update status') }
+        setMenuOpen(null)
+    }
+
+    const handleDelete = async (id: string) => {
+        if (!confirm('Delete this instructor? This cannot be undone.')) return
+        try {
+            await instructorApi.delete(id)
+            toast.success('Instructor deleted')
+            fetchList()
+        } catch { toast.error('Failed to delete instructor') }
+        setMenuOpen(null)
+    }
+
+    const filtered = instructors.filter(i =>
         i.name.toLowerCase().includes(search.toLowerCase()) ||
         i.phone.includes(search) ||
-        i.licence_no.toLowerCase().includes(search.toLowerCase())
+        (i.licence_no || '').toLowerCase().includes(search.toLowerCase())
     )
+
+    if (loading) return <div className="text-center py-12 text-slate-400 text-sm">Loading...</div>
 
     return (
         <div className="space-y-6 animate-fade-in">
@@ -29,7 +100,7 @@ export default function InstructorsPage() {
                     <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Instructors</h1>
                     <p className="text-[14px] text-slate-400 mt-1">Manage driving school teaching staff</p>
                 </div>
-                <Button className="rounded-xl h-9 px-4 text-[13px] font-medium bg-amber-500 hover:bg-amber-600 text-black shadow-sm cursor-pointer">
+                <Button onClick={openAdd} className="rounded-xl h-9 px-4 text-[13px] font-medium bg-amber-500 hover:bg-amber-600 text-black shadow-sm cursor-pointer">
                     <Plus className="h-3.5 w-3.5 mr-1.5" />
                     Add Instructor
                 </Button>
@@ -65,15 +136,33 @@ export default function InstructorsPage() {
                                             <span className="text-[12px] text-slate-400 flex items-center gap-1">
                                                 <Phone className="h-3 w-3" /> {instructor.phone}
                                             </span>
-                                            <span className="text-[12px] text-slate-400 flex items-center gap-1">
-                                                <IdCard className="h-3 w-3" /> {instructor.licence_no}
-                                            </span>
+                                            {instructor.licence_no && (
+                                                <span className="text-[12px] text-slate-400 flex items-center gap-1">
+                                                    <IdCard className="h-3 w-3" /> {instructor.licence_no}
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
-                                <Button variant="ghost" size="icon" className="text-slate-300 hover:text-slate-600">
-                                    <MoreVertical className="h-4 w-4" />
-                                </Button>
+                                <div className="relative">
+                                    <Button variant="ghost" size="icon" className="text-slate-300 hover:text-slate-600 cursor-pointer"
+                                        onClick={() => setMenuOpen(menuOpen === instructor.id ? null : instructor.id)}>
+                                        <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                    {menuOpen === instructor.id && (
+                                        <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-xl border border-slate-200 shadow-lg z-10 py-1">
+                                            <button onClick={() => openEdit(instructor)} className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-slate-700 hover:bg-slate-50 cursor-pointer">
+                                                <Pencil className="h-3.5 w-3.5" /> Edit
+                                            </button>
+                                            <button onClick={() => toggleActive(instructor)} className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-slate-700 hover:bg-slate-50 cursor-pointer">
+                                                <Power className="h-3.5 w-3.5" /> {instructor.is_active ? 'Deactivate' : 'Activate'}
+                                            </button>
+                                            <button onClick={() => handleDelete(instructor.id)} className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-red-600 hover:bg-red-50 cursor-pointer">
+                                                <Trash2 className="h-3.5 w-3.5" /> Delete
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </CardContent>
                     </Card>
@@ -86,6 +175,37 @@ export default function InstructorsPage() {
                     <p className="text-sm font-medium">No instructors found</p>
                 </div>
             )}
+
+            <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+                <SheetContent side="right" className="w-full sm:max-w-md">
+                    <SheetHeader>
+                        <SheetTitle>{editTarget ? 'Edit Instructor' : 'Add Instructor'}</SheetTitle>
+                        <SheetDescription>{editTarget ? 'Update instructor details' : 'Add a new driving instructor'}</SheetDescription>
+                    </SheetHeader>
+                    <form onSubmit={handleSave} className="flex flex-col gap-4 p-4">
+                        <div className="space-y-1.5">
+                            <label className="text-[13px] font-medium text-slate-700">Name *</label>
+                            <Input value={formName} onChange={e => setFormName(e.target.value)} required placeholder="Instructor name" className="rounded-xl border-slate-200 h-9 text-sm" />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[13px] font-medium text-slate-700">Phone *</label>
+                            <Input value={formPhone} onChange={e => setFormPhone(e.target.value)} required placeholder="Phone number" className="rounded-xl border-slate-200 h-9 text-sm" />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[13px] font-medium text-slate-700">Licence Number</label>
+                            <Input value={formLicence} onChange={e => setFormLicence(e.target.value)} placeholder="Driving licence number" className="rounded-xl border-slate-200 h-9 text-sm" />
+                        </div>
+                        <SheetFooter className="pt-2">
+                            <SheetClose asChild>
+                                <Button type="button" variant="outline" className="rounded-xl h-9 px-4 text-[13px] border-slate-200 cursor-pointer">Cancel</Button>
+                            </SheetClose>
+                            <Button type="submit" disabled={saving} className="rounded-xl h-9 px-4 text-[13px] font-medium bg-amber-500 hover:bg-amber-600 text-black cursor-pointer disabled:opacity-50">
+                                {saving ? 'Saving...' : editTarget ? 'Update' : 'Add Instructor'}
+                            </Button>
+                        </SheetFooter>
+                    </form>
+                </SheetContent>
+            </Sheet>
         </div>
     )
 }

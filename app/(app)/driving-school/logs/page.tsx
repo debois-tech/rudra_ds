@@ -1,19 +1,33 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { CalendarClock, Plus, UserCircle, Car, Clock, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-
-const mockLogs = [
-    { id: '1', instructor: 'Rajesh Kumar', vehicle: 'MH12 AB 1234 (Swift Dzire)', opted_at: '09:15 AM', released_at: null, notes: '' },
-    { id: '2', instructor: 'Suresh Patel', vehicle: 'MH12 CD 5678 (Hyundai i10)', opted_at: '09:30 AM', released_at: '12:45 PM', notes: 'Morning batch complete' },
-    { id: '3', instructor: 'Amit Singh', vehicle: 'MH12 EF 9012 (Baleno)', opted_at: '10:00 AM', released_at: null, notes: '' },
-    { id: '4', instructor: 'Vijay Sharma', vehicle: 'MH12 GH 3456 (Activa)', opted_at: '11:00 AM', released_at: '01:30 PM', notes: 'Bike training' },
-]
+import { drivingLogApi } from '@/lib/ds-api'
+import type { DsDrivingLogView } from '@/lib/types'
 
 export default function DailyLogsPage() {
     const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+    const [logs, setLogs] = useState<DsDrivingLogView[]>([])
+    const [loading, setLoading] = useState(true)
+
+    const fetchLogs = (d: string) => {
+        setLoading(true)
+        drivingLogApi.getByDate(d).then(data => { setLogs(data); setLoading(false) }).catch(console.error)
+    }
+
+    useEffect(() => { fetchLogs(date) }, [date])
+
+    const handleRelease = async (id: string) => {
+        await drivingLogApi.release(id)
+        fetchLogs(date)
+    }
+
+    const formatTime = (iso: string) => {
+        const d = new Date(iso)
+        return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+    }
 
     return (
         <div className="space-y-6 animate-fade-in">
@@ -51,29 +65,31 @@ export default function DailyLogsPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50">
-                                {mockLogs.map((log) => (
+                                {loading ? (
+                                    <tr><td colSpan={6} className="px-6 py-8 text-center text-slate-400 text-sm">Loading...</td></tr>
+                                ) : logs.map((log) => (
                                     <tr key={log.id} className="hover:bg-slate-50/50 transition-colors">
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
                                                 <UserCircle className="h-6 w-6 text-slate-400" />
-                                                <span className="text-[13px] font-medium text-slate-900">{log.instructor}</span>
+                                                <span className="text-[13px] font-medium text-slate-900">{log.instructor_name}</span>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-2">
                                                 <Car className="h-4 w-4 text-slate-400" />
-                                                <span className="text-[13px] text-slate-600">{log.vehicle}</span>
+                                                <span className="text-[13px] text-slate-600">{log.vehicle_number} {log.vehicle_name ? `(${log.vehicle_name})` : ''}</span>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-1.5">
                                                 <Clock className="h-3.5 w-3.5 text-slate-400" />
-                                                <span className="text-[13px] text-slate-600">{log.opted_at}</span>
+                                                <span className="text-[13px] text-slate-600">{formatTime(log.opted_at)}</span>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
                                             {log.released_at ? (
-                                                <span className="text-[13px] text-slate-600">{log.released_at}</span>
+                                                <span className="text-[13px] text-slate-600">{formatTime(log.released_at)}</span>
                                             ) : (
                                                 <span className="text-[13px] text-slate-300">—</span>
                                             )}
@@ -91,7 +107,8 @@ export default function DailyLogsPage() {
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             {!log.released_at && (
-                                                <Button size="sm" variant="ghost" className="text-[12px] text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg cursor-pointer">
+                                                <Button size="sm" variant="ghost" className="text-[12px] text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg cursor-pointer"
+                                                    onClick={() => handleRelease(log.id)}>
                                                     Release
                                                 </Button>
                                             )}

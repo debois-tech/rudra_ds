@@ -1,6 +1,6 @@
 # Rudra DS — Complete Implementation Roadmap
 
-> **Note:** Items marked with ~~strikethrough~~ are completed. The current focus is the **Driving School module**.
+> **Note:** Items marked with ~~strikethrough~~ are completed. The current focus is **Phase 5: Remaining DS Dialogs**.
 
 ---
 
@@ -15,94 +15,24 @@
 - ~~Nav: Logo size reduced + org name moved from navbar to dashboard page~~
 - ~~Fix: Middleware → Proxy migration (codemod)~~
 - ~~Fix: Routing performance — proxy now uses `getSession()` (cookie read) instead of `getUser()` (API call), removed DB query from proxy~~
+- ~~Phase 1: Route restructure — (app) route group, shared layout, app shell, module selector~~
+- ~~Phase 2: Driving School — Database layer (6 tables, RLS, 3 views)~~
+- ~~Phase 3: Driving School — TypeScript types + API client (`lib/ds-api.ts`)~~
+- ~~Phase 4: Driving School — Frontend pages wired to real DB, CRUD dialogs for Instructors/Fleet/Students~~
 
 ---
 
-## Phase 1: Route Restructure — Module Selector + Shared Layout
+## ~~Phase 1: Route Restructure — Module Selector + Shared Layout~~ ✅
 
-### Step 1.1 — Create `(app)` Route Group
-
-Move existing routes into a shared route group so both modules share a parent layout:
-
-```
-app/
-├── (app)/                    ← NEW route group
-│   ├── layout.tsx            ← Shared layout: auth guard + top nav + floating sub-nav
-│   ├── dashboard/            ← Doc Services module (existing routes moved here)
-│   │   ├── page.tsx          ← Module selector (two big cards: Doc Services / Driving School)
-│   │   ├── overview/page.tsx ← Current dashboard stats content (moved from /dashboard)
-│   │   ├── customers/...     ← Unchanged
-│   │   ├── services/
-│   │   │   ├── page.tsx      ← New service wizard (currently at /dashboard/services)
-│   │   │   └── overview/     ← Services list (currently at /dashboard/services/overview)
-│   │   └── ...
-│   └── driving-school/       ← Driving School module (new)
-│       └── ...
-├── dashboard/                ← DELETE after move (all content moved to (app))
-├── admin/                    ← Unchanged
-├── (auth)/login/             ← Unchanged
-└── ...
-```
-
-**Affected files to create:**
-- `app/(app)/layout.tsx` — Shared auth guard + top nav bar + floating sub-nav
-- `app/(app)/dashboard/page.tsx` — Module selector (replaces current dashboard stats)
-
-**Affected files to move/rename:**
-- `app/dashboard/layout.tsx` → move logic into `app/(app)/layout.tsx`, then delete
-- `app/dashboard/page.tsx` → move stats content to `app/(app)/dashboard/overview/page.tsx`
-- `app/dashboard/dashboard-shell.tsx` → becomes the Doc Services shell (rename to `services-shell.tsx`)
-- `app/dashboard/services/page.tsx` → move to `app/(app)/dashboard/services/new/page.tsx`
-
-### Step 1.2 — Shared Layout (`app/(app)/layout.tsx`)
-
-This layout wraps ALL authenticated pages (both modules). It contains:
-
-1. **Auth guard** (server-side): checks session, fetches profile + org name (same as current `dashboard/layout.tsx`)
-2. **Top nav bar**: Logo (left), profile dropdown with module switch options (right)
-   - Profile dropdown: "Manage Services" → `/dashboard/overview` | "Manage Driving School" → `/driving-school` | Sign Out
-3. **Floating sub-nav bar**: Centered horizontal pills below the top nav
-   - Doc Services active: Overview | Customers | Services
-   - Driving School active: Overview | Instructors | Fleet | Daily Logs | Students | Attendance
-   - Module Selector active: hidden
-4. **Main content area**: renders `{children}`
-
-**Key behavior**: The sub-nav is dynamic based on `pathname`. If path starts with `/dashboard`, show doc services nav. If starts with `/driving-school`, show DS nav. If at `/dashboard` exactly (module selector), hide sub-nav.
-
-### Step 1.3 — Module Selector (`app/(app)/dashboard/page.tsx`)
-
-Two large cards filling the viewport:
-
-```
-┌──────────────────────────────────────────────┐
-│  Welcome back, {name}!                        │
-│  Select a module to get started               │
-│                                               │
-│  ┌────────────────┐  ┌────────────────────┐   │
-│  │  📄             │  │  🚗                 │   │
-│  │  Doc Services   │  │  Driving School     │   │
-│  │                 │  │                     │   │
-│  │  Manage         │  │  Manage students,   │   │
-│  │  customers,     │  │  instructors,       │   │
-│  │  services,      │  │  fleet, daily       │   │
-│  │  documents      │  │  logs, attendance   │   │
-│  │                 │  │                     │   │
-│  │  [Enter →]      │  │  [Enter →]          │   │
-│  └────────────────┘  └────────────────────┘   │
-└──────────────────────────────────────────────┘
-```
-
-### Step 1.4 — Create Doc Services Shell (`components/services-shell.tsx`)
-
-Extract the current `dashboard-shell.tsx` content into a dedicated component for the doc services module. Remove org name from it (already moved to dashboard page). Keep the existing nav (Overview, Customers, Services).
+~~Complete — moved routes to `(app)/` group, shared layout with dynamic sub-nav, module selector page, doc services shell.~~
 
 ---
 
-## Phase 2: Driving School — Database Layer
+## ~~Phase 2: Driving School — Database Layer~~ ✅
 
-### Step 2.1 — Create `supabase/ds_schema.sql`
+### ~~Step 2.1 — Create `supabase/ds_schema.sql`~~
 
-6 new tables (from `update_plan_MotoAdmin.md`):
+~~6 new tables:~~
 
 | # | Table | Purpose |
 |---|-------|---------|
@@ -113,136 +43,81 @@ Extract the current `dashboard-shell.tsx` content into a dedicated component for
 | 5 | `ds_fee_payments` | Student fee records (student_id, amount, payment_date, payment_mode, note, org_id) |
 | 6 | `ds_attendance` | Student attendance (attendance_date, student_id, instructor_id, vehicle_id, driving_log_id, notes, org_id) |
 
-Plus: `updated_at` triggers, indexes on `org_id`, unique constraints.
-
-### Step 2.2 — Create `supabase/ds_rls.sql`
-
-RLS policies for all 6 tables:
-- Super admins: full access
-- Users: CRUD within own `org_id`
-
-### Step 2.3 — Create `supabase/ds_views.sql`
-
-| View | Description |
-|------|-------------|
-| `v_ds_driving_logs` | Logs joined with instructor name + vehicle number |
-| `v_ds_attendance` | Attendance joined with student name, instructor name, vehicle number |
-| `v_ds_student_dashboard` | Students with total paid, pending balance, attendance count |
-
-### Step 2.4 — Run in Supabase SQL Editor
-
-Run files in order:
-1. `supabase/ds_schema.sql`
-2. `supabase/ds_rls.sql`
-3. `supabase/ds_views.sql`
+~~Files: `supabase/ds_schema.sql`, `supabase/ds_rls.sql`, `supabase/ds_views.sql` — run in order.~~
 
 ---
 
-## Phase 3: Driving School — Types & API Layer
+## ~~Phase 3: Driving School — Types & API Layer~~ ✅
 
-### Step 3.1 — Add TypeScript Types (`lib/types.ts`)
+### ~~Step 3.1 — Add TypeScript Types (`lib/types.ts`)~~
 
-Add interfaces:
-- `DsInstructor`, `DsInstructorFormData`
-- `DsFleetVehicle`, `DsFleetVehicleFormData`
-- `DsDrivingLog`, `DsDrivingLogFormData`, `DsDrivingLogView`
-- `DsStudent`, `DsStudentFormData`, `DsStudentDashboardView`
-- `DsFeePayment`, `DsFeePaymentFormData`
-- `DsAttendance`, `DsAttendanceFormData`, `DsAttendanceView`
+~~15+ new interfaces for DS entities.~~
 
-### Step 3.2 — Create `lib/ds-api.ts`
+### ~~Step 3.2 — Create `lib/ds-api.ts`~~
 
-New API module following `lib/api.ts` pattern:
-
-| API Object | Methods |
-|------------|---------|
-| `instructorApi` | `getAll()`, `getById(id)`, `create(data)`, `update(id, data)`, `delete(id)` |
-| `fleetVehicleApi` | `getAll()`, `getById(id)`, `create(data)`, `update(id, data)`, `delete(id)` |
-| `drivingLogApi` | `getByDate(date)`, `getByDateRange(from, to)`, `create(data)`, `release(id)` |
-| `studentApi` | `getAll()`, `getById(id)`, `search(query)`, `create(data)`, `update(id, data)`, `delete(id)` |
-| `feePaymentApi` | `getByStudent(studentId)`, `create(data)` |
-| `attendanceApi` | `getByDate(date)`, `getByStudent(studentId)`, `mark(data)`, `delete(id)` |
-| `dsDashboardApi` | `getStats()` — active students, today's logs count, fee collection summary |
+~~7 API objects: `instructorApi`, `fleetVehicleApi`, `drivingLogApi`, `studentApi`, `feePaymentApi`, `attendanceApi`, `dsDashboardApi`.~~
 
 ---
 
-## Phase 4: Driving School — Frontend Pages
+## ~~Phase 4: Driving School — Frontend Pages~~ ✅
 
-### Step 4.1 — Create Driving School Shell (`components/driving-shell.tsx`)
+~~All 8 DS pages wired from mock data to real API calls, including CRUD dialogs:~~
 
-Similar to doc services shell but with DS-specific nav items. Same warm-ivory theme, same layout pattern. Nav items:
-
-- Overview (`/driving-school`)
-- Instructors (`/driving-school/instructors`)
-- Fleet (`/driving-school/fleet`)
-- Daily Logs (`/driving-school/logs`)
-- Students (`/driving-school/students`)
-- Attendance (`/driving-school/attendance`)
-
-### Step 4.2 — Driving School Overview (`app/(app)/driving-school/page.tsx`)
-
-Summary cards:
-- Today's active logs count
-- Active students count
-- Fee collection this month (₹)
-- Pending fees total (₹)
-- Quick-action buttons: Assign Car, Enroll Student, Mark Attendance
-
-### Step 4.3 — Instructors (`app/(app)/driving-school/instructors/page.tsx`)
-
-List with search + Add/Edit dialog:
-- Fields: name, phone, licence number, photo (optional)
-- Status badge: Active (green) / Inactive (red)
-- Edit and deactivate actions
-
-### Step 4.4 — Fleet (`app/(app)/driving-school/fleet/page.tsx`)
-
-List with filters + Add/Edit dialog:
-- Fields: vehicle number, name/model, type (car/bike/truck/other)
-- Status badge: Available / In Use / Maintenance
-- Edit and retire actions
-
-### Step 4.5 — Daily Logs (`app/(app)/driving-school/logs/page.tsx`)
-
-Core operational page:
-- Date picker (defaults to today)
-- Table: Instructor | Car | Opted At | Released At | Status | Actions
-- "Assign Car" button opens a dialog: instructor dropdown + vehicle dropdown + time
-- "Release" quick-action button on active rows (sets `released_at` to now)
-- Status: 🟢 In Use (no release time) / ⚪ Completed
-
-### Step 4.6 — Students List (`app/(app)/driving-school/students/page.tsx`)
-
-Enrollment list with search:
-- Cards/rows: name, phone, course type, fee summary (total/paid/pending)
-- Status badge: Active / Completed / Dropped
-- Click → Student profile page
-
-### Step 4.7 — Enroll Student (`app/(app)/driving-school/students/new/page.tsx`)
-
-Form:
-- Personal info: name, phone, email, address, DOB
-- Enrollment: date, course type (dropdown: LMV, MCWG, HMV, etc.)
-- Fee setup: total fee amount
-- On submit: create student record
-- **Option A**: optionally auto-create a linked `customers` record
-
-### Step 4.8 — Student Profile (`app/(app)/driving-school/students/[id]/page.tsx`)
-
-Tabs:
-- **Overview**: Personal info, enrollment details, fee summary bar (Total | Paid | Pending)
-- **Fees**: Payment history table + "Record Payment" button (amount, date, mode, note)
-- **Attendance**: Date-wise attendance list with instructor/car info
-
-### Step 4.9 — Attendance (`app/(app)/driving-school/attendance/page.tsx`)
-
-Date-filtered list:
-- "Mark Attendance" dialog: select student → select instructor → car auto-resolves from driving log → save
-- Table: Date | Student | Instructor | Car | Notes
+| Page | What was done |
+|------|---------------|
+| Overview | `dsDashboardApi.getStats()` — live counts |
+| Instructors | List from DB + Add/Edit Sheet + Deactivate/Activate + Delete |
+| Fleet | List from DB + Add/Edit Sheet + Deactivate/Activate + Delete |
+| Daily Logs | Live table via `drivingLogApi.getByDate()` + Release action |
+| Students List | List from DB with fee progress + Delete action |
+| Enroll Student | Form submits via `studentApi.create()` |
+| Student Profile | Three tabs from DB (overview, fees, attendance) |
+| Attendance | Live date-filtered records via `attendanceApi.getByDate()` |
 
 ---
 
-## Future Backlog (After Driving School Module)
+## Phase 5: Driving School — Remaining Dialogs
+
+### Step 5.1 — Assign Car Dialog (Daily Logs)
+
+A modal/dialog on the Daily Logs page to create a new driving log entry:
+- Instructor dropdown (active instructors only)
+- Vehicle dropdown (active fleet vehicles only)
+- Time picker (defaults to now)
+- Optional notes field
+- Calls `drivingLogApi.create()` on submit
+- Refreshes table after creation
+
+### Step 5.2 — Mark Attendance Dialog
+
+A modal/dialog on the Attendance page:
+- Date picker (defaults to current date)
+- Student dropdown (active students)
+- Instructor dropdown (active instructors)
+- **Auto-resolve**: vehicle/car auto-fills from the instructor's active driving log
+- Calls `attendanceApi.mark()` on submit
+- Refreshes list after creation
+
+### Step 5.3 — Record Payment Dialog (Student Profile)
+
+A modal/dialog in the Fees tab of the student profile:
+- Amount (₹)
+- Payment date (defaults to today)
+- Payment mode dropdown (cash, UPI, bank transfer, card, other)
+- Optional note
+- Calls `feePaymentApi.create()` on submit
+- Refreshes payment list and fee summary bar
+
+### Step 5.4 — Edit Student (Student List / Profile)
+
+Add edit capability for student details:
+- Edit button on student profile or student list (MoreVertical menu)
+- Opens a Sheet with pre-filled fields (name, phone, email, address, DOB, course, fee)
+- Calls `studentApi.update()` on submit
+
+---
+
+## Future Backlog
 
 ### Public Pages
 - `/features` — dedicated feature showcase
