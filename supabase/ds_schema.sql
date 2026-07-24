@@ -44,11 +44,16 @@ CREATE TRIGGER set_ds_fleet_vehicles_updated_at
 -- 3. ds_driving_logs
 CREATE TABLE public.ds_driving_logs (
     id              UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    log_date        DATE NOT NULL DEFAULT CURRENT_DATE,
+    logging_date    DATE NOT NULL DEFAULT CURRENT_DATE,
     instructor_id   UUID NOT NULL REFERENCES public.ds_instructors(id),
     vehicle_id      UUID NOT NULL REFERENCES public.ds_fleet_vehicles(id),
-    opted_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
-    released_at     TIMESTAMPTZ,
+    student_1_id    UUID,
+    student_2_id    UUID,
+    student_3_id    UUID,
+    student_4_id    UUID,
+    student_5_id    UUID,
+    start_datetime  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    end_datetime    TIMESTAMPTZ,
     notes           TEXT,
     org_id          UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
     created_at      TIMESTAMPTZ DEFAULT now(),
@@ -56,8 +61,8 @@ CREATE TABLE public.ds_driving_logs (
 );
 
 CREATE INDEX idx_ds_driving_logs_org ON public.ds_driving_logs(org_id);
-CREATE INDEX IF NOT EXISTS idx_ds_driving_logs_org_date ON public.ds_driving_logs(org_id, log_date);
-CREATE INDEX idx_ds_driving_logs_date ON public.ds_driving_logs(log_date);
+CREATE INDEX IF NOT EXISTS idx_ds_driving_logs_org_date ON public.ds_driving_logs(org_id, logging_date);
+CREATE INDEX idx_ds_driving_logs_date ON public.ds_driving_logs(logging_date);
 
 CREATE TRIGGER set_ds_driving_logs_updated_at
     BEFORE UPDATE ON public.ds_driving_logs
@@ -90,6 +95,13 @@ CREATE INDEX idx_ds_students_status ON public.ds_students(status);
 CREATE TRIGGER set_ds_students_updated_at
     BEFORE UPDATE ON public.ds_students
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+ALTER TABLE public.ds_driving_logs
+    ADD CONSTRAINT fk_ds_driving_logs_student_1 FOREIGN KEY (student_1_id) REFERENCES public.ds_students(id),
+    ADD CONSTRAINT fk_ds_driving_logs_student_2 FOREIGN KEY (student_2_id) REFERENCES public.ds_students(id),
+    ADD CONSTRAINT fk_ds_driving_logs_student_3 FOREIGN KEY (student_3_id) REFERENCES public.ds_students(id),
+    ADD CONSTRAINT fk_ds_driving_logs_student_4 FOREIGN KEY (student_4_id) REFERENCES public.ds_students(id),
+    ADD CONSTRAINT fk_ds_driving_logs_student_5 FOREIGN KEY (student_5_id) REFERENCES public.ds_students(id);
 
 -- 5. ds_fee_payments
 CREATE TABLE public.ds_fee_payments (
