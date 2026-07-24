@@ -32,23 +32,38 @@ export async function getCurrentUser(): Promise<User | null> {
     return user
 }
 
+let cachedProfilePromise: Promise<Profile | null> | null = null
+
 /** Get current user's profile (with org_id and role) */
 export async function getCurrentProfile(): Promise<Profile | null> {
-    const supabase = createSupabaseBrowser()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return null
-
-    const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single()
-
-    if (error) {
-        console.error('Error fetching profile:', error)
-        return null
+    if (typeof window !== 'undefined' && cachedProfilePromise) {
+        return cachedProfilePromise
     }
-    return data as Profile
+
+    const fetchProfile = async () => {
+        const supabase = createSupabaseBrowser()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return null
+
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('id, org_id, role, full_name, email, avatar_url, is_active, created_at, updated_at')
+            .eq('id', user.id)
+            .single()
+
+        if (error) {
+            console.error('Error fetching profile:', error)
+            return null
+        }
+        return data as Profile
+    }
+
+    if (typeof window !== 'undefined') {
+        cachedProfilePromise = fetchProfile()
+        return cachedProfilePromise
+    }
+
+    return fetchProfile()
 }
 
 /** Get full auth context (user + profile) */
@@ -69,6 +84,7 @@ export async function getAuthUser(): Promise<AuthUser | null> {
 
 /** Sign in with email and password */
 export async function signIn(email: string, password: string) {
+    cachedProfilePromise = null
     const supabase = createSupabaseBrowser()
     const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -80,6 +96,7 @@ export async function signIn(email: string, password: string) {
 
 /** Sign out — global scope invalidates all sessions across devices */
 export async function signOut() {
+    cachedProfilePromise = null
     const supabase = createSupabaseBrowser()
     const { error } = await supabase.auth.signOut({ scope: 'global' })
     if (error) throw error

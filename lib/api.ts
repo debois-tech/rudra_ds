@@ -365,7 +365,7 @@ export const dashboardApi = {
         ]);
 
         const totalRevenue = (revenueRes.data || []).reduce(
-            (sum, row) => sum + (Number(row.total_cost) || 0), 0
+            (sum: number, row: { total_cost: number }) => sum + (Number(row.total_cost) || 0), 0
         );
 
         return {
@@ -447,7 +447,7 @@ export const dashboardApi = {
     async getServiceBreakdown(): Promise<ServiceBreakdown[]> {
         const supabase = getClient();
         const { data, error } = await supabase
-            .from('v_services_overview')
+            .from('services')
             .select('category');
         if (error) throw error;
 
@@ -465,7 +465,7 @@ export const dashboardApi = {
     async getStatusBreakdown(): Promise<StatusBreakdown[]> {
         const supabase = getClient();
         const { data, error } = await supabase
-            .from('v_services_overview')
+            .from('services')
             .select('status');
         if (error) throw error;
 

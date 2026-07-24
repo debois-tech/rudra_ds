@@ -415,22 +415,27 @@ export const dsDashboardApi = {
         const now = new Date();
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
 
-        const [activeLogsRes, activeStudentsRes, feesRes, pendingRes] = await Promise.all([
+        const [activeLogsRes, activeStudentsRes, feesRes, studentFeesRes, allPaymentsRes] = await Promise.all([
             supabase.from('ds_driving_logs').select('id', { count: 'exact', head: true })
                 .eq('log_date', today).is('released_at', null),
             supabase.from('ds_students').select('id', { count: 'exact', head: true })
                 .eq('status', 'active'),
             supabase.from('ds_fee_payments').select('amount')
                 .gte('payment_date', monthStart),
-            supabase.from('v_ds_student_dashboard').select('pending_balance'),
+            supabase.from('ds_students').select('total_fee'),
+            supabase.from('ds_fee_payments').select('amount'),
         ]);
 
         const feeThisMonth = (feesRes.data || []).reduce(
-            (sum, row) => sum + (Number(row.amount) || 0), 0
+            (sum: number, row: { amount: number }) => sum + (Number(row.amount) || 0), 0
         );
-        const pendingTotal = (pendingRes.data || []).reduce(
-            (sum, row) => sum + (Number(row.pending_balance) || 0), 0
+        const totalFees = (studentFeesRes.data || []).reduce(
+            (sum: number, row: { total_fee: number }) => sum + (Number(row.total_fee) || 0), 0
         );
+        const totalPaid = (allPaymentsRes.data || []).reduce(
+            (sum: number, row: { amount: number }) => sum + (Number(row.amount) || 0), 0
+        );
+        const pendingTotal = Math.max(0, totalFees - totalPaid);
 
         return {
             activeLogsToday: activeLogsRes.count || 0,

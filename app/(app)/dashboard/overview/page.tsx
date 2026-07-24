@@ -361,18 +361,12 @@ export default function DashboardPage() {
     useEffect(() => {
         async function loadData() {
             try {
-                const [statsData, customersData, servicesData, breakdown, statusData, revenue] = await Promise.all([
+                const [statsData, customersData, servicesData] = await Promise.all([
                     dashboardApi.getStats(),
                     dashboardApi.getRecentCustomers(8),
                     dashboardApi.getRecentServices(8),
-                    dashboardApi.getServiceBreakdown(),
-                    dashboardApi.getStatusBreakdown(),
-                    dashboardApi.getRevenueByMonth(),
                 ]);
                 setStats(statsData);
-                setServiceBreakdown(breakdown);
-                setStatusBreakdown(statusData);
-                setRevenueData(revenue);
 
                 const allActivity: ActivityItem[] = [
                     ...customersData.map((c: CustomerDashboardView) => ({
@@ -404,17 +398,22 @@ export default function DashboardPage() {
         loadData();
     }, []);
 
-    // Load expiring documents when filter changes
+    // Charts and expiry alerts must not block the first screen paint.
     useEffect(() => {
-        async function loadExpiring() {
-            try {
-                const docs = await dashboardApi.getExpiringDocuments(expiryFilter);
-                setExpiringDocs(docs);
-            } catch (error) {
-                console.error('Expiring docs error:', error);
-            }
-        }
-        loadExpiring();
+        let cancelled = false;
+        Promise.all([
+            dashboardApi.getServiceBreakdown(),
+            dashboardApi.getStatusBreakdown(),
+            dashboardApi.getRevenueByMonth(),
+            dashboardApi.getExpiringDocuments(expiryFilter),
+        ]).then(([breakdown, statusData, revenue, docs]) => {
+            if (cancelled) return;
+            setServiceBreakdown(breakdown);
+            setStatusBreakdown(statusData);
+            setRevenueData(revenue);
+            setExpiringDocs(docs);
+        }).catch(error => console.error('Dashboard secondary data error:', error));
+        return () => { cancelled = true; };
     }, [expiryFilter]);
 
     return (

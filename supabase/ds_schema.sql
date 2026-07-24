@@ -56,6 +56,7 @@ CREATE TABLE public.ds_driving_logs (
 );
 
 CREATE INDEX idx_ds_driving_logs_org ON public.ds_driving_logs(org_id);
+CREATE INDEX IF NOT EXISTS idx_ds_driving_logs_org_date ON public.ds_driving_logs(org_id, log_date);
 CREATE INDEX idx_ds_driving_logs_date ON public.ds_driving_logs(log_date);
 
 CREATE TRIGGER set_ds_driving_logs_updated_at
@@ -83,6 +84,7 @@ CREATE TABLE public.ds_students (
 );
 
 CREATE INDEX idx_ds_students_org ON public.ds_students(org_id);
+CREATE INDEX IF NOT EXISTS idx_ds_students_org_status ON public.ds_students(org_id, status);
 CREATE INDEX idx_ds_students_status ON public.ds_students(status);
 
 CREATE TRIGGER set_ds_students_updated_at
@@ -104,6 +106,7 @@ CREATE TABLE public.ds_fee_payments (
 
 CREATE INDEX idx_ds_fee_payments_student ON public.ds_fee_payments(student_id);
 CREATE INDEX idx_ds_fee_payments_org ON public.ds_fee_payments(org_id);
+CREATE INDEX IF NOT EXISTS idx_ds_fee_payments_org_date ON public.ds_fee_payments(org_id, payment_date);
 
 -- 6. ds_attendance
 CREATE TABLE public.ds_attendance (
@@ -120,6 +123,7 @@ CREATE TABLE public.ds_attendance (
 );
 
 CREATE INDEX idx_ds_attendance_org ON public.ds_attendance(org_id);
+CREATE INDEX IF NOT EXISTS idx_ds_attendance_org_date ON public.ds_attendance(org_id, attendance_date);
 CREATE INDEX idx_ds_attendance_date ON public.ds_attendance(attendance_date);
 
 CREATE TRIGGER set_ds_attendance_updated_at

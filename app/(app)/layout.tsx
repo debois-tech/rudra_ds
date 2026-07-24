@@ -1,13 +1,10 @@
 import { cookies } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
 import { redirect } from 'next/navigation'
+import { cache } from 'react'
 import { AppShell } from './app-shell'
 
-export default async function AppLayout({
-    children,
-}: {
-    children: React.ReactNode
-}) {
+const getAuthenticatedUserData = cache(async () => {
     const cookieStore = await cookies()
 
     const supabase = createServerClient(
@@ -22,30 +19,38 @@ export default async function AppLayout({
     )
 
     const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-        redirect('/login')
-    }
+    if (!user) return null
 
     const { data: profile } = await supabase
         .from('profiles')
-        .select('id, org_id, role, full_name, email, avatar_url, is_active')
+        .select('id, org_id, role, full_name, email, avatar_url, is_active, organizations(name)')
         .eq('id', user.id)
         .single()
 
-    if (!profile || !profile.is_active) {
+    if (!profile) return null
+
+    const orgData = profile.organizations as unknown as { name: string } | null
+    const orgName = orgData?.name || ''
+
+    return {
+        user,
+        profile,
+        orgName,
+    }
+})
+
+export default async function AppLayout({
+    children,
+}: {
+    children: React.ReactNode
+}) {
+    const authData = await getAuthenticatedUserData()
+
+    if (!authData || !authData.profile || !authData.profile.is_active) {
         redirect('/login')
     }
 
-    let orgName = ''
-    if (profile.org_id) {
-        const { data: org } = await supabase
-            .from('organizations')
-            .select('name')
-            .eq('id', profile.org_id)
-            .single()
-        if (org) orgName = org.name
-    }
+    const { profile, orgName } = authData
 
     return (
         <AppShell

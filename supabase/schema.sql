@@ -144,6 +144,7 @@ CREATE TABLE public.vehicles (
 
 CREATE INDEX idx_vehicles_org ON public.vehicles(org_id);
 CREATE INDEX idx_vehicles_owner ON public.vehicles(owner_id);
+CREATE INDEX IF NOT EXISTS idx_vehicles_org_owner ON public.vehicles(org_id, owner_id);
 
 CREATE TRIGGER set_vehicles_updated_at
     BEFORE UPDATE ON public.vehicles
@@ -199,6 +200,7 @@ CREATE TABLE public.services (
 );
 
 CREATE INDEX idx_services_org ON public.services(org_id);
+CREATE INDEX IF NOT EXISTS idx_services_org_customer ON public.services(org_id, customer_id);
 CREATE INDEX idx_services_customer ON public.services(customer_id);
 CREATE INDEX idx_services_category ON public.services(category);
 

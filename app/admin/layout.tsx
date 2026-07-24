@@ -7,7 +7,9 @@ import { Building2, Users, BarChart3, Menu, LogOut, ArrowLeft, ShieldCheck, Chev
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Toaster } from "@/components/ui/sonner"
-import { getAuthUser, signOut, type Profile } from '@/lib/auth'
+import { signOut, type Profile } from '@/lib/auth'
+
+let cachedProfile: Profile | null = null
 
 export default function AdminLayout({
     children,
@@ -16,17 +18,21 @@ export default function AdminLayout({
 }) {
     const router = useRouter()
     const pathname = usePathname()
-    const [profile, setProfile] = useState<Profile | null>(null)
-    const [loading, setLoading] = useState(true)
+    const [profile, setProfile] = useState<Profile | null>(cachedProfile)
+    const [loading, setLoading] = useState(!cachedProfile)
 
     useEffect(() => {
+        if (cachedProfile) return
+
         const loadAuth = async () => {
             try {
+                const { getAuthUser } = await import('@/lib/auth')
                 const authUser = await getAuthUser()
                 if (!authUser || authUser.profile.role !== 'super_admin') {
                     router.replace('/dashboard')
                     return
                 }
+                cachedProfile = authUser.profile
                 setProfile(authUser.profile)
             } catch {
                 router.replace('/login')
@@ -37,6 +43,7 @@ export default function AdminLayout({
     }, [router])
 
     const handleSignOut = async () => {
+        cachedProfile = null
         await signOut()
         router.replace('/login')
     }
