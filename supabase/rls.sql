@@ -16,7 +16,7 @@ BEGIN
     SELECT org_id INTO v_org_id FROM public.profiles WHERE id = auth.uid();
     RETURN v_org_id;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
 -- Check if current user is super_admin
 CREATE OR REPLACE FUNCTION public.is_super_admin()
@@ -30,7 +30,7 @@ BEGIN
     ) INTO v_is_admin;
     RETURN COALESCE(v_is_admin, false);
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
 -- ============================================
 -- RLS: ORGANIZATIONS

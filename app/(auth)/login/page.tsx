@@ -2,7 +2,7 @@
 
 import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { signIn } from '@/lib/auth'
+import { getCurrentProfile, signIn } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -24,9 +24,7 @@ export default function LoginPage() {
 function LoginForm() {
     const router = useRouter()
     const searchParams = useSearchParams()
-    const raw = searchParams.get('redirect') || '/dashboard'
-    // Security: Only allow relative paths to prevent open redirect attacks.
-    const redirectTo = raw.startsWith('/') && !raw.startsWith('//') ? raw : '/dashboard'
+    const rawRedirect = searchParams.get('redirect')
 
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
@@ -40,7 +38,20 @@ function LoginForm() {
 
         try {
             await signIn(email, password)
-            router.push(redirectTo)
+            const profile = await getCurrentProfile()
+            if (!profile || !profile.is_active) {
+                throw new Error('Your account is inactive. Contact your administrator.')
+            }
+
+            // Security: only allow relative paths. Without an explicit target,
+            // route by the role stored in the database.
+            const requestedRedirect = rawRedirect &&
+                rawRedirect.startsWith('/') &&
+                !rawRedirect.startsWith('//')
+                ? rawRedirect
+                : null
+            const defaultRedirect = profile.role === 'super_admin' ? '/admin' : '/dashboard'
+            router.replace(requestedRedirect || defaultRedirect)
             router.refresh()
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : 'Login failed'

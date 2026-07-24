@@ -231,3 +231,212 @@ export interface StatusBreakdown {
   status: string;
   count: number;
 }
+
+// =============================================
+// DRIVING SCHOOL TYPES
+// =============================================
+
+export type DsInstructorStatus = 'active' | 'inactive';
+export type DsVehicleType = 'car' | 'bike' | 'truck' | 'other';
+export type DsVehicleStatus = 'available' | 'in_use' | 'maintenance';
+export type DsCourseType = 'LMV' | 'MCWG' | 'MCWOG' | 'HMV' | 'LMV-TR' | 'HMV-TR' | 'OTHER';
+export type DsStudentStatus = 'active' | 'completed' | 'dropped';
+export type DsPaymentMode = 'cash' | 'upi' | 'bank_transfer' | 'card' | 'other';
+export type DsLogStatus = 'in_use' | 'completed';
+
+// Instructor
+export interface DsInstructor {
+  id: string;
+  name: string;
+  phone: string;
+  licence_no: string | null;
+  photo_url: string | null;
+  is_active: boolean;
+  org_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DsInstructorFormData {
+  name: string;
+  phone: string;
+  licence_no?: string;
+  photo_url?: string;
+  is_active?: boolean;
+}
+
+// Fleet Vehicle
+export interface DsFleetVehicle {
+  id: string;
+  v_number: string;
+  v_name: string | null;
+  v_type: string;
+  is_active: boolean;
+  org_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DsFleetVehicleFormData {
+  v_number: string;
+  v_name?: string;
+  v_type?: string;
+  is_active?: boolean;
+}
+
+// Driving Log
+export interface DsDrivingLog {
+  id: string;
+  log_date: string;
+  instructor_id: string;
+  vehicle_id: string;
+  opted_at: string;
+  released_at: string | null;
+  notes: string | null;
+  org_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DsDrivingLogFormData {
+  log_date: string;
+  instructor_id: string;
+  vehicle_id: string;
+  opted_at?: string;
+  notes?: string;
+}
+
+export interface DsDrivingLogView {
+  id: string;
+  log_date: string;
+  instructor_id: string;
+  instructor_name: string;
+  instructor_phone: string;
+  vehicle_id: string;
+  vehicle_number: string;
+  vehicle_name: string | null;
+  opted_at: string;
+  released_at: string | null;
+  status: DsLogStatus;
+  notes: string | null;
+  org_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Student
+export interface DsStudent {
+  id: string;
+  name: string;
+  phone: string;
+  email: string | null;
+  address: string | null;
+  dob: string | null;
+  enrollment_date: string;
+  course_type: string;
+  total_fee: number;
+  status: DsStudentStatus;
+  notes: string | null;
+  customer_id: string | null;
+  org_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DsStudentFormData {
+  name: string;
+  phone: string;
+  email?: string;
+  address?: string;
+  dob?: string;
+  enrollment_date?: string;
+  course_type?: string;
+  total_fee?: number;
+  notes?: string;
+  customer_id?: string;
+}
+
+export interface DsStudentDashboardView {
+  id: string;
+  name: string;
+  phone: string;
+  email: string | null;
+  address: string | null;
+  dob: string | null;
+  enrollment_date: string;
+  course_type: string;
+  total_fee: number;
+  status: DsStudentStatus;
+  notes: string | null;
+  customer_id: string | null;
+  org_id: string;
+  created_at: string;
+  updated_at: string;
+  total_paid: number;
+  pending_balance: number;
+  attendance_count: number;
+}
+
+// Fee Payment
+export interface DsFeePayment {
+  id: string;
+  student_id: string;
+  amount: number;
+  payment_date: string;
+  payment_mode: DsPaymentMode;
+  note: string | null;
+  org_id: string;
+  created_at: string;
+}
+
+export interface DsFeePaymentFormData {
+  student_id: string;
+  amount: number;
+  payment_date?: string;
+  payment_mode?: string;
+  note?: string;
+}
+
+// Attendance
+export interface DsAttendance {
+  id: string;
+  attendance_date: string;
+  student_id: string;
+  instructor_id: string;
+  vehicle_id: string | null;
+  driving_log_id: string | null;
+  notes: string | null;
+  org_id: string;
+  created_at: string;
+}
+
+export interface DsAttendanceFormData {
+  attendance_date?: string;
+  student_id: string;
+  instructor_id: string;
+  notes?: string;
+}
+
+export interface DsAttendanceView {
+  id: string;
+  attendance_date: string;
+  student_id: string;
+  student_name: string;
+  student_phone: string;
+  instructor_id: string;
+  instructor_name: string;
+  vehicle_id: string | null;
+  vehicle_number: string | null;
+  driving_log_date: string | null;
+  notes: string | null;
+  org_id: string;
+  created_at: string;
+}
+
+// Dashboard
+export interface DsDashboardStats {
+  activeLogsToday: number;
+  activeStudents: number;
+  feeCollectionThisMonth: number;
+  pendingFeesTotal: number;
+}
