@@ -22,13 +22,7 @@ export default async function Home() {
     }
   )
 
-  let user = null
-  try {
-    const { data } = await supabase.auth.getUser()
-    user = data.user
-  } catch {
-    // Invalid/expired session — treat as unauthenticated
-  }
+  const { data: { user } } = await supabase.auth.getUser()
 
   if (user) {
     const { data: profile } = await supabase

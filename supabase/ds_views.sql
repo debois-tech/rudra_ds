@@ -9,41 +9,28 @@
 -- v_ds_driving_logs
 -- Logs joined with instructor name + vehicle number
 -- ============================================
-DROP VIEW IF EXISTS public.v_ds_driving_logs;
-CREATE VIEW public.v_ds_driving_logs
+CREATE OR REPLACE VIEW public.v_ds_driving_logs
 WITH (security_invoker = true)
 AS
 SELECT
     dl.id,
-    dl.logging_date,
+    dl.log_date,
     dl.instructor_id,
     i.name AS instructor_name,
     i.phone AS instructor_phone,
     dl.vehicle_id,
     fv.v_number AS vehicle_number,
     fv.v_name AS vehicle_name,
-    dl.start_datetime,
-    dl.end_datetime,
-    CASE WHEN dl.end_datetime IS NULL THEN 'in_use' ELSE 'completed' END AS status,
+    dl.opted_at,
+    dl.released_at,
+    CASE WHEN dl.released_at IS NULL THEN 'in_use' ELSE 'completed' END AS status,
     dl.notes,
     dl.org_id,
     dl.created_at,
-    dl.updated_at,
-    ARRAY_REMOVE(ARRAY[dl.student_1_id, dl.student_2_id, dl.student_3_id, dl.student_4_id, dl.student_5_id], NULL) AS student_ids,
-    ARRAY_REMOVE(ARRAY[s1.name, s2.name, s3.name, s4.name, s5.name], NULL) AS student_names,
-    (CASE WHEN dl.student_1_id IS NOT NULL THEN 1 ELSE 0 END
-     + CASE WHEN dl.student_2_id IS NOT NULL THEN 1 ELSE 0 END
-     + CASE WHEN dl.student_3_id IS NOT NULL THEN 1 ELSE 0 END
-     + CASE WHEN dl.student_4_id IS NOT NULL THEN 1 ELSE 0 END
-     + CASE WHEN dl.student_5_id IS NOT NULL THEN 1 ELSE 0 END) AS student_count
+    dl.updated_at
 FROM public.ds_driving_logs dl
 JOIN public.ds_instructors i ON i.id = dl.instructor_id
-JOIN public.ds_fleet_vehicles fv ON fv.id = dl.vehicle_id
-LEFT JOIN public.ds_students s1 ON s1.id = dl.student_1_id
-LEFT JOIN public.ds_students s2 ON s2.id = dl.student_2_id
-LEFT JOIN public.ds_students s3 ON s3.id = dl.student_3_id
-LEFT JOIN public.ds_students s4 ON s4.id = dl.student_4_id
-LEFT JOIN public.ds_students s5 ON s5.id = dl.student_5_id;
+JOIN public.ds_fleet_vehicles fv ON fv.id = dl.vehicle_id;
 
 -- ============================================
 -- v_ds_attendance
@@ -62,7 +49,7 @@ SELECT
     i.name AS instructor_name,
     a.vehicle_id,
     fv.v_number AS vehicle_number,
-    dl.logging_date AS driving_log_date,
+    dl.log_date AS driving_log_date,
     a.notes,
     a.org_id,
     a.created_at

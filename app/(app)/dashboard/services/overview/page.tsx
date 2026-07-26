@@ -70,7 +70,7 @@ export default function ServiceOverviewPage() {
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">Services</h1>
           <p className="text-slate-500 mt-1 font-medium">{services.length} total services</p>
         </div>
-        <Link href="/dashboard/services/new">
+        <Link href="/dashboard/services">
           <Button className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl h-10 px-5 font-medium shadow-sm border border-purple-700/20">
             <Wrench className="h-4 w-4 mr-2" /> New Service
           </Button>
@@ -101,7 +101,7 @@ export default function ServiceOverviewPage() {
               </div>
               <p className="text-slate-500 font-medium mb-4">{searchQuery ? 'No services found matching that query' : 'No services yet'}</p>
               {!searchQuery && (
-                <Link href="/dashboard/services/new">
+                <Link href="/dashboard/services">
                   <Button variant="outline" className="rounded-xl font-medium">Create First Service</Button>
                 </Link>
               )}

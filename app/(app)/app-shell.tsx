@@ -150,9 +150,9 @@ export function AppShell({ profile, orgName, children }: AppShellProps) {
 
             {/* ── Floating Sub-Nav Bar (desktop) ── */}
             {!isModuleSelector && activeSubNav.length > 0 && (
-                <div className="hidden md:block mt-5">
-                    <div className="max-w-4xl mx-auto px-6">
-                        <nav className="flex items-center justify-center gap-1 py-2.5 bg-white rounded-xl shadow-sm border border-slate-200">
+                <div className="hidden md:block sticky top-14 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200">
+                    <div className="max-w-[1440px] mx-auto px-6">
+                        <nav className="flex items-center justify-center gap-1 py-2.5">
                             {activeSubNav.map((link) => {
                                 const isActive = link.href === pathname ||
                                     (link.href !== '/dashboard/overview' && link.href !== '/driving-school' && pathname.startsWith(link.href + '/'))
