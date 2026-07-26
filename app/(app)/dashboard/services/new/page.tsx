@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { customerApi, vehicleApi, serviceTypeApi, serviceApi } from '@/lib/api';
 import type {
   CustomerDashboardView, Vehicle, ServiceType,
@@ -20,11 +20,12 @@ const VEHICLE_TYPE_LICENCE: VehicleTypeLicence[] = [
 ];
 
 export default function NewServicePage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const preselectedCustomerId = searchParams.get('customer');
 
   // State
-  const [step, setStep] = useState(1); // 1=customer, 2=category, 3=details
+  const [step, setStep] = useState(1); // 1=customer, 2=category, 3=details, 4=confirm
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<CustomerDashboardView[]>([]);
   const [searching, setSearching] = useState(false);
@@ -125,8 +126,8 @@ export default function NewServicePage() {
     return isNaN(parsed) ? 0 : Math.round(parsed * 100) / 100;
   }
 
-  // Submit
-  async function handleSubmit(e: React.FormEvent) {
+  // Move from details to confirmation
+  function handleConfirm(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedCustomer || !serviceTypeId) {
       toast.error('Please fill all required fields');
@@ -137,11 +138,16 @@ export default function NewServicePage() {
       toast.error('Please enter a valid service cost');
       return;
     }
+    setStep(4);
+  }
+
+  // Actually create the service via API
+  async function handleCreate() {
+    if (!selectedCustomer || !serviceTypeId) return;
+    const cost = parseCost(totalCost);
     setSubmitting(true);
     try {
       if (category === 'vehicle') {
-        // Issue 1 Fix: If no existing vehicle was selected (manual entry) and vehicle number is provided,
-        // auto-create the vehicle record under this customer BEFORE creating the service.
         let resolvedVehicleId = vehicleId || undefined;
         if (!vehicleId && vehicleNumber.trim() && selectedCustomer) {
           try {
@@ -153,7 +159,6 @@ export default function NewServicePage() {
             });
             resolvedVehicleId = newVehicle.v_id;
           } catch (vErr) {
-            // If vehicle already exists (duplicate number), that's OK - proceed without vehicle_id
             console.warn('Vehicle auto-add skipped:', vErr);
           }
         }
@@ -170,7 +175,6 @@ export default function NewServicePage() {
           notes: notes || undefined,
         });
       } else {
-        // Issue 2 Fix: renewal_date removed — expiry_date serves as the single renewal/expiry date
         await serviceApi.createLicenceService({
           customer_id: selectedCustomer.c_id,
           service_type_id: serviceTypeId,
@@ -184,12 +188,14 @@ export default function NewServicePage() {
         });
       }
       toast.success('Service created successfully!');
-      resetForm();
+      router.replace('/dashboard/services/overview');
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : 'Failed to create service');
     }
     setSubmitting(false);
   }
+
+  const selectedServiceType = serviceTypes.find(t => t.st_id === serviceTypeId);
 
   return (
     <div className="max-w-3xl mx-auto space-y-8 pb-10">
@@ -204,6 +210,7 @@ export default function NewServicePage() {
           { n: 1, label: 'Customer' },
           { n: 2, label: 'Category' },
           { n: 3, label: 'Details' },
+          { n: 4, label: 'Confirm' },
         ].map(s => (
           <div key={s.n} className="flex items-center gap-2">
             <div className={`h-8 w-8 rounded-full flex items-center justify-center text-sm font-bold shadow-sm transition-colors ${
@@ -215,7 +222,7 @@ export default function NewServicePage() {
             <span className={`text-sm hidden sm:inline ${step >= s.n ? 'text-slate-900 font-bold' : 'text-slate-400 font-medium'}`}>
               {s.label}
             </span>
-            {s.n < 3 && <ChevronDown className="h-4 w-4 text-slate-300 rotate-[-90deg] mx-1" />}
+            {s.n < 4 && <ChevronDown className="h-4 w-4 text-slate-300 rotate-[-90deg] mx-1" />}
           </div>
         ))}
       </div>
@@ -330,6 +337,60 @@ export default function NewServicePage() {
         </Card>
       )}
 
+      {/* Step 4: Confirm Details */}
+      {step === 4 && (
+        <Card className="rounded-2xl shadow-sm border-slate-200 overflow-hidden">
+          <CardHeader className="bg-white border-b border-slate-100 pb-4 pt-5 px-6">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Check className="h-5 w-5 text-emerald-600" />
+              Confirm Service Details
+            </CardTitle>
+            <CardDescription>Review the service details before creating</CardDescription>
+          </CardHeader>
+          <CardContent className="p-6 bg-slate-50/30 space-y-5">
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm divide-y divide-slate-100">
+              <SummaryRow label="Customer" value={selectedCustomer?.c_name || ''} />
+              <SummaryRow label="Mobile" value={selectedCustomer?.c_mobile || ''} />
+              <SummaryRow label="Reg. ID" value={selectedCustomer?.c_registration_id || ''} />
+              <SummaryRow label="Category" value={category === 'vehicle' ? 'Vehicle Service' : 'Licence Service'} />
+              <SummaryRow label="Service Type" value={selectedServiceType?.name || ''} />
+              {category === 'vehicle' && (
+                <>
+                  <SummaryRow label="Vehicle Number" value={vehicleNumber} />
+                  <SummaryRow label="Vehicle Type" value={vehicleType} />
+                  {vehicleName && <SummaryRow label="Vehicle Name" value={vehicleName} />}
+                </>
+              )}
+              {category === 'licence' && (
+                <>
+                  <SummaryRow label="Vehicle Class" value={vehicleClass} />
+                  <SummaryRow label="Licence Type" value={vehicleTypeLicence} />
+                  {mdlNumber && <SummaryRow label="MDL / Application No." value={mdlNumber} />}
+                </>
+              )}
+              <SummaryRow label="Issue Date" value={issueDate} />
+              {expiryDate && <SummaryRow label={category === 'licence' ? 'Renewal / Expiry Date' : 'Expiry Date'} value={expiryDate} />}
+              <SummaryRow label="Total Cost" value={`₹${parseCost(totalCost).toLocaleString()}`} />
+              {notes && <SummaryRow label="Notes" value={notes} />}
+            </div>
+
+            <div className="flex gap-4 pt-2">
+              <Button
+                onClick={handleCreate}
+                disabled={submitting}
+                size="sm"
+                className="bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-black rounded-xl font-bold shadow-sm px-5"
+              >
+                {submitting ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" /> Creating...</> : <><Check className="h-4 w-4 mr-1.5" /> Create Service</>}
+              </Button>
+              <Button type="button" variant="outline" size="sm" className="rounded-xl font-bold" onClick={() => setStep(3)}>
+                Back
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Step 3: Service Details */}
       {step === 3 && (
         <Card className="rounded-2xl shadow-sm border-slate-200 overflow-hidden">
@@ -340,7 +401,7 @@ export default function NewServicePage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-6 bg-slate-50/30">
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleConfirm} className="space-y-6">
               {/* Service Type */}
               <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
                 <label className="text-[11px] uppercase font-bold tracking-wider text-slate-500">Service Type <span className="text-red-500">*</span></label>
@@ -500,10 +561,10 @@ export default function NewServicePage() {
               </div>
 
               <div className="flex gap-4 pt-4">
-                <Button type="submit" className="flex-1 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-black rounded-2xl h-14 text-base font-bold shadow-md tracking-wide" disabled={submitting}>
-                  {submitting ? <><Loader2 className="h-5 w-5 animate-spin mr-2" /> Creating Record...</> : <><Check className="h-6 w-6 mr-2" /> Confirm & Create Service</>}
+                <Button type="submit" size="sm" className="bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-black rounded-xl font-bold shadow-sm px-5">
+                  Confirm
                 </Button>
-                <Button type="button" variant="outline" className="h-14 px-8 rounded-2xl font-bold bg-white" onClick={() => { setStep(2); setCategory(null); }}>
+                <Button type="button" variant="outline" size="sm" className="rounded-xl font-bold" onClick={() => { setStep(2); setCategory(null); }}>
                   Back
                 </Button>
               </div>
@@ -511,6 +572,15 @@ export default function NewServicePage() {
           </CardContent>
         </Card>
       )}
+    </div>
+  );
+}
+
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between px-5 py-3.5">
+      <span className="text-sm font-semibold text-slate-500">{label}</span>
+      <span className="text-sm font-bold text-slate-900 text-right max-w-[55%] truncate">{value}</span>
     </div>
   );
 }

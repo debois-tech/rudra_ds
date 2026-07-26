@@ -163,8 +163,8 @@ export const drivingLogApi = {
         const { data, error } = await supabase
             .from('v_ds_driving_logs')
             .select('*')
-            .eq('log_date', date)
-            .order('opted_at', { ascending: false });
+            .eq('logging_date', date)
+            .order('start_datetime', { ascending: false });
         if (error) throw error;
         return data || [];
     },
@@ -174,10 +174,10 @@ export const drivingLogApi = {
         const { data, error } = await supabase
             .from('v_ds_driving_logs')
             .select('*')
-            .gte('log_date', from)
-            .lte('log_date', to)
-            .order('log_date', { ascending: false })
-            .order('opted_at', { ascending: false });
+            .gte('logging_date', from)
+            .lte('logging_date', to)
+            .order('logging_date', { ascending: false })
+            .order('start_datetime', { ascending: false });
         if (error) throw error;
         return data || [];
     },
@@ -188,10 +188,16 @@ export const drivingLogApi = {
         const { data: result, error } = await supabase
             .from('ds_driving_logs')
             .insert([{
-                log_date: data.log_date,
+                logging_date: data.logging_date,
                 instructor_id: data.instructor_id,
                 vehicle_id: data.vehicle_id,
-                opted_at: data.opted_at || new Date().toISOString(),
+                student_1_id: data.student_1_id || null,
+                student_2_id: data.student_2_id || null,
+                student_3_id: data.student_3_id || null,
+                student_4_id: data.student_4_id || null,
+                student_5_id: data.student_5_id || null,
+                start_datetime: data.start_datetime || new Date().toISOString(),
+                end_datetime: data.end_datetime || null,
                 notes: data.notes || null,
                 org_id: orgId,
             }])
@@ -212,7 +218,7 @@ export const drivingLogApi = {
         const supabase = getClient();
         const { error } = await supabase
             .from('ds_driving_logs')
-            .update({ released_at: new Date().toISOString() })
+            .update({ end_datetime: new Date().toISOString() })
             .eq('id', id);
         if (error) throw error;
     },
@@ -377,8 +383,8 @@ export const attendanceApi = {
             .from('ds_driving_logs')
             .select('id, vehicle_id')
             .eq('instructor_id', data.instructor_id)
-            .is('released_at', null)
-            .order('opted_at', { ascending: false })
+            .is('end_datetime', null)
+            .order('start_datetime', { ascending: false })
             .limit(1)
             .maybeSingle();
 
@@ -417,7 +423,7 @@ export const dsDashboardApi = {
 
         const [activeLogsRes, activeStudentsRes, feesRes, studentFeesRes, allPaymentsRes] = await Promise.all([
             supabase.from('ds_driving_logs').select('id', { count: 'exact', head: true })
-                .eq('log_date', today).is('released_at', null),
+                .eq('logging_date', today).is('end_datetime', null),
             supabase.from('ds_students').select('id', { count: 'exact', head: true })
                 .eq('status', 'active'),
             supabase.from('ds_fee_payments').select('amount')

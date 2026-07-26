@@ -26,7 +26,7 @@ export default function AuthLayout({
 
                 {/* Bottom brand mark */}
                 <p className="text-center text-[11px] text-slate-400 mt-8 tracking-wide">
-                    Powered by <span className="font-semibold text-amber-600">MotoAdmin</span>
+                    Powered by <span className="font-semibold text-green-600">deboistech</span>
                 </p>
             </div>
         </div>

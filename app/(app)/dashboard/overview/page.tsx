@@ -441,7 +441,7 @@ export default function DashboardPage() {
                             Customer
                         </Button>
                     </Link>
-                    <Link href="/dashboard/services">
+                    <Link href="/dashboard/services/new">
                         <Button className="rounded-xl h-9 px-4 text-[13px] font-medium bg-amber-500 hover:bg-amber-600 text-black shadow-sm shadow-amber-400/20 cursor-pointer">
                             <Plus className="h-3.5 w-3.5 mr-1.5" />
                             Service

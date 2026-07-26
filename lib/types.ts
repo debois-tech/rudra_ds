@@ -287,11 +287,16 @@ export interface DsFleetVehicleFormData {
 // Driving Log
 export interface DsDrivingLog {
   id: string;
-  log_date: string;
+  logging_date: string;
   instructor_id: string;
   vehicle_id: string;
-  opted_at: string;
-  released_at: string | null;
+  student_1_id: string | null;
+  student_2_id: string | null;
+  student_3_id: string | null;
+  student_4_id: string | null;
+  student_5_id: string | null;
+  start_datetime: string;
+  end_datetime: string | null;
   notes: string | null;
   org_id: string;
   created_at: string;
@@ -299,24 +304,33 @@ export interface DsDrivingLog {
 }
 
 export interface DsDrivingLogFormData {
-  log_date: string;
+  logging_date: string;
   instructor_id: string;
   vehicle_id: string;
-  opted_at?: string;
+  student_1_id?: string;
+  student_2_id?: string;
+  student_3_id?: string;
+  student_4_id?: string;
+  student_5_id?: string;
+  start_datetime?: string;
+  end_datetime?: string;
   notes?: string;
 }
 
 export interface DsDrivingLogView {
   id: string;
-  log_date: string;
+  logging_date: string;
   instructor_id: string;
   instructor_name: string;
   instructor_phone: string;
   vehicle_id: string;
   vehicle_number: string;
   vehicle_name: string | null;
-  opted_at: string;
-  released_at: string | null;
+  student_ids: string[];
+  student_names: string[];
+  student_count: number;
+  start_datetime: string;
+  end_datetime: string | null;
   status: DsLogStatus;
   notes: string | null;
   org_id: string;
