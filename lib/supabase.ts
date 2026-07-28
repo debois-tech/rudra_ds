@@ -43,8 +43,10 @@ export function createSupabaseAdmin() {
 }
 
 // ============================================
-// DEFAULT EXPORT for backward compatibility
-// Existing code imports { supabase } from '@/lib/supabase'
-// We keep this working but it now uses the browser client
+// NOTES
 // ============================================
-export const supabase = createSupabaseBrowser()
+// Do NOT use a module-level default export of createSupabaseBrowser().
+// Calling createBrowserClient() at module evaluation time on the server
+// bypasses the singleton guard (typeof window === 'undefined' is true there),
+// creating a new instance on every import. Always call createSupabaseBrowser()
+// explicitly in the function/component where you need it.

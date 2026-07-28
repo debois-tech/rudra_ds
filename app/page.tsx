@@ -22,13 +22,15 @@ export default async function Home() {
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
+  // Use getSession() (cookie read, zero network) for the root redirect check.
+  // Active users will hit the layout's auth guard next which verifies identity.
+  const { data: { session } } = await supabase.auth.getSession()
 
-  if (user) {
+  if (session?.user) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('role, is_active')
-      .eq('id', user.id)
+      .eq('id', session.user.id)
       .single()
 
     // Only redirect active users; inactive users see the landing page

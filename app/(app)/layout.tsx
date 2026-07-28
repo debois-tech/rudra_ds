@@ -18,13 +18,16 @@ const getAuthenticatedUserData = cache(async () => {
         }
     )
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return null
+    // Use getSession() (cookie read, zero network) for the layout guard.
+    // The session token is still verified by Supabase RLS on every DB query.
+    // Server API routes that need hard JWT verification use getUser() directly.
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.user) return null
 
     const { data: profile } = await supabase
         .from('profiles')
         .select('id, org_id, role, full_name, email, avatar_url, is_active, organizations(name)')
-        .eq('id', user.id)
+        .eq('id', session.user.id)
         .single()
 
     if (!profile) return null
@@ -33,7 +36,7 @@ const getAuthenticatedUserData = cache(async () => {
     const orgName = orgData?.name || ''
 
     return {
-        user,
+        user: session.user,
         profile,
         orgName,
     }

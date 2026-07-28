@@ -15,6 +15,13 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { formatDistanceToNow, format } from 'date-fns';
 
+import { StatCard, StatCardSkeleton, CardSkeleton } from './_components/stat-card';
+import { StatusBadge, UrgencyBadge } from './_components/badges';
+import { RevenueChart } from './_components/revenue-chart';
+import { ServiceDonut } from './_components/service-donut';
+import { StatusBars } from './_components/status-bars';
+import { EmptyState } from './_components/empty-state';
+
 // ═══════════════════════════════════════════
 // Types
 // ═══════════════════════════════════════════
@@ -27,307 +34,6 @@ type ActivityItem = {
     date: Date;
     status?: string;
     url: string;
-}
-
-// ═══════════════════════════════════════════
-// Skeleton Components
-// ═══════════════════════════════════════════
-
-function StatCardSkeleton() {
-    return (
-        <div className="bg-white rounded-2xl border border-slate-100 p-5">
-            <div className="flex items-center justify-between mb-4">
-                <div className="skeleton h-4 w-16 rounded" />
-                <div className="skeleton h-8 w-8 rounded-lg" />
-            </div>
-            <div className="skeleton h-8 w-24 rounded mb-1" />
-            <div className="skeleton h-3 w-20 rounded" />
-        </div>
-    )
-}
-
-function CardSkeleton() {
-    return (
-        <div className="bg-white rounded-2xl border border-slate-100 p-6">
-            <div className="skeleton h-5 w-32 rounded mb-4" />
-            <div className="skeleton h-24 w-full rounded" />
-        </div>
-    )
-}
-
-// ═══════════════════════════════════════════
-// Stat Card
-// ═══════════════════════════════════════════
-
-function StatCard({ label, value, icon: Icon, accentColor, trend }: {
-    label: string;
-    value: string | number;
-    icon: React.ElementType;
-    accentColor: string;
-    trend?: string;
-}) {
-    return (
-        <div className="bg-white rounded-2xl border border-slate-100 p-5 card-hover group">
-            <div className="flex items-center justify-between mb-3.5">
-                <span className="text-[13px] font-medium text-slate-400 uppercase tracking-wide">
-                    {label}
-                </span>
-                <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${accentColor} transition-transform group-hover:scale-110`}>
-                    <Icon className="h-4 w-4" />
-                </div>
-            </div>
-            <p className="text-[28px] font-bold text-slate-900 tracking-tight leading-none">
-                {value}
-            </p>
-            {trend && (
-                <p className="text-[11px] font-medium text-emerald-500 mt-1.5 flex items-center gap-1">
-                    <TrendingUp className="h-3 w-3" />
-                    {trend}
-                </p>
-            )}
-        </div>
-    )
-}
-
-// ═══════════════════════════════════════════
-// Status Badge
-// ═══════════════════════════════════════════
-
-function StatusBadge({ status }: { status: string }) {
-    const styles: Record<string, string> = {
-        active: 'bg-emerald-50 text-emerald-600 border-emerald-100',
-        completed: 'bg-slate-50 text-slate-500 border-slate-200',
-        cancelled: 'bg-red-50 text-red-500 border-red-100',
-    }
-
-    return (
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium border ${styles[status] || styles.active}`}>
-            {status}
-        </span>
-    )
-}
-
-// ═══════════════════════════════════════════
-// Urgency Badge for expiring documents
-// ═══════════════════════════════════════════
-
-function UrgencyBadge({ days }: { days: number }) {
-    if (days <= 3) return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-red-100 text-red-700 border border-red-200 animate-pulse">
-            {days}d left
-        </span>
-    );
-    if (days <= 7) return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-orange-100 text-orange-700 border border-orange-200">
-            {days}d left
-        </span>
-    );
-    if (days <= 15) return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-100 text-amber-700 border border-amber-200">
-            {days}d left
-        </span>
-    );
-    return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
-            {days}d left
-        </span>
-    );
-}
-
-// ═══════════════════════════════════════════
-// Mini Revenue Bar Chart (SVG)
-// ═══════════════════════════════════════════
-
-function RevenueChart({ data }: { data: MonthlyRevenue[] }) {
-    const maxRevenue = Math.max(...data.map(d => d.revenue), 1);
-    const chartHeight = 100;
-    const barWidth = 32;
-    const gap = 12;
-    const totalWidth = data.length * (barWidth + gap) - gap;
-
-    return (
-        <div className="flex flex-col items-center">
-            <svg width={totalWidth} height={chartHeight + 30} className="overflow-visible">
-                {data.map((d, i) => {
-                    const barHeight = (d.revenue / maxRevenue) * chartHeight;
-                    const x = i * (barWidth + gap);
-                    const y = chartHeight - barHeight;
-                    return (
-                        <g key={i}>
-                            {/* Bar background */}
-                            <rect
-                                x={x} y={0}
-                                width={barWidth} height={chartHeight}
-                                rx={6} fill="#f1f5f9"
-                            />
-                            {/* Value bar */}
-                            <rect
-                                x={x} y={y}
-                                width={barWidth} height={barHeight}
-                                rx={6}
-                                fill="url(#amberGradient)"
-                                className="transition-all duration-500"
-                            />
-                            {/* Month label */}
-                            <text
-                                x={x + barWidth / 2}
-                                y={chartHeight + 16}
-                                textAnchor="middle"
-                                className="text-[10px] font-medium fill-slate-400"
-                            >
-                                {d.month}
-                            </text>
-                            {/* Value on hover - always show for non-zero */}
-                            {d.revenue > 0 && (
-                                <text
-                                    x={x + barWidth / 2}
-                                    y={y - 6}
-                                    textAnchor="middle"
-                                    className="text-[9px] font-bold fill-amber-600"
-                                >
-                                    ₹{(d.revenue / 1000).toFixed(d.revenue >= 1000 ? 1 : 0)}k
-                                </text>
-                            )}
-                        </g>
-                    );
-                })}
-                <defs>
-                    <linearGradient id="amberGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#f59e0b" />
-                        <stop offset="100%" stopColor="#d97706" />
-                    </linearGradient>
-                </defs>
-            </svg>
-        </div>
-    );
-}
-
-// ═══════════════════════════════════════════
-// Donut Chart for Service Breakdown (SVG)
-// ═══════════════════════════════════════════
-
-function ServiceDonut({ data }: { data: ServiceBreakdown[] }) {
-    const total = data.reduce((s, d) => s + d.count, 0);
-    if (total === 0) return <p className="text-sm text-slate-400 text-center py-6">No services yet</p>;
-
-    const colors: Record<string, string> = {
-        vehicle: '#f59e0b',
-        licence: '#6366f1',
-    };
-    const labels: Record<string, string> = {
-        vehicle: 'Vehicle',
-        licence: 'Licence',
-    };
-
-    const radius = 40;
-    const circumference = 2 * Math.PI * radius;
-    
-    const slices = data.reduce<{ category: string, count: number, pct: number, offset: number, dashArray: string }[]>((acc, d) => {
-        const pct = d.count / total;
-        const prev = acc[acc.length - 1];
-        const cumulative = prev ? (prev.offset / circumference) + prev.pct : 0;
-        const offset = circumference * cumulative;
-        const dashArray = `${circumference * pct} ${circumference * (1 - pct)}`;
-        acc.push({ ...d, pct, offset, dashArray });
-        return acc;
-    }, []);
-
-    return (
-        <div className="flex items-center justify-center gap-6">
-            <svg width={100} height={100} viewBox="0 0 100 100">
-                {slices.map((slice, i) => (
-                        <circle
-                            key={i}
-                            cx={50} cy={50} r={radius}
-                            fill="none"
-                            stroke={colors[slice.category] || '#94a3b8'}
-                            strokeWidth={14}
-                            strokeDasharray={slice.dashArray}
-                            strokeDashoffset={-slice.offset}
-                            strokeLinecap="round"
-                            transform="rotate(-90 50 50)"
-                            className="transition-all duration-700"
-                        />
-                ))}
-                <text x={50} y={50} textAnchor="middle" dominantBaseline="central"
-                    className="text-[18px] font-bold fill-slate-900">{total}</text>
-            </svg>
-            <div className="space-y-2">
-                {data.map((d, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: colors[d.category] || '#94a3b8' }} />
-                        <span className="text-[12px] font-medium text-slate-600">
-                            {labels[d.category] || d.category}: <span className="text-slate-900 font-bold">{d.count}</span>
-                        </span>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-}
-
-// ═══════════════════════════════════════════
-// Status Bars
-// ═══════════════════════════════════════════
-
-function StatusBars({ data }: { data: StatusBreakdown[] }) {
-    const total = data.reduce((s, d) => s + d.count, 0);
-    if (total === 0) return <p className="text-sm text-slate-400 text-center py-6">No services yet</p>;
-
-    const colors: Record<string, { bg: string; bar: string; text: string }> = {
-        active: { bg: 'bg-emerald-50', bar: 'bg-emerald-500', text: 'text-emerald-700' },
-        completed: { bg: 'bg-slate-50', bar: 'bg-slate-400', text: 'text-slate-600' },
-        cancelled: { bg: 'bg-red-50', bar: 'bg-red-400', text: 'text-red-600' },
-    };
-
-    return (
-        <div className="space-y-3">
-            {data.map((d, i) => {
-                const pct = (d.count / total) * 100;
-                const style = colors[d.status] || colors.active;
-                return (
-                    <div key={i}>
-                        <div className="flex justify-between items-center mb-1">
-                            <span className={`text-[12px] font-semibold capitalize ${style.text}`}>{d.status}</span>
-                            <span className="text-[11px] font-bold text-slate-500">{d.count} ({pct.toFixed(0)}%)</span>
-                        </div>
-                        <div className={`h-2 rounded-full ${style.bg}`}>
-                            <div className={`h-2 rounded-full ${style.bar} transition-all duration-700`} style={{ width: `${pct}%` }} />
-                        </div>
-                    </div>
-                );
-            })}
-        </div>
-    );
-}
-
-// ═══════════════════════════════════════════
-// Empty State
-// ═══════════════════════════════════════════
-
-function EmptyState() {
-    return (
-        <div className="text-center py-16 px-6">
-            <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-slate-100 flex items-center justify-center">
-                <Clock className="h-6 w-6 text-slate-400" />
-            </div>
-            <h3 className="text-[15px] font-semibold text-slate-900 mb-1">No activity yet</h3>
-            <p className="text-sm text-slate-400 max-w-[240px] mx-auto">
-                Start by adding your first customer or creating a service record.
-            </p>
-            <div className="flex items-center justify-center gap-3 mt-5">
-                <Link href="/dashboard/customers/new">
-                    <Button
-                        variant="outline"
-                        className="rounded-xl h-9 px-4 text-[13px] font-medium border-slate-200"
-                    >
-                        <Plus className="h-3.5 w-3.5 mr-1.5" />
-                        Add Customer
-                    </Button>
-                </Link>
-            </div>
-        </div>
-    )
 }
 
 // ═══════════════════════════════════════════
@@ -361,12 +67,15 @@ export default function DashboardPage() {
     useEffect(() => {
         async function loadData() {
             try {
-                const [statsData, customersData, servicesData] = await Promise.all([
-                    dashboardApi.getStats(),
+                const [allStats, customersData, servicesData] = await Promise.all([
+                    dashboardApi.getAllStats(),
                     dashboardApi.getRecentCustomers(8),
                     dashboardApi.getRecentServices(8),
                 ]);
-                setStats(statsData);
+                setStats(allStats.stats);
+                setServiceBreakdown(allStats.serviceBreakdown);
+                setStatusBreakdown(allStats.statusBreakdown);
+                setRevenueData(allStats.revenueByMonth);
 
                 const allActivity: ActivityItem[] = [
                     ...customersData.map((c: CustomerDashboardView) => ({
@@ -401,16 +110,8 @@ export default function DashboardPage() {
     // Charts and expiry alerts must not block the first screen paint.
     useEffect(() => {
         let cancelled = false;
-        Promise.all([
-            dashboardApi.getServiceBreakdown(),
-            dashboardApi.getStatusBreakdown(),
-            dashboardApi.getRevenueByMonth(),
-            dashboardApi.getExpiringDocuments(expiryFilter),
-        ]).then(([breakdown, statusData, revenue, docs]) => {
+        dashboardApi.getExpiringDocuments(expiryFilter).then(docs => {
             if (cancelled) return;
-            setServiceBreakdown(breakdown);
-            setStatusBreakdown(statusData);
-            setRevenueData(revenue);
             setExpiringDocs(docs);
         }).catch(error => console.error('Dashboard secondary data error:', error));
         return () => { cancelled = true; };

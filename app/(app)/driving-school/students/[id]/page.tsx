@@ -8,6 +8,9 @@ import { Card, CardContent } from '@/components/ui/card'
 import { studentApi, feePaymentApi, attendanceApi } from '@/lib/ds-api'
 import type { DsStudentDashboardView, DsFeePayment, DsAttendanceView } from '@/lib/types'
 import Link from 'next/link'
+import { RecordPaymentSheet } from './_components/record-payment-sheet'
+import { EditStudentSheet } from './_components/edit-student-sheet'
+import { Pencil } from 'lucide-react'
 
 export default function StudentProfilePage() {
     const params = useParams()
@@ -17,8 +20,10 @@ export default function StudentProfilePage() {
     const [attendance, setAttendance] = useState<DsAttendanceView[]>([])
     const [tab, setTab] = useState<'overview' | 'fees' | 'attendance'>('overview')
     const [loading, setLoading] = useState(true)
+    const [paymentSheetOpen, setPaymentSheetOpen] = useState(false)
+    const [editSheetOpen, setEditSheetOpen] = useState(false)
 
-    useEffect(() => {
+    const fetchAllData = () => {
         Promise.all([
             studentApi.getByIdWithStats(id),
             feePaymentApi.getByStudent(id),
@@ -29,6 +34,10 @@ export default function StudentProfilePage() {
             setAttendance(a)
             setLoading(false)
         }).catch(console.error)
+    }
+
+    useEffect(() => {
+        fetchAllData()
     }, [id])
 
     if (loading) return <div className="text-center py-12 text-slate-400 text-sm">Loading...</div>
@@ -45,17 +54,26 @@ export default function StudentProfilePage() {
                         <ArrowLeft className="h-4 w-4" />
                     </Button>
                 </Link>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 flex-1">
                     <div className="h-12 w-12 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white text-lg font-bold">
                         {student.name.charAt(0)}
                     </div>
-                    <div>
+                    <div className="flex-1">
                         <div className="flex items-center gap-2">
                             <h1 className="text-xl font-bold text-slate-900">{student.name}</h1>
                             <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-50 text-emerald-600 capitalize">{student.status}</span>
                         </div>
                         <p className="text-[13px] text-slate-400">{student.course_type} &middot; Enrolled {new Date(student.enrollment_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                     </div>
+                    <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setEditSheetOpen(true)}
+                        className="rounded-xl h-9 px-4 text-[13px] font-medium border-slate-200 cursor-pointer ml-auto"
+                    >
+                        <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                        Edit Student
+                    </Button>
                 </div>
             </div>
 
@@ -137,7 +155,11 @@ export default function StudentProfilePage() {
                     <CardContent className="p-0">
                         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
                             <h3 className="text-[14px] font-semibold text-slate-900">Payment History</h3>
-                            <Button size="sm" className="rounded-xl h-8 px-3 text-[12px] font-medium bg-amber-500 hover:bg-amber-600 text-black cursor-pointer">
+                            <Button 
+                                size="sm" 
+                                onClick={() => setPaymentSheetOpen(true)}
+                                className="rounded-xl h-8 px-3 text-[12px] font-medium bg-amber-500 hover:bg-amber-600 text-black cursor-pointer"
+                            >
                                 <Plus className="h-3 w-3 mr-1" /> Record Payment
                             </Button>
                         </div>
@@ -196,6 +218,20 @@ export default function StudentProfilePage() {
                     </CardContent>
                 </Card>
             )}
+
+            <RecordPaymentSheet
+                open={paymentSheetOpen}
+                onOpenChange={setPaymentSheetOpen}
+                studentId={id}
+                onSuccess={fetchAllData}
+            />
+
+            <EditStudentSheet
+                open={editSheetOpen}
+                onOpenChange={setEditSheetOpen}
+                student={student}
+                onSuccess={fetchAllData}
+            />
         </div>
     )
 }

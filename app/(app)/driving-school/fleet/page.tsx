@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { Plus, Search, Car, MoreVertical, Pencil, Power, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,13 +26,28 @@ export default function FleetPage() {
 
     const [menuOpen, setMenuOpen] = useState<string | null>(null)
 
-    const fetchList = () => {
+    const menuRef = useRef<HTMLDivElement>(null)
+
+    const fetchList = useCallback(() => {
         fleetVehicleApi.getAll()
             .then(data => { setVehicles(data); setLoading(false) })
             .catch(() => toast.error('Failed to load fleet vehicles'))
-    }
+    }, [])
 
-    useEffect(() => { fetchList() }, [])
+    useEffect(() => { fetchList() }, [fetchList])
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        function handleClickOutside(e: MouseEvent) {
+            if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+                setMenuOpen(null)
+            }
+        }
+        if (menuOpen) {
+            document.addEventListener('mousedown', handleClickOutside)
+            return () => document.removeEventListener('mousedown', handleClickOutside)
+        }
+    }, [menuOpen])
 
     const openAdd = () => {
         setEditTarget(null)
@@ -138,7 +153,7 @@ export default function FleetPage() {
                                         </p>
                                     </div>
                                 </div>
-                                <div className="relative">
+                                <div className="relative" ref={menuOpen === vehicle.id ? menuRef : undefined}>
                                     <Button variant="ghost" size="icon" className="text-slate-300 hover:text-slate-600 cursor-pointer"
                                         onClick={() => setMenuOpen(menuOpen === vehicle.id ? null : vehicle.id)}>
                                         <MoreVertical className="h-4 w-4" />

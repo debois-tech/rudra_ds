@@ -25,80 +25,95 @@ export interface AuthUser {
 // AUTH HELPERS
 // ============================================
 
-/** Get currently authenticated Supabase user, or null */
+/**
+ * Get currently authenticated user from the local session.
+ * Uses getSession() (cookie-only, ZERO network calls) instead of getUser() (HTTP round-trip).
+ * Note: getSession() trusts the local token without server verification — appropriate
+ * for client-side guards. Server routes use their own getUser() via admin-auth-guard.
+ */
 export async function getCurrentUser(): Promise<User | null> {
     const supabase = createSupabaseBrowser()
-    const { data: { user } } = await supabase.auth.getUser()
-    return user
+    const { data: { session } } = await supabase.auth.getSession()
+    return session?.user ?? null
 }
 
-let cachedProfilePromise: Promise<Profile | null> | null = null
+// In-memory profile cache keyed by user ID — avoids re-fetching on every API call
+let _cachedProfile: Profile | null = null
+let _cachedUserId: string | null = null
 
-/** Get current user's profile (with org_id and role) */
+// Module-level org_id fast path — set once from React context on app boot.
+// This eliminates the DB round-trip inside getOrgId() for every mutation.
+let _cachedOrgId: string | null = null
+
+/** Set the org_id from React context. Called once per app mount. */
+export function setOrgId(id: string) {
+    _cachedOrgId = id
+}
+
+/** Get the org_id — from the fast in-memory cache, profile cache, or Supabase. */
+export async function getOrgId(): Promise<string> {
+    if (_cachedOrgId) return _cachedOrgId
+    const profile = await getCurrentProfile()
+    if (!profile?.org_id) throw new Error('No organization found.')
+    _cachedOrgId = profile.org_id
+    return _cachedOrgId
+}
+
+/** Get current user's profile (with org_id and role). Cached in memory. */
 export async function getCurrentProfile(): Promise<Profile | null> {
-    if (typeof window !== 'undefined' && cachedProfilePromise) {
-        return cachedProfilePromise
+    const supabase = createSupabaseBrowser()
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.user) return null
+
+    // Return cached profile if user hasn't changed
+    if (_cachedProfile && _cachedUserId === session.user.id) {
+        return _cachedProfile
     }
 
-    const fetchProfile = async () => {
-        const supabase = createSupabaseBrowser()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return null
+    const { data, error } = await supabase
+        .from('profiles')
+        .select('id, org_id, role, full_name, email, avatar_url, is_active, created_at, updated_at')
+        .eq('id', session.user.id)
+        .single()
 
-        const { data, error } = await supabase
-            .from('profiles')
-            .select('id, org_id, role, full_name, email, avatar_url, is_active, created_at, updated_at')
-            .eq('id', user.id)
-            .single()
-
-        if (error) {
-            console.error('Error fetching profile:', error)
-            return null
-        }
-        return data as Profile
+    if (error || !data) {
+        console.error('Error fetching profile:', error)
+        return null
     }
 
-    if (typeof window !== 'undefined') {
-        cachedProfilePromise = fetchProfile()
-        return cachedProfilePromise
-    }
-
-    return fetchProfile()
+    _cachedProfile = data as Profile
+    _cachedUserId = session.user.id
+    return _cachedProfile
 }
 
 /** Get full auth context (user + profile) */
 export async function getAuthUser(): Promise<AuthUser | null> {
     const supabase = createSupabaseBrowser()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return null
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.user) return null
 
-    const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single()
-
+    const profile = await getCurrentProfile()
     if (!profile) return null
-    return { user, profile: profile as Profile }
+    return { user: session.user, profile }
 }
 
 /** Sign in with email and password */
 export async function signIn(email: string, password: string) {
-    cachedProfilePromise = null
+    _cachedProfile = null
+    _cachedUserId = null
     const supabase = createSupabaseBrowser()
-    const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-    })
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw error
     return data
 }
 
-/** Sign out — global scope invalidates all sessions across devices */
+/** Sign out from the current device only */
 export async function signOut() {
-    cachedProfilePromise = null
+    _cachedProfile = null
+    _cachedUserId = null
     const supabase = createSupabaseBrowser()
-    const { error } = await supabase.auth.signOut({ scope: 'global' })
+    // 'local' scope only clears this device's session — not all sessions globally
+    const { error } = await supabase.auth.signOut({ scope: 'local' })
     if (error) throw error
 }
 
@@ -116,4 +131,10 @@ export async function getCurrentOrganization() {
 
     if (error) return null
     return data
+}
+
+/** Invalidate the in-memory profile cache (call after profile updates) */
+export function invalidateProfileCache() {
+    _cachedProfile = null
+    _cachedUserId = null
 }

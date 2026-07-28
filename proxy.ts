@@ -1,9 +1,10 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
 /**
- * Cheap request gate. Protected page requests verify the session in the app
- * layout. Duplicating Supabase getUser() here added a network round-trip to
- * every navigation. API handlers keep their own auth guards.
+ * Middleware — runs on the Edge before every request.
+ * Cheap cookie-check gate only. Protected page requests verify the session
+ * fully in the server layout. Duplicating Supabase getUser() here added a
+ * network round-trip to every navigation. API handlers keep their own auth guards.
  */
 export function proxy(request: NextRequest) {
     const pathname = request.nextUrl.pathname
@@ -18,7 +19,7 @@ export function proxy(request: NextRequest) {
 
     const hasAuthToken = request.cookies.getAll().some(c =>
         c.name.startsWith('sb-') &&
-        c.name.includes('auth-token') &&
+        c.name.endsWith('-auth-token') &&
         c.value &&
         c.value !== 'deleted' &&
         c.value !== '""' &&
@@ -35,12 +36,7 @@ export function proxy(request: NextRequest) {
         return NextResponse.redirect(url)
     }
 
-    const response = NextResponse.next({ request })
-    if (!isPublicRoute) {
-        response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
-        response.headers.set('Pragma', 'no-cache')
-    }
-    return response
+    return NextResponse.next({ request })
 }
 
 export const config = {

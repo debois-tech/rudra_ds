@@ -6,15 +6,21 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { attendanceApi } from '@/lib/ds-api'
 import type { DsAttendanceView } from '@/lib/types'
+import { MarkAttendanceSheet } from './_components/mark-attendance-sheet'
 
 export default function AttendancePage() {
     const [date, setDate] = useState(new Date().toISOString().split('T')[0])
     const [records, setRecords] = useState<DsAttendanceView[]>([])
     const [loading, setLoading] = useState(true)
+    const [sheetOpen, setSheetOpen] = useState(false)
+
+    const fetchRecords = (d: string) => {
+        setLoading(true)
+        attendanceApi.getByDate(d).then(data => { setRecords(data); setLoading(false) }).catch(console.error)
+    }
 
     useEffect(() => {
-        setLoading(true)
-        attendanceApi.getByDate(date).then(data => { setRecords(data); setLoading(false) }).catch(console.error)
+        fetchRecords(date)
     }, [date])
 
     return (
@@ -31,7 +37,10 @@ export default function AttendancePage() {
                         onChange={e => setDate(e.target.value)}
                         className="rounded-xl border border-slate-200 px-3 py-1.5 text-sm text-slate-600 bg-white"
                     />
-                    <Button className="rounded-xl h-9 px-4 text-[13px] font-medium bg-amber-500 hover:bg-amber-600 text-black shadow-sm cursor-pointer">
+                    <Button
+                        onClick={() => setSheetOpen(true)}
+                        className="rounded-xl h-9 px-4 text-[13px] font-medium bg-amber-500 hover:bg-amber-600 text-black shadow-sm cursor-pointer"
+                    >
                         <Plus className="h-3.5 w-3.5 mr-1.5" />
                         Mark Attendance
                     </Button>
@@ -81,6 +90,13 @@ export default function AttendancePage() {
                     <p className="text-sm font-medium">No attendance records found for this date</p>
                 </div>
             )}
+
+            <MarkAttendanceSheet
+                open={sheetOpen}
+                onOpenChange={setSheetOpen}
+                defaultDate={date}
+                onSuccess={() => fetchRecords(date)}
+            />
         </div>
     )
 }

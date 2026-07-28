@@ -6,11 +6,14 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { drivingLogApi } from '@/lib/ds-api'
 import type { DsDrivingLogView } from '@/lib/types'
+import { AssignCarSheet } from './_components/assign-car-sheet'
 
 export default function DailyLogsPage() {
     const [date, setDate] = useState(new Date().toISOString().split('T')[0])
     const [logs, setLogs] = useState<DsDrivingLogView[]>([])
     const [loading, setLoading] = useState(true)
+    const [isReleasing, setIsReleasing] = useState<string | null>(null) // track which log is being released
+    const [sheetOpen, setSheetOpen] = useState(false)
 
     const fetchLogs = (d: string) => {
         setLoading(true)
@@ -20,8 +23,16 @@ export default function DailyLogsPage() {
     useEffect(() => { fetchLogs(date) }, [date])
 
     const handleRelease = async (id: string) => {
-        await drivingLogApi.release(id)
-        fetchLogs(date)
+        if (isReleasing) return // prevent double-click
+        setIsReleasing(id)
+        try {
+            await drivingLogApi.release(id)
+            fetchLogs(date)
+        } catch {
+            // fetchLogs will show current state; toast could be added here
+        } finally {
+            setIsReleasing(null)
+        }
     }
 
     const formatTime = (iso: string) => {
@@ -43,7 +54,10 @@ export default function DailyLogsPage() {
                         onChange={e => setDate(e.target.value)}
                         className="rounded-xl border border-slate-200 px-3 py-1.5 text-sm text-slate-600 bg-white"
                     />
-                    <Button className="rounded-xl h-9 px-4 text-[13px] font-medium bg-amber-500 hover:bg-amber-600 text-black shadow-sm cursor-pointer">
+                    <Button
+                        onClick={() => setSheetOpen(true)}
+                        className="rounded-xl h-9 px-4 text-[13px] font-medium bg-amber-500 hover:bg-amber-600 text-black shadow-sm cursor-pointer"
+                    >
                         <Plus className="h-3.5 w-3.5 mr-1.5" />
                         Assign Car
                     </Button>
@@ -107,9 +121,14 @@ export default function DailyLogsPage() {
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             {!log.released_at && (
-                                                <Button size="sm" variant="ghost" className="text-[12px] text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg cursor-pointer"
-                                                    onClick={() => handleRelease(log.id)}>
-                                                    Release
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    disabled={isReleasing === log.id}
+                                                    className="text-[12px] text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg cursor-pointer disabled:opacity-50"
+                                                    onClick={() => handleRelease(log.id)}
+                                                >
+                                                    {isReleasing === log.id ? 'Releasing...' : 'Release'}
                                                 </Button>
                                             )}
                                         </td>
@@ -120,6 +139,13 @@ export default function DailyLogsPage() {
                     </div>
                 </CardContent>
             </Card>
+
+            <AssignCarSheet
+                open={sheetOpen}
+                onOpenChange={setSheetOpen}
+                defaultDate={date}
+                onSuccess={() => fetchLogs(date)}
+            />
         </div>
     )
 }

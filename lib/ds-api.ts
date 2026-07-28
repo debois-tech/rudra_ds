@@ -1,5 +1,5 @@
 import { createSupabaseBrowser } from './supabase';
-import { getCurrentProfile } from './auth';
+import { getCurrentProfile, getOrgId } from './auth';
 import type {
     DsInstructor,
     DsInstructorFormData,
@@ -17,12 +17,6 @@ import type {
     DsAttendanceView,
     DsDashboardStats,
 } from './types';
-
-async function getOrgId(): Promise<string> {
-    const profile = await getCurrentProfile();
-    if (!profile?.org_id) throw new Error('No organization found. Please contact your administrator.');
-    return profile.org_id;
-}
 
 function getClient() {
     return createSupabaseBrowser();
@@ -409,39 +403,25 @@ export const attendanceApi = {
 };
 
 export const dsDashboardApi = {
+    /**
+     * Single RPC call — all 4 stats aggregated server-side in one round-trip.
+     */
     async getStats(): Promise<DsDashboardStats> {
         const supabase = getClient();
-        const today = new Date().toISOString().split('T')[0];
-        const now = new Date();
-        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-
-        const [activeLogsRes, activeStudentsRes, feesRes, studentFeesRes, allPaymentsRes] = await Promise.all([
-            supabase.from('ds_driving_logs').select('id', { count: 'exact', head: true })
-                .eq('log_date', today).is('released_at', null),
-            supabase.from('ds_students').select('id', { count: 'exact', head: true })
-                .eq('status', 'active'),
-            supabase.from('ds_fee_payments').select('amount')
-                .gte('payment_date', monthStart),
-            supabase.from('ds_students').select('total_fee'),
-            supabase.from('ds_fee_payments').select('amount'),
-        ]);
-
-        const feeThisMonth = (feesRes.data || []).reduce(
-            (sum: number, row: { amount: number }) => sum + (Number(row.amount) || 0), 0
-        );
-        const totalFees = (studentFeesRes.data || []).reduce(
-            (sum: number, row: { total_fee: number }) => sum + (Number(row.total_fee) || 0), 0
-        );
-        const totalPaid = (allPaymentsRes.data || []).reduce(
-            (sum: number, row: { amount: number }) => sum + (Number(row.amount) || 0), 0
-        );
-        const pendingTotal = Math.max(0, totalFees - totalPaid);
-
+        const orgId = await getOrgId();
+        const { data, error } = await supabase.rpc('get_ds_dashboard_stats', { p_org_id: orgId });
+        if (error) throw error;
+        const result = data as {
+            activeLogsToday: number;
+            activeStudents: number;
+            feeCollectionThisMonth: number;
+            pendingFeesTotal: number;
+        };
         return {
-            activeLogsToday: activeLogsRes.count || 0,
-            activeStudents: activeStudentsRes.count || 0,
-            feeCollectionThisMonth: feeThisMonth,
-            pendingFeesTotal: pendingTotal,
+            activeLogsToday: result.activeLogsToday || 0,
+            activeStudents: result.activeStudents || 0,
+            feeCollectionThisMonth: result.feeCollectionThisMonth || 0,
+            pendingFeesTotal: result.pendingFeesTotal || 0,
         };
     },
 };

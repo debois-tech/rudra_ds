@@ -3,7 +3,7 @@
 // For INSERT, we must include org_id in the payload.
 
 import { createSupabaseBrowser } from './supabase';
-import { getCurrentProfile } from './auth';
+import { getCurrentProfile, getOrgId } from './auth';
 import type {
     Customer,
     CustomerFormData,
@@ -23,13 +23,6 @@ import type {
     MonthlyRevenue,
     StatusBreakdown,
 } from './types';
-
-// Helper to get the current user's org_id
-async function getOrgId(): Promise<string> {
-    const profile = await getCurrentProfile();
-    if (!profile?.org_id) throw new Error('No organization found. Please contact your administrator.');
-    return profile.org_id;
-}
 
 function getClient() {
     return createSupabaseBrowser();
@@ -355,24 +348,39 @@ export const serviceApi = {
 // =============================================
 
 export const dashboardApi = {
-    async getStats(): Promise<DashboardStats> {
+    /**
+     * Single RPC call returns all dashboard stats, charts, and breakdowns.
+     * Replaces 7 separate queries — DB does all aggregation in one round-trip.
+     */
+    async getAllStats(): Promise<{
+        stats: DashboardStats;
+        serviceBreakdown: ServiceBreakdown[];
+        statusBreakdown: StatusBreakdown[];
+        revenueByMonth: MonthlyRevenue[];
+    }> {
         const supabase = getClient();
-        const [customersRes, vehiclesRes, servicesRes, revenueRes] = await Promise.all([
-            supabase.from('customers').select('*', { count: 'exact', head: true }),
-            supabase.from('vehicles').select('*', { count: 'exact', head: true }),
-            supabase.from('services').select('*', { count: 'exact', head: true }),
-            supabase.from('services').select('total_cost'),
-        ]);
-
-        const totalRevenue = (revenueRes.data || []).reduce(
-            (sum: number, row: { total_cost: number }) => sum + (Number(row.total_cost) || 0), 0
-        );
-
+        const orgId = await getOrgId();
+        const { data, error } = await supabase.rpc('get_dashboard_stats', { p_org_id: orgId });
+        if (error) throw error;
+        const result = data as {
+            totalCustomers: number;
+            totalVehicles: number;
+            totalServices: number;
+            totalRevenue: number;
+            serviceBreakdown: Array<{ category: string; count: number }> | null;
+            statusBreakdown: Array<{ status: string; count: number }> | null;
+            revenueByMonth: Array<{ month: string; month_key: string; revenue: number }> | null;
+        };
         return {
-            totalCustomers: customersRes.count || 0,
-            totalVehicles: vehiclesRes.count || 0,
-            totalServices: servicesRes.count || 0,
-            totalRevenue,
+            stats: {
+                totalCustomers: result.totalCustomers || 0,
+                totalVehicles: result.totalVehicles || 0,
+                totalServices: result.totalServices || 0,
+                totalRevenue: result.totalRevenue || 0,
+            },
+            serviceBreakdown: result.serviceBreakdown || [],
+            statusBreakdown: result.statusBreakdown || [],
+            revenueByMonth: (result.revenueByMonth || []).map(r => ({ month: r.month, revenue: r.revenue })),
         };
     },
 
@@ -400,14 +408,13 @@ export const dashboardApi = {
 
     /**
      * Get services with expiry dates within the next N days.
-     * Used for the "Documents Expiring Soon" alert panel.
+     * RLS scopes this to the logged-in user's org automatically.
      */
     async getExpiringDocuments(daysThreshold: number = 15): Promise<ExpiringDocument[]> {
         const supabase = getClient();
         const today = new Date();
         const futureDate = new Date();
         futureDate.setDate(today.getDate() + daysThreshold);
-
         const todayStr = today.toISOString().split('T')[0];
         const futureStr = futureDate.toISOString().split('T')[0];
 
@@ -423,92 +430,14 @@ export const dashboardApi = {
         if (error) throw error;
 
         return (data || []).map((row: {
-            s_id: string;
-            customer_id: string;
-            customer_name: string;
-            service_name: string;
-            category: 'vehicle' | 'licence';
-            expiry_date: string;
-            vehicle_number: string | null;
+            s_id: string; customer_id: string; customer_name: string;
+            service_name: string; category: 'vehicle' | 'licence';
+            expiry_date: string; vehicle_number: string | null;
         }) => {
             const expiry = new Date(row.expiry_date);
             const diffMs = expiry.getTime() - today.getTime();
             const daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-            return {
-                ...row,
-                days_remaining: daysRemaining,
-            };
+            return { ...row, days_remaining: daysRemaining };
         });
-    },
-
-    /**
-     * Get service counts grouped by category (vehicle vs licence).
-     */
-    async getServiceBreakdown(): Promise<ServiceBreakdown[]> {
-        const supabase = getClient();
-        const { data, error } = await supabase
-            .from('services')
-            .select('category');
-        if (error) throw error;
-
-        const counts: Record<string, number> = {};
-        (data || []).forEach((row: { category: string }) => {
-            counts[row.category] = (counts[row.category] || 0) + 1;
-        });
-
-        return Object.entries(counts).map(([category, count]) => ({ category, count }));
-    },
-
-    /**
-     * Get service counts grouped by status.
-     */
-    async getStatusBreakdown(): Promise<StatusBreakdown[]> {
-        const supabase = getClient();
-        const { data, error } = await supabase
-            .from('services')
-            .select('status');
-        if (error) throw error;
-
-        const counts: Record<string, number> = {};
-        (data || []).forEach((row: { status: string }) => {
-            counts[row.status] = (counts[row.status] || 0) + 1;
-        });
-
-        return Object.entries(counts).map(([status, count]) => ({ status, count }));
-    },
-
-    /**
-     * Get monthly revenue for the last 6 months.
-     */
-    async getRevenueByMonth(): Promise<MonthlyRevenue[]> {
-        const supabase = getClient();
-        const sixMonthsAgo = new Date();
-        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-        const sinceStr = sixMonthsAgo.toISOString().split('T')[0];
-
-        const { data, error } = await supabase
-            .from('services')
-            .select('issue_date, total_cost')
-            .gte('issue_date', sinceStr);
-        if (error) throw error;
-
-        const monthMap: Record<string, number> = {};
-        (data || []).forEach((row: { issue_date: string; total_cost: number }) => {
-            const d = new Date(row.issue_date);
-            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-            monthMap[key] = (monthMap[key] || 0) + (Number(row.total_cost) || 0);
-        });
-
-        // Build last 6 months in order
-        const result: MonthlyRevenue[] = [];
-        const now = new Date();
-        for (let i = 5; i >= 0; i--) {
-            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-            const label = d.toLocaleDateString('en-IN', { month: 'short' });
-            result.push({ month: label, revenue: monthMap[key] || 0 });
-        }
-
-        return result;
     },
 };

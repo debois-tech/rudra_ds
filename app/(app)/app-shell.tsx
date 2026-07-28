@@ -6,10 +6,11 @@ import { useRouter, usePathname } from 'next/navigation'
 import { Users, ClipboardList, BarChart3, Menu, LogOut, X, ChevronDown, GraduationCap, Car, CalendarClock, UserCircle, BookOpenCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/sonner"
-import { signOut } from '@/lib/auth'
+import { signOut, setOrgId } from '@/lib/auth'
 import Image from 'next/image'
 
 export const DashboardOrgContext = createContext('')
+export const OrgIdContext = createContext<string | null>(null)
 
 interface AppProfile {
     id: string
@@ -58,6 +59,12 @@ export function AppShell({ profile, orgName, children }: AppShellProps) {
         document.addEventListener('mousedown', handleClickOutside)
         return () => document.removeEventListener('mousedown', handleClickOutside)
     }, [])
+
+    useEffect(() => {
+        if (profile.org_id) {
+            setOrgId(profile.org_id)
+        }
+    }, [profile.org_id])
 
     const handleSignOut = async () => {
         await signOut()
@@ -302,11 +309,13 @@ export function AppShell({ profile, orgName, children }: AppShellProps) {
 
             {/* ── Main Content ── */}
             <DashboardOrgContext.Provider value={orgName}>
+            <OrgIdContext.Provider value={profile.org_id}>
                 <main className="flex-1 w-full">
                     <div className="max-w-[1440px] mx-auto px-4 md:px-8 py-6 md:py-8">
                         {children}
                     </div>
                 </main>
+            </OrgIdContext.Provider>
             </DashboardOrgContext.Provider>
 
             <Toaster />

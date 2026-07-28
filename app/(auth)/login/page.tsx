@@ -2,7 +2,8 @@
 
 import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { getCurrentProfile, signIn } from '@/lib/auth'
+import { signIn } from '@/lib/auth'
+import { createSupabaseBrowser } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -37,14 +38,21 @@ function LoginForm() {
         setError(null)
 
         try {
-            await signIn(email, password)
-            const profile = await getCurrentProfile()
-            if (!profile || !profile.is_active) {
-                throw new Error('Your account is inactive. Contact your administrator.')
-            }
+            // signIn returns the session which includes user — no need to call getUser() again
+            const { user } = await signIn(email, password)
+            if (!user) throw new Error('Login failed — no user returned.')
 
-            // Security: only allow relative paths. Without an explicit target,
-            // route by the role stored in the database.
+            // Fetch profile using the user.id we already have (one direct query, no getUser())
+            const supabase = createSupabaseBrowser()
+            const { data: profile, error: profileError } = await supabase
+                .from('profiles')
+                .select('role, is_active')
+                .eq('id', user.id)
+                .single()
+
+            if (profileError || !profile) throw new Error('Could not load your profile.')
+            if (!profile.is_active) throw new Error('Your account is inactive. Contact your administrator.')
+
             const requestedRedirect = rawRedirect &&
                 rawRedirect.startsWith('/') &&
                 !rawRedirect.startsWith('//')
@@ -52,7 +60,6 @@ function LoginForm() {
                 : null
             const defaultRedirect = profile.role === 'super_admin' ? '/admin' : '/dashboard'
             router.replace(requestedRedirect || defaultRedirect)
-            router.refresh()
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : 'Login failed'
             setError(message)

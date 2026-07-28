@@ -1,6 +1,22 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Tell Turbopack to optimize these heavy packages — pre-compiles them once
+  // instead of re-transpiling every module import individually
+  experimental: {
+    optimizePackageImports: [
+      "lucide-react",
+      "framer-motion",
+      "@radix-ui/react-dialog",
+      "@radix-ui/react-select",
+      "@radix-ui/react-label",
+      "@radix-ui/react-slot",
+      "@radix-ui/react-radio-group",
+      "date-fns",
+      "sonner",
+    ],
+  },
+
   // Security headers applied to all responses
   async headers() {
     return [
@@ -26,10 +42,6 @@ const nextConfig: NextConfig = {
           {
             key: "X-DNS-Prefetch-Control",
             value: "on",
-          },
-          {
-            key: "Strict-Transport-Security",
-            value: "max-age=63072000; includeSubDomains; preload",
           },
         ],
       },
