@@ -8,8 +8,9 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { studentApi } from '@/lib/ds-api'
 import Link from 'next/link'
+import { toast } from 'sonner'
 
-const courseTypes = ['LMV', 'MCWG', 'HMV', 'Transport', 'Conductor', 'Others']
+const courseTypes = ['LMV', 'MCWG', 'HMV', 'LMV+MCWG', 'Transport', 'Conductor', 'Others']
 
 export default function EnrollStudentPage() {
     const router = useRouter()
@@ -24,9 +25,13 @@ export default function EnrollStudentPage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
+        if (!name || !phone) {
+            toast.error('Name and phone are required')
+            return
+        }
         setSubmitting(true)
         try {
-            await studentApi.create({
+            const student = await studentApi.create({
                 name,
                 phone,
                 email: email || undefined,
@@ -35,9 +40,12 @@ export default function EnrollStudentPage() {
                 course_type: course,
                 total_fee: Number(fee) || 0,
             })
-            router.push('/driving-school/students')
+            toast.success(`${name} enrolled successfully!`)
+            // Redirect to student profile and auto-open payment sheet
+            router.push(`/driving-school/students/${student.id}?openPayment=true`)
         } catch (err) {
             console.error(err)
+            toast.error('Failed to enroll student. Please try again.')
             setSubmitting(false)
         }
     }
@@ -46,13 +54,13 @@ export default function EnrollStudentPage() {
         <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
             <div className="flex items-center gap-4">
                 <Link href="/driving-school/students">
-                    <Button variant="ghost" size="icon" className="rounded-xl h-9 w-9 text-slate-400 hover:text-slate-600">
+                    <Button variant="ghost" size="icon" className="rounded-xl h-9 w-9 text-slate-400 hover:text-slate-600 cursor-pointer">
                         <ArrowLeft className="h-4 w-4" />
                     </Button>
                 </Link>
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Enroll Student</h1>
-                    <p className="text-[14px] text-slate-400 mt-1">Add a new driving school student</p>
+                    <p className="text-[14px] text-slate-400 mt-1">After enrollment, you can record the initial payment</p>
                 </div>
             </div>
 
@@ -63,24 +71,52 @@ export default function EnrollStudentPage() {
                             <h2 className="text-[15px] font-semibold text-slate-900 mb-4">Personal Information</h2>
                             <div className="grid md:grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
-                                    <label className="text-[13px] font-medium text-slate-700">Full Name *</label>
-                                    <Input value={name} onChange={e => setName(e.target.value)} required placeholder="Enter full name" className="rounded-xl border-slate-200 h-9 text-sm" />
+                                    <label className="text-[13px] font-medium text-slate-700">Full Name <span className="text-red-500">*</span></label>
+                                    <Input
+                                        value={name}
+                                        onChange={e => setName(e.target.value)}
+                                        required
+                                        placeholder="Enter full name"
+                                        className="rounded-xl border-slate-200 h-9 text-sm"
+                                    />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[13px] font-medium text-slate-700">Phone *</label>
-                                    <Input value={phone} onChange={e => setPhone(e.target.value)} required placeholder="10-digit mobile" className="rounded-xl border-slate-200 h-9 text-sm" />
+                                    <label className="text-[13px] font-medium text-slate-700">Phone <span className="text-red-500">*</span></label>
+                                    <Input
+                                        value={phone}
+                                        onChange={e => setPhone(e.target.value)}
+                                        required
+                                        placeholder="10-digit mobile"
+                                        className="rounded-xl border-slate-200 h-9 text-sm"
+                                    />
                                 </div>
                                 <div className="space-y-1.5">
                                     <label className="text-[13px] font-medium text-slate-700">Email</label>
-                                    <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="email@example.com" className="rounded-xl border-slate-200 h-9 text-sm" />
+                                    <Input
+                                        type="email"
+                                        value={email}
+                                        onChange={e => setEmail(e.target.value)}
+                                        placeholder="email@example.com"
+                                        className="rounded-xl border-slate-200 h-9 text-sm"
+                                    />
                                 </div>
                                 <div className="space-y-1.5">
                                     <label className="text-[13px] font-medium text-slate-700">Date of Birth</label>
-                                    <Input type="date" value={dob} onChange={e => setDob(e.target.value)} className="rounded-xl border-slate-200 h-9 text-sm" />
+                                    <Input
+                                        type="date"
+                                        value={dob}
+                                        onChange={e => setDob(e.target.value)}
+                                        className="rounded-xl border-slate-200 h-9 text-sm"
+                                    />
                                 </div>
                                 <div className="md:col-span-2 space-y-1.5">
                                     <label className="text-[13px] font-medium text-slate-700">Address</label>
-                                    <Input value={address} onChange={e => setAddress(e.target.value)} placeholder="Full address" className="rounded-xl border-slate-200 h-9 text-sm" />
+                                    <Input
+                                        value={address}
+                                        onChange={e => setAddress(e.target.value)}
+                                        placeholder="Full address"
+                                        className="rounded-xl border-slate-200 h-9 text-sm"
+                                    />
                                 </div>
                             </div>
                         </div>
@@ -89,7 +125,7 @@ export default function EnrollStudentPage() {
                             <h2 className="text-[15px] font-semibold text-slate-900 mb-4">Enrollment Details</h2>
                             <div className="grid md:grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
-                                    <label className="text-[13px] font-medium text-slate-700">Course Type *</label>
+                                    <label className="text-[13px] font-medium text-slate-700">Course Type <span className="text-red-500">*</span></label>
                                     <select
                                         value={course}
                                         onChange={e => setCourse(e.target.value)}
@@ -99,23 +135,39 @@ export default function EnrollStudentPage() {
                                     </select>
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[13px] font-medium text-slate-700">Total Fee (₹)</label>
+                                    <label className="text-[13px] font-medium text-slate-700">Agreed Total Fee (₹)</label>
                                     <div className="relative">
                                         <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                                        <Input value={fee} onChange={e => setFee(e.target.value)} placeholder="0" className="pl-9 rounded-xl border-slate-200 h-9 text-sm" />
+                                        <Input
+                                            type="number"
+                                            min="0"
+                                            value={fee}
+                                            onChange={e => setFee(e.target.value)}
+                                            placeholder="0"
+                                            className="pl-9 rounded-xl border-slate-200 h-9 text-sm"
+                                        />
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                        {/* Info banner */}
+                        <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-4">
+                            <p className="text-[13px] text-emerald-700 font-medium">💡 After enrolling, you'll be taken directly to the student's profile to record the first payment.</p>
+                        </div>
+
+                        <div className="flex justify-end gap-3 pt-2">
                             <Link href="/driving-school/students">
                                 <Button type="button" variant="outline" className="rounded-xl h-9 px-4 text-[13px] border-slate-200 cursor-pointer">
                                     Cancel
                                 </Button>
                             </Link>
-                            <Button type="submit" disabled={submitting} className="rounded-xl h-9 px-6 text-[13px] font-medium bg-amber-500 hover:bg-amber-600 text-black cursor-pointer disabled:opacity-50">
-                                {submitting ? 'Enrolling...' : 'Enroll Student'}
+                            <Button
+                                type="submit"
+                                disabled={submitting}
+                                className="rounded-xl h-9 px-6 text-[13px] font-medium bg-amber-500 hover:bg-amber-600 text-black cursor-pointer disabled:opacity-50"
+                            >
+                                {submitting ? 'Enrolling...' : 'Enroll Student →'}
                             </Button>
                         </div>
                     </form>

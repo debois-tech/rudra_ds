@@ -176,16 +176,26 @@ export const drivingLogApi = {
         return data || [];
     },
 
+    /**
+     * Create a new driving log entry.
+     * FIX: Instead of querying the view right after insert (which causes RLS race condition),
+     * we enrich the response by fetching instructor + vehicle details separately
+     * and building the DsDrivingLogView manually.
+     */
     async create(data: DsDrivingLogFormData): Promise<DsDrivingLogView> {
         const supabase = getClient();
         const orgId = await getOrgId();
+
+        // Build a proper timezone-aware ISO timestamp from date + time parts
+        const optedAt = data.opted_at ?? new Date().toISOString();
+
         const { data: result, error } = await supabase
             .from('ds_driving_logs')
             .insert([{
                 log_date: data.log_date,
                 instructor_id: data.instructor_id,
                 vehicle_id: data.vehicle_id,
-                opted_at: data.opted_at || new Date().toISOString(),
+                opted_at: optedAt,
                 notes: data.notes || null,
                 org_id: orgId,
             }])
@@ -193,15 +203,32 @@ export const drivingLogApi = {
             .single();
         if (error) throw error;
 
-        const view = await supabase
-            .from('v_ds_driving_logs')
-            .select('*')
-            .eq('id', result.id)
-            .single();
-        if (view.error) throw view.error;
-        return view.data;
+        // Fetch instructor and vehicle in parallel to build the view object
+        const [instRes, vehRes] = await Promise.all([
+            supabase.from('ds_instructors').select('name, phone').eq('id', data.instructor_id).single(),
+            supabase.from('ds_fleet_vehicles').select('v_number, v_name').eq('id', data.vehicle_id).single(),
+        ]);
+
+        return {
+            id: result.id,
+            log_date: result.log_date,
+            instructor_id: result.instructor_id,
+            instructor_name: instRes.data?.name ?? '',
+            instructor_phone: instRes.data?.phone ?? '',
+            vehicle_id: result.vehicle_id,
+            vehicle_number: vehRes.data?.v_number ?? '',
+            vehicle_name: vehRes.data?.v_name ?? null,
+            opted_at: result.opted_at,
+            released_at: result.released_at,
+            status: result.released_at ? 'completed' : 'in_use',
+            notes: result.notes,
+            org_id: result.org_id,
+            created_at: result.created_at,
+            updated_at: result.updated_at,
+        } as DsDrivingLogView;
     },
 
+    /** Release / Opt-out a car from an active driving log */
     async release(id: string): Promise<void> {
         const supabase = getClient();
         const { error } = await supabase
@@ -269,7 +296,7 @@ export const studentApi = {
                 dob: data.dob || null,
                 enrollment_date: data.enrollment_date || new Date().toISOString().split('T')[0],
                 course_type: data.course_type || 'LMV',
-                total_fee: data.total_fee || 0,
+                total_fee: data.total_fee ?? 0,
                 notes: data.notes || null,
                 customer_id: data.customer_id || null,
                 org_id: orgId,
@@ -280,20 +307,28 @@ export const studentApi = {
         return result;
     },
 
-    async update(id: string, data: DsStudentFormData): Promise<DsStudent> {
+    /**
+     * Update a student record.
+     * FIX: Use partial payload — only send fields present in the form.
+     * Use `?? 0` (not `|| 0`) so that 0 fee is not treated as falsy.
+     * enrollment_date is intentionally excluded from updates.
+     */
+    async update(id: string, data: Partial<DsStudentFormData>): Promise<DsStudent> {
         const supabase = getClient();
+        const payload: Record<string, unknown> = {};
+        if (data.name !== undefined) payload.name = data.name;
+        if (data.phone !== undefined) payload.phone = data.phone;
+        if (data.email !== undefined) payload.email = data.email || null;
+        if (data.address !== undefined) payload.address = data.address || null;
+        if (data.dob !== undefined) payload.dob = data.dob || null;
+        if (data.course_type !== undefined) payload.course_type = data.course_type || 'LMV';
+        if (data.total_fee !== undefined) payload.total_fee = data.total_fee ?? 0;
+        if (data.notes !== undefined) payload.notes = data.notes || null;
+        if (data.status !== undefined) payload.status = data.status;
+
         const { data: result, error } = await supabase
             .from('ds_students')
-            .update({
-                name: data.name,
-                phone: data.phone,
-                email: data.email || null,
-                address: data.address || null,
-                dob: data.dob || null,
-                course_type: data.course_type || 'LMV',
-                total_fee: data.total_fee || 0,
-                notes: data.notes || null,
-            })
+            .update(payload)
             .eq('id', id)
             .select()
             .single();
@@ -363,20 +398,24 @@ export const attendanceApi = {
         return data || [];
     },
 
+    /**
+     * Mark attendance for a single student.
+     * Auto-attaches the active driving log (vehicle) for the given instructor if one exists.
+     */
     async mark(data: DsAttendanceFormData): Promise<DsAttendance> {
         const supabase = getClient();
         const orgId = await getOrgId();
 
-        const { data: activeLog, error: logError } = await supabase
+        // Find the active (not released) driving log for this instructor on this date
+        const { data: activeLog } = await supabase
             .from('ds_driving_logs')
             .select('id, vehicle_id')
             .eq('instructor_id', data.instructor_id)
+            .eq('log_date', data.attendance_date || new Date().toISOString().split('T')[0])
             .is('released_at', null)
             .order('opted_at', { ascending: false })
             .limit(1)
             .maybeSingle();
-
-        if (logError) throw logError;
 
         const { data: result, error } = await supabase
             .from('ds_attendance')
@@ -384,8 +423,8 @@ export const attendanceApi = {
                 attendance_date: data.attendance_date || new Date().toISOString().split('T')[0],
                 student_id: data.student_id,
                 instructor_id: data.instructor_id,
-                vehicle_id: activeLog?.vehicle_id || null,
-                driving_log_id: activeLog?.id || null,
+                vehicle_id: activeLog?.vehicle_id ?? null,
+                driving_log_id: activeLog?.id ?? null,
                 notes: data.notes || null,
                 org_id: orgId,
             }])
@@ -393,6 +432,56 @@ export const attendanceApi = {
             .single();
         if (error) throw error;
         return result;
+    },
+
+    /**
+     * Mark attendance for multiple students at once (batch).
+     * Uses the same instructor for all, auto-attaches their active driving log.
+     */
+    async markBatch(params: {
+        attendance_date: string;
+        instructor_id: string;
+        student_ids: string[];
+        notes?: string;
+    }): Promise<{ success: number; skipped: number }> {
+        const supabase = getClient();
+        const orgId = await getOrgId();
+
+        // Find the active driving log for this instructor on this date
+        const { data: activeLog } = await supabase
+            .from('ds_driving_logs')
+            .select('id, vehicle_id')
+            .eq('instructor_id', params.instructor_id)
+            .eq('log_date', params.attendance_date)
+            .is('released_at', null)
+            .order('opted_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        const rows = params.student_ids.map(student_id => ({
+            attendance_date: params.attendance_date,
+            student_id,
+            instructor_id: params.instructor_id,
+            vehicle_id: activeLog?.vehicle_id ?? null,
+            driving_log_id: activeLog?.id ?? null,
+            notes: params.notes || null,
+            org_id: orgId,
+        }));
+
+        // Use upsert with onConflict to skip already-marked students gracefully
+        const { data: inserted, error } = await supabase
+            .from('ds_attendance')
+            .upsert(rows, {
+                onConflict: 'student_id,attendance_date',
+                ignoreDuplicates: true,
+            })
+            .select();
+
+        if (error) throw error;
+        return {
+            success: inserted?.length ?? 0,
+            skipped: params.student_ids.length - (inserted?.length ?? 0),
+        };
     },
 
     async delete(id: string): Promise<void> {

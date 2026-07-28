@@ -352,6 +352,7 @@ export interface DsStudentFormData {
   enrollment_date?: string;
   course_type?: string;
   total_fee?: number;
+  status?: DsStudentStatus;
   notes?: string;
   customer_id?: string;
 }

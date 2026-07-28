@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetClose } from '@/components/ui/sheet'
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetClose } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -33,7 +33,7 @@ export function MarkAttendanceSheet({ open, onOpenChange, defaultDate, onSuccess
             setInstructorId('')
             setStudentId('')
             setNotes('')
-            
+
             setLoading(true)
             Promise.all([
                 instructorApi.getAll(),
@@ -62,17 +62,18 @@ export function MarkAttendanceSheet({ open, onOpenChange, defaultDate, onSuccess
                 attendance_date: attendanceDate,
                 student_id: studentId,
                 instructor_id: instructorId,
-                notes
+                notes,
             })
             toast.success('Attendance marked successfully')
             onSuccess()
             onOpenChange(false)
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Failed to mark attendance:', error)
-            if (error.code === '23505') {
+            const pgError = error as { code?: string }
+            if (pgError?.code === '23505') {
                 toast.error('Attendance already marked for this student today')
             } else {
-                toast.error('Failed to mark attendance')
+                toast.error('Failed to mark attendance. Please try again.')
             }
         } finally {
             setSaving(false)
@@ -151,14 +152,14 @@ export function MarkAttendanceSheet({ open, onOpenChange, defaultDate, onSuccess
 
                         <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-end gap-3 mt-auto">
                             <SheetClose asChild>
-                                <Button type="button" variant="outline" className="h-10 px-5 rounded-xl border-slate-200">
+                                <Button type="button" variant="outline" className="h-10 px-5 rounded-xl border-slate-200 cursor-pointer">
                                     Cancel
                                 </Button>
                             </SheetClose>
                             <Button
                                 type="submit"
                                 disabled={saving}
-                                className="h-10 px-5 rounded-xl bg-amber-500 hover:bg-amber-600 text-black font-semibold shadow-sm shadow-amber-500/20"
+                                className="h-10 px-5 rounded-xl bg-amber-500 hover:bg-amber-600 text-black font-semibold shadow-sm shadow-amber-500/20 cursor-pointer"
                             >
                                 {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                                 Save Attendance
