@@ -1,6 +1,7 @@
 -- ============================================
 -- DRIVING SCHOOL: DATABASE SCHEMA
 -- Run this FIRST in Supabase SQL Editor
+-- IMPORTANT: Column names match live DB exactly
 -- ============================================
 
 -- 1. ds_instructors
@@ -42,13 +43,14 @@ CREATE TRIGGER set_ds_fleet_vehicles_updated_at
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 -- 3. ds_driving_logs
+-- NOTE: Uses logging_date, start_datetime, end_datetime (matches live DB)
 CREATE TABLE public.ds_driving_logs (
     id              UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    log_date        DATE NOT NULL DEFAULT CURRENT_DATE,
+    logging_date    DATE NOT NULL DEFAULT CURRENT_DATE,
     instructor_id   UUID NOT NULL REFERENCES public.ds_instructors(id),
     vehicle_id      UUID NOT NULL REFERENCES public.ds_fleet_vehicles(id),
-    opted_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
-    released_at     TIMESTAMPTZ,
+    start_datetime  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    end_datetime    TIMESTAMPTZ,
     notes           TEXT,
     org_id          UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
     created_at      TIMESTAMPTZ DEFAULT now(),
@@ -56,8 +58,8 @@ CREATE TABLE public.ds_driving_logs (
 );
 
 CREATE INDEX idx_ds_driving_logs_org ON public.ds_driving_logs(org_id);
-CREATE INDEX IF NOT EXISTS idx_ds_driving_logs_org_date ON public.ds_driving_logs(org_id, log_date);
-CREATE INDEX idx_ds_driving_logs_date ON public.ds_driving_logs(log_date);
+CREATE INDEX idx_ds_driving_logs_org_date ON public.ds_driving_logs(org_id, logging_date);
+CREATE INDEX idx_ds_driving_logs_date ON public.ds_driving_logs(logging_date);
 
 CREATE TRIGGER set_ds_driving_logs_updated_at
     BEFORE UPDATE ON public.ds_driving_logs
@@ -84,7 +86,7 @@ CREATE TABLE public.ds_students (
 );
 
 CREATE INDEX idx_ds_students_org ON public.ds_students(org_id);
-CREATE INDEX IF NOT EXISTS idx_ds_students_org_status ON public.ds_students(org_id, status);
+CREATE INDEX idx_ds_students_org_status ON public.ds_students(org_id, status);
 CREATE INDEX idx_ds_students_status ON public.ds_students(status);
 
 CREATE TRIGGER set_ds_students_updated_at
@@ -106,9 +108,10 @@ CREATE TABLE public.ds_fee_payments (
 
 CREATE INDEX idx_ds_fee_payments_student ON public.ds_fee_payments(student_id);
 CREATE INDEX idx_ds_fee_payments_org ON public.ds_fee_payments(org_id);
-CREATE INDEX IF NOT EXISTS idx_ds_fee_payments_org_date ON public.ds_fee_payments(org_id, payment_date);
+CREATE INDEX idx_ds_fee_payments_org_date ON public.ds_fee_payments(org_id, payment_date);
 
 -- 6. ds_attendance
+-- NOTE: instructor_id is NULLABLE — attendance can be marked without assigning an instructor
 CREATE TABLE public.ds_attendance (
     id              UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     attendance_date DATE NOT NULL DEFAULT CURRENT_DATE,
@@ -123,9 +126,5 @@ CREATE TABLE public.ds_attendance (
 );
 
 CREATE INDEX idx_ds_attendance_org ON public.ds_attendance(org_id);
-CREATE INDEX IF NOT EXISTS idx_ds_attendance_org_date ON public.ds_attendance(org_id, attendance_date);
+CREATE INDEX idx_ds_attendance_org_date ON public.ds_attendance(org_id, attendance_date);
 CREATE INDEX idx_ds_attendance_date ON public.ds_attendance(attendance_date);
-
-CREATE TRIGGER set_ds_attendance_updated_at
-    BEFORE UPDATE ON public.ds_attendance
-    FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();

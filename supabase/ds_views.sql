@@ -2,28 +2,32 @@
 -- DRIVING SCHOOL: DATABASE VIEWS
 -- Run this THIRD in Supabase SQL Editor
 -- (after ds_schema.sql + ds_rls.sql)
--- security_invoker = true ensures RLS applies
+-- security_invoker = true is CRITICAL for multi-tenancy:
+-- it ensures RLS policies apply when users query views.
+-- Without it, ALL tenants' data would be visible to everyone.
 -- ============================================
 
 -- ============================================
 -- v_ds_driving_logs
 -- Logs joined with instructor name + vehicle number
+-- security_invoker = true enforces org-level RLS
 -- ============================================
-CREATE OR REPLACE VIEW public.v_ds_driving_logs
+DROP VIEW IF EXISTS public.v_ds_driving_logs;
+CREATE VIEW public.v_ds_driving_logs
 WITH (security_invoker = true)
 AS
 SELECT
     dl.id,
-    dl.log_date,
+    dl.logging_date,
     dl.instructor_id,
     i.name AS instructor_name,
     i.phone AS instructor_phone,
     dl.vehicle_id,
     fv.v_number AS vehicle_number,
     fv.v_name AS vehicle_name,
-    dl.opted_at,
-    dl.released_at,
-    CASE WHEN dl.released_at IS NULL THEN 'in_use' ELSE 'completed' END AS status,
+    dl.start_datetime,
+    dl.end_datetime,
+    CASE WHEN dl.end_datetime IS NULL THEN 'in_use' ELSE 'completed' END AS status,
     dl.notes,
     dl.org_id,
     dl.created_at,
@@ -34,7 +38,9 @@ JOIN public.ds_fleet_vehicles fv ON fv.id = dl.vehicle_id;
 
 -- ============================================
 -- v_ds_attendance
--- Attendance joined with student name, instructor name, vehicle number
+-- Attendance joined with student + instructor + vehicle
+-- Uses LEFT JOINs so attendance without instructor/vehicle is visible
+-- security_invoker = true enforces org-level RLS
 -- ============================================
 CREATE OR REPLACE VIEW public.v_ds_attendance
 WITH (security_invoker = true)
@@ -49,7 +55,7 @@ SELECT
     i.name AS instructor_name,
     a.vehicle_id,
     fv.v_number AS vehicle_number,
-    dl.log_date AS driving_log_date,
+    dl.logging_date AS driving_log_date,
     a.notes,
     a.org_id,
     a.created_at
@@ -62,8 +68,10 @@ LEFT JOIN public.ds_driving_logs dl ON dl.id = a.driving_log_id;
 -- ============================================
 -- v_ds_student_dashboard
 -- Students with total paid, pending balance, attendance count
+-- security_invoker = true enforces org-level RLS
 -- ============================================
-CREATE OR REPLACE VIEW public.v_ds_student_dashboard
+DROP VIEW IF EXISTS public.v_ds_student_dashboard;
+CREATE VIEW public.v_ds_student_dashboard
 WITH (security_invoker = true)
 AS
 SELECT
