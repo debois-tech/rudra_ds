@@ -85,10 +85,10 @@ export function AssignCarSheet({ open, onOpenChange, defaultDate, onSuccess, act
             optedDate.setHours(hh, mm, 0, 0)
 
             await drivingLogApi.create({
-                log_date: logDate,
+                logging_date: logDate,
                 instructor_id: instructorId,
                 vehicle_id: vehicleId,
-                opted_at: optedDate.toISOString(),
+                start_datetime: optedDate.toISOString(),
                 notes,
             })
             toast.success('Car assigned successfully')

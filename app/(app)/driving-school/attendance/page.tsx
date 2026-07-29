@@ -39,7 +39,7 @@ export default function AttendancePage() {
             setRecords(recs)
             setInstructors(insts.filter(i => i.is_active))
             setStudents(studs.filter(s => s.status === 'active'))
-            setActiveLogs(logs.filter(l => !l.released_at))
+            setActiveLogs(logs.filter(l => !l.end_datetime))
             setCheckedIds(new Set())
         } catch {
             toast.error('Failed to load attendance data')

@@ -44,8 +44,8 @@ export default function DailyLogsPage() {
         return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
     }
 
-    const activeLogs = logs.filter(l => !l.released_at)
-    const completedLogs = logs.filter(l => l.released_at)
+    const activeLogs = logs.filter(l => !l.end_datetime)
+    const completedLogs = logs.filter(l => l.end_datetime)
 
     return (
         <div className="space-y-6 animate-fade-in">
@@ -136,7 +136,7 @@ export default function DailyLogsPage() {
                                                 {/* Time */}
                                                 <div className="flex items-center gap-2 text-[12px] text-slate-400">
                                                     <Clock className="h-3.5 w-3.5 shrink-0" />
-                                                    <span>Since {formatTime(log.opted_at)}</span>
+                                                    <span>Since {formatTime(log.start_datetime)}</span>
                                                 </div>
 
                                                 {/* Opt Out button */}
@@ -198,8 +198,8 @@ export default function DailyLogsPage() {
                                             </thead>
                                             <tbody className="divide-y divide-slate-50">
                                                 {completedLogs.map(log => {
-                                                    const mins = log.released_at
-                                                        ? Math.round((new Date(log.released_at).getTime() - new Date(log.opted_at).getTime()) / 60000)
+                                                    const mins = log.end_datetime
+                                                        ? Math.round((new Date(log.end_datetime).getTime() - new Date(log.start_datetime).getTime()) / 60000)
                                                         : 0
                                                     const durText = mins >= 60
                                                         ? `${Math.floor(mins / 60)}h ${mins % 60}m`
@@ -220,11 +220,11 @@ export default function DailyLogsPage() {
                                                                 </div>
                                                             </td>
                                                             <td className="px-5 py-3.5">
-                                                                <span className="text-[13px] text-slate-600">{formatTime(log.opted_at)}</span>
+                                                                <span className="text-[13px] text-slate-600">{formatTime(log.start_datetime)}</span>
                                                             </td>
                                                             <td className="px-5 py-3.5">
                                                                 <span className="text-[13px] text-slate-600">
-                                                                    {log.released_at ? formatTime(log.released_at) : '—'}
+                                                                    {log.end_datetime ? formatTime(log.end_datetime) : '—'}
                                                                 </span>
                                                             </td>
                                                             <td className="px-5 py-3.5">

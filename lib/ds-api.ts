@@ -157,8 +157,8 @@ export const drivingLogApi = {
         const { data, error } = await supabase
             .from('v_ds_driving_logs')
             .select('*')
-            .eq('log_date', date)
-            .order('opted_at', { ascending: false });
+            .eq('logging_date', date)
+            .order('start_datetime', { ascending: false });
         if (error) throw error;
         return data || [];
     },
@@ -168,34 +168,30 @@ export const drivingLogApi = {
         const { data, error } = await supabase
             .from('v_ds_driving_logs')
             .select('*')
-            .gte('log_date', from)
-            .lte('log_date', to)
-            .order('log_date', { ascending: false })
-            .order('opted_at', { ascending: false });
+            .gte('logging_date', from)
+            .lte('logging_date', to)
+            .order('logging_date', { ascending: false })
+            .order('start_datetime', { ascending: false });
         if (error) throw error;
         return data || [];
     },
 
     /**
      * Create a new driving log entry.
-     * FIX: Instead of querying the view right after insert (which causes RLS race condition),
-     * we enrich the response by fetching instructor + vehicle details separately
-     * and building the DsDrivingLogView manually.
      */
     async create(data: DsDrivingLogFormData): Promise<DsDrivingLogView> {
         const supabase = getClient();
         const orgId = await getOrgId();
 
-        // Build a proper timezone-aware ISO timestamp from date + time parts
-        const optedAt = data.opted_at ?? new Date().toISOString();
+        const startDatetime = data.start_datetime ?? new Date().toISOString();
 
         const { data: result, error } = await supabase
             .from('ds_driving_logs')
             .insert([{
-                log_date: data.log_date,
+                logging_date: data.logging_date,
                 instructor_id: data.instructor_id,
                 vehicle_id: data.vehicle_id,
-                opted_at: optedAt,
+                start_datetime: startDatetime,
                 notes: data.notes || null,
                 org_id: orgId,
             }])
@@ -211,16 +207,16 @@ export const drivingLogApi = {
 
         return {
             id: result.id,
-            log_date: result.log_date,
+            logging_date: result.logging_date,
             instructor_id: result.instructor_id,
             instructor_name: instRes.data?.name ?? '',
             instructor_phone: instRes.data?.phone ?? '',
             vehicle_id: result.vehicle_id,
             vehicle_number: vehRes.data?.v_number ?? '',
             vehicle_name: vehRes.data?.v_name ?? null,
-            opted_at: result.opted_at,
-            released_at: result.released_at,
-            status: result.released_at ? 'completed' : 'in_use',
+            start_datetime: result.start_datetime,
+            end_datetime: result.end_datetime,
+            status: result.end_datetime ? 'completed' : 'in_use',
             notes: result.notes,
             org_id: result.org_id,
             created_at: result.created_at,
@@ -233,7 +229,7 @@ export const drivingLogApi = {
         const supabase = getClient();
         const { error } = await supabase
             .from('ds_driving_logs')
-            .update({ released_at: new Date().toISOString() })
+            .update({ end_datetime: new Date().toISOString() })
             .eq('id', id);
         if (error) throw error;
     },
@@ -411,9 +407,9 @@ export const attendanceApi = {
             .from('ds_driving_logs')
             .select('id, vehicle_id')
             .eq('instructor_id', data.instructor_id)
-            .eq('log_date', data.attendance_date || new Date().toISOString().split('T')[0])
-            .is('released_at', null)
-            .order('opted_at', { ascending: false })
+            .eq('logging_date', data.attendance_date || new Date().toISOString().split('T')[0])
+            .is('end_datetime', null)
+            .order('start_datetime', { ascending: false })
             .limit(1)
             .maybeSingle();
 
@@ -452,9 +448,9 @@ export const attendanceApi = {
             .from('ds_driving_logs')
             .select('id, vehicle_id')
             .eq('instructor_id', params.instructor_id)
-            .eq('log_date', params.attendance_date)
-            .is('released_at', null)
-            .order('opted_at', { ascending: false })
+            .eq('logging_date', params.attendance_date)
+            .is('end_datetime', null)
+            .order('start_datetime', { ascending: false })
             .limit(1)
             .maybeSingle();
 
