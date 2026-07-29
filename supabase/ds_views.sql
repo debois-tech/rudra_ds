@@ -55,7 +55,7 @@ SELECT
     a.created_at
 FROM public.ds_attendance a
 JOIN public.ds_students s ON s.id = a.student_id
-JOIN public.ds_instructors i ON i.id = a.instructor_id
+LEFT JOIN public.ds_instructors i ON i.id = a.instructor_id
 LEFT JOIN public.ds_fleet_vehicles fv ON fv.id = a.vehicle_id
 LEFT JOIN public.ds_driving_logs dl ON dl.id = a.driving_log_id;
 

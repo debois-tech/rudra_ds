@@ -113,7 +113,7 @@ CREATE TABLE public.ds_attendance (
     id              UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     attendance_date DATE NOT NULL DEFAULT CURRENT_DATE,
     student_id      UUID NOT NULL REFERENCES public.ds_students(id) ON DELETE CASCADE,
-    instructor_id   UUID NOT NULL REFERENCES public.ds_instructors(id),
+    instructor_id   UUID REFERENCES public.ds_instructors(id),
     vehicle_id      UUID REFERENCES public.ds_fleet_vehicles(id),
     driving_log_id  UUID REFERENCES public.ds_driving_logs(id),
     notes           TEXT,

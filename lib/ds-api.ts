@@ -225,11 +225,11 @@ export const drivingLogApi = {
     },
 
     /** Release / Opt-out a car from an active driving log */
-    async release(id: string): Promise<void> {
+    async release(id: string, endTime?: string): Promise<void> {
         const supabase = getClient();
         const { error } = await supabase
             .from('ds_driving_logs')
-            .update({ end_datetime: new Date().toISOString() })
+            .update({ end_datetime: endTime || new Date().toISOString() })
             .eq('id', id);
         if (error) throw error;
     },
@@ -403,22 +403,26 @@ export const attendanceApi = {
         const orgId = await getOrgId();
 
         // Find the active (not released) driving log for this instructor on this date
-        const { data: activeLog } = await supabase
-            .from('ds_driving_logs')
-            .select('id, vehicle_id')
-            .eq('instructor_id', data.instructor_id)
-            .eq('logging_date', data.attendance_date || new Date().toISOString().split('T')[0])
-            .is('end_datetime', null)
-            .order('start_datetime', { ascending: false })
-            .limit(1)
-            .maybeSingle();
+        let activeLog = null;
+        if (data.instructor_id) {
+            const { data: logData } = await supabase
+                .from('ds_driving_logs')
+                .select('id, vehicle_id')
+                .eq('instructor_id', data.instructor_id)
+                .eq('logging_date', data.attendance_date || new Date().toISOString().split('T')[0])
+                .is('end_datetime', null)
+                .order('start_datetime', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+            activeLog = logData;
+        }
 
         const { data: result, error } = await supabase
             .from('ds_attendance')
             .insert([{
                 attendance_date: data.attendance_date || new Date().toISOString().split('T')[0],
                 student_id: data.student_id,
-                instructor_id: data.instructor_id,
+                instructor_id: data.instructor_id || null,
                 vehicle_id: activeLog?.vehicle_id ?? null,
                 driving_log_id: activeLog?.id ?? null,
                 notes: data.notes || null,
@@ -436,7 +440,7 @@ export const attendanceApi = {
      */
     async markBatch(params: {
         attendance_date: string;
-        instructor_id: string;
+        instructor_id?: string;
         student_ids: string[];
         notes?: string;
     }): Promise<{ success: number; skipped: number }> {
@@ -444,20 +448,24 @@ export const attendanceApi = {
         const orgId = await getOrgId();
 
         // Find the active driving log for this instructor on this date
-        const { data: activeLog } = await supabase
-            .from('ds_driving_logs')
-            .select('id, vehicle_id')
-            .eq('instructor_id', params.instructor_id)
-            .eq('logging_date', params.attendance_date)
-            .is('end_datetime', null)
-            .order('start_datetime', { ascending: false })
-            .limit(1)
-            .maybeSingle();
+        let activeLog = null;
+        if (params.instructor_id) {
+            const { data: logData } = await supabase
+                .from('ds_driving_logs')
+                .select('id, vehicle_id')
+                .eq('instructor_id', params.instructor_id)
+                .eq('logging_date', params.attendance_date)
+                .is('end_datetime', null)
+                .order('start_datetime', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+            activeLog = logData;
+        }
 
         const rows = params.student_ids.map(student_id => ({
             attendance_date: params.attendance_date,
             student_id,
-            instructor_id: params.instructor_id,
+            instructor_id: params.instructor_id || null,
             vehicle_id: activeLog?.vehicle_id ?? null,
             driving_log_id: activeLog?.id ?? null,
             notes: params.notes || null,

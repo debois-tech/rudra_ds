@@ -403,7 +403,7 @@ export interface DsAttendance {
   id: string;
   attendance_date: string;
   student_id: string;
-  instructor_id: string;
+  instructor_id: string | null;
   vehicle_id: string | null;
   driving_log_id: string | null;
   notes: string | null;
@@ -414,7 +414,7 @@ export interface DsAttendance {
 export interface DsAttendanceFormData {
   attendance_date?: string;
   student_id: string;
-  instructor_id: string;
+  instructor_id?: string | null;
   notes?: string;
 }
 
@@ -424,8 +424,8 @@ export interface DsAttendanceView {
   student_id: string;
   student_name: string;
   student_phone: string;
-  instructor_id: string;
-  instructor_name: string;
+  instructor_id: string | null;
+  instructor_name: string | null;
   vehicle_id: string | null;
   vehicle_number: string | null;
   driving_log_date: string | null;

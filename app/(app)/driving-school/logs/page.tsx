@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { drivingLogApi } from '@/lib/ds-api'
 import type { DsDrivingLogView } from '@/lib/types'
 import { AssignCarSheet } from './_components/assign-car-sheet'
+import { ReleaseCarSheet } from './_components/release-car-sheet'
 import { toast } from 'sonner'
 
 export default function DailyLogsPage() {
@@ -15,6 +16,8 @@ export default function DailyLogsPage() {
     const [loading, setLoading] = useState(true)
     const [isReleasing, setIsReleasing] = useState<string | null>(null)
     const [sheetOpen, setSheetOpen] = useState(false)
+    const [releaseSheetOpen, setReleaseSheetOpen] = useState(false)
+    const [selectedLogToRelease, setSelectedLogToRelease] = useState<DsDrivingLogView | null>(null)
 
     const fetchLogs = useCallback((d: string) => {
         setLoading(true)
@@ -25,18 +28,9 @@ export default function DailyLogsPage() {
 
     useEffect(() => { fetchLogs(date) }, [date, fetchLogs])
 
-    const handleOptOut = async (log: DsDrivingLogView) => {
-        if (isReleasing) return
-        setIsReleasing(log.id)
-        try {
-            await drivingLogApi.release(log.id)
-            toast.success(`${log.vehicle_number} opted out successfully`)
-            fetchLogs(date)
-        } catch {
-            toast.error('Failed to opt out. Please try again.')
-        } finally {
-            setIsReleasing(null)
-        }
+    const handleOptOut = (log: DsDrivingLogView) => {
+        setSelectedLogToRelease(log)
+        setReleaseSheetOpen(true)
     }
 
     const formatTime = (iso: string) => {
@@ -252,6 +246,16 @@ export default function DailyLogsPage() {
                 defaultDate={date}
                 onSuccess={() => fetchLogs(date)}
                 activeLogs={activeLogs}
+            />
+
+            <ReleaseCarSheet
+                open={releaseSheetOpen}
+                onOpenChange={setReleaseSheetOpen}
+                log={selectedLogToRelease}
+                onSuccess={() => {
+                    fetchLogs(date)
+                    setSelectedLogToRelease(null)
+                }}
             />
         </div>
     )
