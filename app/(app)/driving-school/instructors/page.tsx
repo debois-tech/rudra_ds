@@ -23,6 +23,7 @@ export default function InstructorsPage() {
     const [saving, setSaving] = useState(false)
 
     const [menuOpen, setMenuOpen] = useState<string | null>(null)
+    const [pendingId, setPendingId] = useState<string | null>(null)
 
     const menuRef = useRef<HTMLDivElement>(null)
 
@@ -82,21 +83,27 @@ export default function InstructorsPage() {
     }
 
     const toggleActive = async (i: DsInstructor) => {
+        if (pendingId) return
+        setPendingId(i.id)
         try {
             await instructorApi.update(i.id, { name: i.name, phone: i.phone, licence_no: i.licence_no || undefined, is_active: !i.is_active })
             toast.success(`Instructor ${i.is_active ? 'deactivated' : 'activated'}`)
             fetchList()
         } catch { toast.error('Failed to update status') }
+        setPendingId(null)
         setMenuOpen(null)
     }
 
     const handleDelete = async (id: string) => {
+        if (pendingId) return
         if (!confirm('Delete this instructor? This cannot be undone.')) return
+        setPendingId(id)
         try {
             await instructorApi.delete(id)
             toast.success('Instructor deleted')
             fetchList()
         } catch { toast.error('Failed to delete instructor') }
+        setPendingId(null)
         setMenuOpen(null)
     }
 
@@ -169,10 +176,10 @@ export default function InstructorsPage() {
                                             <button onClick={() => openEdit(instructor)} className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-slate-700 hover:bg-slate-50 cursor-pointer">
                                                 <Pencil className="h-3.5 w-3.5" /> Edit
                                             </button>
-                                            <button onClick={() => toggleActive(instructor)} className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-slate-700 hover:bg-slate-50 cursor-pointer">
+                                            <button onClick={() => toggleActive(instructor)} disabled={pendingId === instructor.id} className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-slate-700 hover:bg-slate-50 cursor-pointer disabled:opacity-50 disabled:pointer-events-none">
                                                 <Power className="h-3.5 w-3.5" /> {instructor.is_active ? 'Deactivate' : 'Activate'}
                                             </button>
-                                            <button onClick={() => handleDelete(instructor.id)} className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-red-600 hover:bg-red-50 cursor-pointer">
+                                            <button onClick={() => handleDelete(instructor.id)} disabled={pendingId === instructor.id} className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-red-600 hover:bg-red-50 cursor-pointer disabled:opacity-50 disabled:pointer-events-none">
                                                 <Trash2 className="h-3.5 w-3.5" /> Delete
                                             </button>
                                         </div>

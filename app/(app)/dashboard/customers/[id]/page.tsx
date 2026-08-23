@@ -107,7 +107,7 @@ export default function CustomerDetailPage() {
               <Edit2 className="h-4 w-4 mr-2" /> Edit Profile
             </Button>
           )}
-          <Link href={`/dashboard/services?customer=${customer.c_id}`}>
+          <Link href={`/dashboard/services/new?customer=${customer.c_id}`}>
             <Button className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl h-10 px-5 font-medium shadow-sm border border-purple-700/20">
               <Wrench className="h-4 w-4 mr-2" /> Give Service
             </Button>
@@ -227,7 +227,7 @@ export default function CustomerDetailPage() {
           <Card className="rounded-2xl shadow-sm border-slate-200 overflow-hidden">
             <CardHeader className="bg-white border-b border-slate-100 pb-3 pt-5 px-6 flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-lg"><Wrench className="h-5 w-5 text-purple-500" /> Service History <span className="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full">{services.length}</span></CardTitle>
-              <Link href={`/dashboard/services?customer=${customer.c_id}`}>
+              <Link href={`/dashboard/services/new?customer=${customer.c_id}`}>
                 <Button variant="outline" size="sm" className="h-8 rounded-lg border-slate-200 text-slate-600 text-xs font-semibold hover:bg-purple-50 hover:text-purple-700 hover:border-purple-200"><Plus className="h-3 w-3 mr-1" /> Add Record</Button>
               </Link>
             </CardHeader>

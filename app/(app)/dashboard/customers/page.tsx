@@ -160,7 +160,7 @@ export default function CustomersPage() {
                               <Eye className="h-4 w-4" />
                             </Button>
                           </Link>
-                          <Link href={`/dashboard/services?customer=${c.c_id}`}>
+                          <Link href={`/dashboard/services/new?customer=${c.c_id}`}>
                             <Button variant="outline" size="sm" className="h-8 w-8 p-0 rounded-lg border-slate-200 text-slate-600 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50" title="New Service">
                               <Wrench className="h-4 w-4" />
                             </Button>

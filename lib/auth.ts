@@ -1,21 +1,12 @@
 import { createSupabaseBrowser } from './supabase'
 import type { User } from '@supabase/supabase-js'
+import type { Profile } from './types'
+
+export type { Profile }
 
 // ============================================
 // TYPES
 // ============================================
-export interface Profile {
-    id: string
-    org_id: string | null
-    role: 'super_admin' | 'user'
-    full_name: string | null
-    email: string | null
-    avatar_url: string | null
-    is_active: boolean
-    created_at: string
-    updated_at: string
-}
-
 export interface AuthUser {
     user: User
     profile: Profile
@@ -101,6 +92,7 @@ export async function getAuthUser(): Promise<AuthUser | null> {
 export async function signIn(email: string, password: string) {
     _cachedProfile = null
     _cachedUserId = null
+    _cachedOrgId = null
     const supabase = createSupabaseBrowser()
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw error
@@ -111,6 +103,7 @@ export async function signIn(email: string, password: string) {
 export async function signOut() {
     _cachedProfile = null
     _cachedUserId = null
+    _cachedOrgId = null
     const supabase = createSupabaseBrowser()
     // 'local' scope only clears this device's session — not all sessions globally
     const { error } = await supabase.auth.signOut({ scope: 'local' })

@@ -58,7 +58,8 @@ export async function PATCH(request: NextRequest) {
 
     try {
         const body = await request.json()
-        const { id, ...updates } = body
+        const { id, name, slug, phone, email, address, is_active } = body
+        const updates = { name, slug, phone, email, address, is_active }
         const { data, error } = await supabase
             .from('organizations')
             .update(updates)
