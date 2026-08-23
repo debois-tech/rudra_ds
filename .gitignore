@@ -14,3 +14,7 @@ build/
 # Logs and OS files
 npm-debug.log*
 .DS_Store
+
+# Claude Code
+.claude/
+CLAUDE.md

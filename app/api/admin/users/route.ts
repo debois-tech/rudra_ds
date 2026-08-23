@@ -36,6 +36,18 @@ export async function POST(request: NextRequest) {
 
     try {
         const body = await request.json()
+
+        if (typeof body.email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email)) {
+            return NextResponse.json({ error: 'A valid email is required' }, { status: 400 })
+        }
+        if (typeof body.password !== 'string' || body.password.length < 8) {
+            return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 })
+        }
+        const role = body.role || 'user'
+        if (role !== 'super_admin' && role !== 'user') {
+            return NextResponse.json({ error: "role must be 'super_admin' or 'user'" }, { status: 400 })
+        }
+
         const { data, error } = await supabase.auth.admin.createUser({
             email: body.email,
             password: body.password,
@@ -43,7 +55,7 @@ export async function POST(request: NextRequest) {
             user_metadata: {
                 full_name: body.full_name,
                 org_id: body.org_id,
-                role: body.role || 'user',
+                role,
             },
         })
         if (error) throw error

@@ -63,13 +63,9 @@ META_WHATSAPP_TOKEN=your_meta_token
 *(Find these keys in your Supabase Dashboard → Project Settings → API)*
 
 ### 4. Database Setup
-Run the SQL migration scripts located in the `supabase/` folder chronologically inside the Supabase SQL Editor:
-1. `01_organizations.sql`
-2. `02_profiles.sql`
-3. `03_add_org_id.sql`
-4. `04_update_views.sql`
-5. `05_rls_policies.sql`
-6. `06_seed.sql`
+Run these two files, in order, inside the Supabase SQL Editor:
+1. `supabase/schema.sql` — full schema: tables, RLS policies, views, and dashboard RPC functions
+2. `supabase/seed.sql` — optional demo/sample data
 
 ### 5. Create the Super Admin User
 Since the platform is invite-only, there is no public signup. To create the first Super Admin:
