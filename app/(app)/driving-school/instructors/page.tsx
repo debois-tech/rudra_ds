@@ -116,7 +116,7 @@ export default function InstructorsPage() {
     if (loading) return <div className="text-center py-12 text-slate-400 text-sm">Loading...</div>
 
     return (
-        <div className="space-y-6 animate-fade-in">
+        <div className="space-y-6 animate-fade-in max-w-7xl mx-auto">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Instructors</h1>

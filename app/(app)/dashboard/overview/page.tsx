@@ -118,7 +118,7 @@ export default function DashboardPage() {
     }, [expiryFilter]);
 
     return (
-        <div className="space-y-8 animate-fade-in">
+        <div className="space-y-8 animate-fade-in max-w-7xl mx-auto">
             {/* ── Page Header ── */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>

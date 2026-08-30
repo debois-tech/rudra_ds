@@ -129,7 +129,7 @@ export default function AttendancePage() {
     }
 
     return (
-        <div className="space-y-6 animate-fade-in flex flex-col h-[calc(100vh-8rem)]">
+        <div className="space-y-6 animate-fade-in flex flex-col h-[calc(100vh-8rem)] max-w-7xl mx-auto w-full">
             {/* Header Area (Sticky) */}
             <div className="shrink-0 space-y-4">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">

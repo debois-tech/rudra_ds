@@ -67,11 +67,11 @@ export default function ServiceOverviewPage() {
     <div className="space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 py-2">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Services</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Services</h1>
           <p className="text-slate-500 mt-1 font-medium">{services.length} total services</p>
         </div>
         <Link href="/dashboard/services/new">
-          <Button className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl h-10 px-5 font-medium shadow-sm border border-purple-700/20">
+          <Button className="bg-gradient-to-r from-amber-400 to-amber-600 hover:from-amber-500 hover:to-amber-700 text-black rounded-xl h-10 px-5 font-medium shadow-sm border border-amber-600/20">
             <Wrench className="h-4 w-4 mr-2" /> New Service
           </Button>
         </Link>
@@ -79,7 +79,7 @@ export default function ServiceOverviewPage() {
 
       <Card className="rounded-2xl shadow-sm border-slate-200 overflow-hidden">
         <CardHeader className="bg-white border-b border-slate-100 pb-4 pt-5 px-6">
-          <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 max-w-sm focus-within:ring-2 focus-within:ring-purple-100 focus-within:border-purple-300 transition-all">
+          <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 max-w-sm focus-within:ring-2 focus-within:ring-amber-100 focus-within:border-amber-300 transition-all">
             <Search className="h-4 w-4 text-slate-400" />
             <input
               placeholder="Search by customer, service, vehicle..."
@@ -92,7 +92,7 @@ export default function ServiceOverviewPage() {
         <CardContent className="p-0">
           {loading ? (
             <div className="flex justify-center py-20">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500" />
             </div>
           ) : filtered.length === 0 ? (
             <div className="text-center py-20">
@@ -122,7 +122,7 @@ export default function ServiceOverviewPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filtered.map(s => (
-                    <tr key={s.s_id} className="hover:bg-purple-50/30 transition-colors">
+                    <tr key={s.s_id} className="hover:bg-amber-50/30 transition-colors">
                       <td className="py-4 px-6">
                         <Link href={`/dashboard/customers/${s.customer_id}`} className="block hover:opacity-80 transition-opacity">
                           <p className="font-semibold text-slate-900">{s.customer_name}</p>
@@ -132,7 +132,7 @@ export default function ServiceOverviewPage() {
                       <td className="py-4 px-6">
                         <p className="font-semibold text-slate-800">{s.service_name}</p>
                         <span className={`inline-flex items-center gap-1 mt-1 text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full ${
-                          s.category === 'vehicle' ? 'bg-indigo-50 text-indigo-700' : 'bg-purple-50 text-purple-700'
+                          s.category === 'vehicle' ? 'bg-amber-50 text-amber-700' : 'bg-violet-50 text-violet-700'
                         }`}>
                           {s.category === 'vehicle' ? <Car className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
                           {s.category}
@@ -154,7 +154,7 @@ export default function ServiceOverviewPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="h-8 w-8 p-0 border-slate-200 text-slate-600 hover:text-purple-600 hover:border-purple-200 hover:bg-purple-50 rounded-lg"
+                          className="h-8 w-8 p-0 border-slate-200 text-slate-600 hover:text-amber-700 hover:border-amber-200 hover:bg-amber-50 rounded-lg"
                           onClick={() => handleInvoice(s)}
                           title="Download Invoice"
                         >

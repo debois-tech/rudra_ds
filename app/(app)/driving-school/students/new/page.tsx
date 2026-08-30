@@ -51,7 +51,7 @@ export default function EnrollStudentPage() {
     }
 
     return (
-        <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
+        <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
             <div className="flex items-center gap-4">
                 <Link href="/driving-school/students">
                     <Button variant="ghost" size="icon" className="rounded-xl h-9 w-9 text-slate-400 hover:text-slate-600 cursor-pointer">

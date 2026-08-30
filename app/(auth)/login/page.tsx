@@ -75,7 +75,7 @@ function LoginForm() {
                 <div className="mx-auto w-[160px] md:w-[200px] h-20 relative mb-12">
                     <Image src="/logo_icon.png" alt="MotoAdmin Logo" fill className="object-contain scale-[1.4] md:scale-[1.8] origin-bottom" priority />
                 </div>
-                <h1 className="text-[22px] font-bold text-slate-900 tracking-tight">
+                <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
                     Welcome back
                 </h1>
                 <p className="text-sm text-slate-500 mt-1.5">

@@ -92,7 +92,7 @@ export default function AddCustomerPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-3xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4 py-2 border-b border-slate-200 pb-6">
         <Link href="/dashboard/customers">
@@ -101,7 +101,7 @@ export default function AddCustomerPage() {
           </Button>
         </Link>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">New Customer</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">New Customer</h1>
           <p className="text-slate-500 text-sm font-medium mt-1">Register a new customer and their vehicles</p>
         </div>
       </div>
@@ -111,14 +111,14 @@ export default function AddCustomerPage() {
           {/* Personal Details Card */}
           <Card className="rounded-2xl shadow-sm border-slate-200 overflow-hidden">
             <CardHeader className="bg-white border-b border-slate-100 pb-4 pt-5 px-6">
-              <CardTitle className="flex items-center gap-2 text-lg"><User className="h-5 w-5 text-purple-600" /> Personal Details</CardTitle>
+              <CardTitle className="flex items-center gap-2 text-lg"><User className="h-5 w-5 text-amber-600" /> Personal Details</CardTitle>
               <CardDescription>Fields marked with * are required.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5 p-6 bg-slate-50/30">
               <FormField control={form.control} name="c_name" render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-xs font-semibold uppercase tracking-wider text-slate-500">Full Name <span className="text-red-500">*</span></FormLabel>
-                  <FormControl><Input placeholder="e.g. Rahul Sharma" className="bg-white rounded-xl focus-visible:ring-purple-200" {...field} /></FormControl>
+                  <FormControl><Input placeholder="e.g. Rahul Sharma" className="bg-white rounded-xl focus-visible:ring-amber-200" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
@@ -127,14 +127,14 @@ export default function AddCustomerPage() {
                 <FormField control={form.control} name="c_mobile" render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-xs font-semibold uppercase tracking-wider text-slate-500">Mobile Number <span className="text-red-500">*</span></FormLabel>
-                    <FormControl><Input placeholder="9876543210" maxLength={10} className="bg-white rounded-xl focus-visible:ring-purple-200" {...field} /></FormControl>
+                    <FormControl><Input placeholder="9876543210" maxLength={10} className="bg-white rounded-xl focus-visible:ring-amber-200" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
                 <FormField control={form.control} name="c_whatsapp" render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-xs font-semibold uppercase tracking-wider text-slate-500">WhatsApp Number</FormLabel>
-                    <FormControl><Input placeholder="Same as mobile if empty" maxLength={10} className="bg-white rounded-xl focus-visible:ring-purple-200" {...field} /></FormControl>
+                    <FormControl><Input placeholder="Same as mobile if empty" maxLength={10} className="bg-white rounded-xl focus-visible:ring-amber-200" {...field} /></FormControl>
                     <FormDescription className="text-[10px] uppercase font-semibold">Leave empty to use mobile number</FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -145,7 +145,7 @@ export default function AddCustomerPage() {
                 <FormField control={form.control} name="c_email" render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-xs font-semibold uppercase tracking-wider text-slate-500">Email Address</FormLabel>
-                    <FormControl><Input placeholder="rahul@example.com" type="email" className="bg-white rounded-xl focus-visible:ring-purple-200" {...field} /></FormControl>
+                    <FormControl><Input placeholder="rahul@example.com" type="email" className="bg-white rounded-xl focus-visible:ring-amber-200" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -153,7 +153,7 @@ export default function AddCustomerPage() {
                 <FormField control={form.control} name="c_dob" render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-xs font-semibold uppercase tracking-wider text-slate-500">Date of Birth</FormLabel>
-                    <FormControl><Input type="date" className="bg-white rounded-xl focus-visible:ring-purple-200" {...field} /></FormControl>
+                    <FormControl><Input type="date" className="bg-white rounded-xl focus-visible:ring-amber-200" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -162,7 +162,7 @@ export default function AddCustomerPage() {
               <FormField control={form.control} name="c_address" render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-xs font-semibold uppercase tracking-wider text-slate-500">Address</FormLabel>
-                  <FormControl><Textarea placeholder="Full residential address (optional)" className="resize-none bg-white rounded-xl focus-visible:ring-purple-200" rows={3} {...field} /></FormControl>
+                  <FormControl><Textarea placeholder="Full residential address (optional)" className="resize-none bg-white rounded-xl focus-visible:ring-amber-200" rows={3} {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
@@ -175,7 +175,7 @@ export default function AddCustomerPage() {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                   <CardTitle className="flex items-center gap-2 text-lg">
-                    <Car className="h-5 w-5 text-indigo-600" /> Vehicles
+                    <Car className="h-5 w-5 text-amber-600" /> Vehicles
                   </CardTitle>
                   <CardDescription>Add customer&apos;s vehicles (optional)</CardDescription>
                 </div>
@@ -183,7 +183,7 @@ export default function AddCustomerPage() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="rounded-xl border-purple-200 text-purple-700 hover:bg-purple-50"
+                  className="rounded-xl border-amber-200 text-amber-700 hover:bg-amber-50"
                   onClick={() => append({ v_number: '', v_name: '', v_type: 'car' })}
                 >
                   <Plus className="h-4 w-4 mr-1.5" /> Add Vehicle
@@ -201,7 +201,7 @@ export default function AddCustomerPage() {
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="mt-3 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 font-semibold"
+                    className="mt-3 text-amber-700 hover:text-amber-800 hover:bg-amber-50 font-semibold"
                     onClick={() => append({ v_number: '', v_name: '', v_type: 'car' })}
                   >
                     <Plus className="h-4 w-4 mr-1" /> Add First Vehicle
@@ -210,13 +210,13 @@ export default function AddCustomerPage() {
               ) : (
                 <div className="space-y-4">
                   {fields.map((field, index) => (
-                    <div key={field.id} className="flex flex-col sm:flex-row items-start gap-4 p-5 bg-white rounded-xl border border-slate-200 shadow-sm relative group transition-all hover:border-purple-200">
+                    <div key={field.id} className="flex flex-col sm:flex-row items-start gap-4 p-5 bg-white rounded-xl border border-slate-200 shadow-sm relative group transition-all hover:border-amber-200">
                       <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-4 w-full">
                         <FormField control={form.control} name={`vehicles.${index}.v_number`} render={({ field }) => (
                           <FormItem>
                             <FormLabel className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Vehicle Number *</FormLabel>
                             <FormControl>
-                              <Input placeholder="MH12AB1234" {...field} className="uppercase bg-slate-50 focus-visible:ring-purple-200 h-10 rounded-lg" />
+                              <Input placeholder="MH12AB1234" {...field} className="uppercase bg-slate-50 focus-visible:ring-amber-200 h-10 rounded-lg" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -224,14 +224,14 @@ export default function AddCustomerPage() {
                         <FormField control={form.control} name={`vehicles.${index}.v_name`} render={({ field }) => (
                           <FormItem>
                             <FormLabel className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Vehicle Name</FormLabel>
-                            <FormControl><Input placeholder="e.g. Swift" {...field} className="bg-slate-50 focus-visible:ring-purple-200 h-10 rounded-lg" /></FormControl>
+                            <FormControl><Input placeholder="e.g. Swift" {...field} className="bg-slate-50 focus-visible:ring-amber-200 h-10 rounded-lg" /></FormControl>
                           </FormItem>
                         )} />
                         <FormField control={form.control} name={`vehicles.${index}.v_type`} render={({ field }) => (
                           <FormItem>
                             <FormLabel className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Vehicle Type</FormLabel>
                             <FormControl>
-                              <select {...field} className="flex h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-200">
+                              <select {...field} className="flex h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200">
                                 <option value="car">Car</option>
                                 <option value="bike">Bike</option>
                                 <option value="truck">Truck</option>
@@ -261,7 +261,7 @@ export default function AddCustomerPage() {
             </CardContent>
           </Card>
 
-          <Button type="submit" className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-md border border-purple-700/20 rounded-2xl h-14 text-base font-bold tracking-wide" disabled={loading}>
+          <Button type="submit" className="w-full bg-gradient-to-r from-amber-400 to-amber-600 hover:from-amber-500 hover:to-amber-700 text-black shadow-md border border-amber-600/20 rounded-xl h-10 text-base font-bold tracking-wide" disabled={loading}>
             {loading ? (
               <><Loader2 className="mr-2 h-6 w-6 animate-spin" /> Saving...</>
             ) : (

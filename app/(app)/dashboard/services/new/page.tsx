@@ -194,7 +194,7 @@ export default function NewServicePage() {
   return (
     <div className="max-w-3xl mx-auto space-y-8 pb-10">
       <div className="border-b border-slate-200 pb-5">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">New Service</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900">New Service</h1>
         <p className="text-slate-500 mt-1 font-medium">Issue a new service to a customer</p>
       </div>
 
@@ -242,7 +242,7 @@ export default function NewServicePage() {
       {step === 1 && (
         <Card className="rounded-2xl shadow-sm border-slate-200 overflow-hidden">
           <CardHeader className="bg-white border-b border-slate-100 pb-4 pt-5 px-6">
-            <CardTitle className="text-lg flex items-center gap-2"><User className="h-5 w-5 text-purple-600" /> Select Customer</CardTitle>
+            <CardTitle className="text-lg flex items-center gap-2"><User className="h-5 w-5 text-amber-600" /> Select Customer</CardTitle>
             <CardDescription>Search by name or mobile number</CardDescription>
           </CardHeader>
           <CardContent className="p-6 bg-slate-50/30">
@@ -262,20 +262,20 @@ export default function NewServicePage() {
                 {searchResults.map(c => (
                   <button
                     key={c.c_id}
-                    className="w-full flex items-center justify-between p-4 hover:bg-purple-50/50 transition-colors text-left group"
+                    className="w-full flex items-center justify-between p-4 hover:bg-amber-50/50 transition-colors text-left group"
                     onClick={() => selectCustomer(c)}
                   >
                     <div className="flex items-center gap-4">
-                      <div className="h-10 w-10 rounded-full bg-slate-100 group-hover:bg-purple-100 flex items-center justify-center text-slate-600 group-hover:text-purple-700 font-bold border border-slate-200 transition-colors">
+                      <div className="h-10 w-10 rounded-full bg-slate-100 group-hover:bg-amber-100 flex items-center justify-center text-slate-600 group-hover:text-amber-700 font-bold border border-slate-200 transition-colors">
                         {c.c_name.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <p className="font-semibold text-slate-900 group-hover:text-purple-900">{c.c_name}</p>
+                        <p className="font-semibold text-slate-900 group-hover:text-amber-900">{c.c_name}</p>
                         <p className="text-xs font-medium text-slate-500 uppercase tracking-widest mt-0.5">{c.c_mobile}</p>
                       </div>
                     </div>
                     <div className="text-right">
-                       <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md text-[10px] font-bold uppercase tracking-wider group-hover:bg-white border border-transparent group-hover:border-purple-200">
+                       <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md text-[10px] font-bold uppercase tracking-wider group-hover:bg-white border border-transparent group-hover:border-amber-200">
                          {c.service_count} services
                        </span>
                     </div>
@@ -335,7 +335,7 @@ export default function NewServicePage() {
         <Card className="rounded-2xl shadow-sm border-slate-200 overflow-hidden">
           <CardHeader className="bg-white border-b border-slate-100 pb-4 pt-5 px-6">
             <CardTitle className="text-lg flex items-center gap-2">
-              {category === 'vehicle' ? <Car className="h-5 w-5 text-indigo-600" /> : <FileText className="h-5 w-5 text-purple-600" />}
+              {category === 'vehicle' ? <Car className="h-5 w-5 text-amber-600" /> : <FileText className="h-5 w-5 text-violet-600" />}
               {category === 'vehicle' ? 'Vehicle Service Details' : 'Licence Service Details'}
             </CardTitle>
           </CardHeader>
@@ -347,7 +347,7 @@ export default function NewServicePage() {
                 <select
                   value={serviceTypeId || ''}
                   onChange={e => setServiceTypeId(Number(e.target.value))}
-                  className="flex h-12 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-sm mt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-200 font-medium"
+                  className="flex h-12 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-sm mt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 font-medium"
                   required
                 >
                   <option value="">Select a specific service...</option>
@@ -372,7 +372,7 @@ export default function NewServicePage() {
                             if (v) { setVehicleNumber(v.v_number); setVehicleType(v.v_type); setVehicleName(v.v_name || ''); }
                             else { setVehicleNumber(''); setVehicleType(''); setVehicleName(''); }
                           }}
-                          className="flex h-11 w-full rounded-lg border border-indigo-200 bg-indigo-50/50 px-3 py-1 text-sm mt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 font-medium"
+                          className="flex h-11 w-full rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-1 text-sm mt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 font-medium"
                         >
                           <option value="">— Enter details manually (will be saved to customer) —</option>
                           {customerVehicles.map(v => (
@@ -390,7 +390,7 @@ export default function NewServicePage() {
                           placeholder="MH12AB1234" 
                           required 
                           readOnly={!!vehicleId}
-                          className={`mt-2 h-11 rounded-lg uppercase focus-visible:ring-indigo-200 ${vehicleId ? 'bg-slate-100 text-slate-500' : 'bg-slate-50'}`} 
+                          className={`mt-2 h-11 rounded-lg uppercase focus-visible:ring-amber-200 ${vehicleId ? 'bg-slate-100 text-slate-500' : 'bg-slate-50'}`} 
                         />
                       </div>
                       <div>
@@ -401,7 +401,7 @@ export default function NewServicePage() {
                           placeholder="e.g. car, bike, truck" 
                           required 
                           readOnly={!!vehicleId}
-                          className={`mt-2 h-11 rounded-lg focus-visible:ring-indigo-200 ${vehicleId ? 'bg-slate-100 text-slate-500' : 'bg-slate-50'}`}
+                          className={`mt-2 h-11 rounded-lg focus-visible:ring-amber-200 ${vehicleId ? 'bg-slate-100 text-slate-500' : 'bg-slate-50'}`}
                         />
                       </div>
                     </div>
@@ -413,7 +413,7 @@ export default function NewServicePage() {
                           value={vehicleName}
                           onChange={e => setVehicleName(e.target.value)}
                           placeholder="e.g. Swift, Pulsar, Activa"
-                          className="mt-2 h-11 bg-slate-50 rounded-lg focus-visible:ring-indigo-200"
+                          className="mt-2 h-11 bg-slate-50 rounded-lg focus-visible:ring-amber-200"
                         />
                       </div>
                     )}
@@ -429,7 +429,7 @@ export default function NewServicePage() {
                         <select
                           value={vehicleClass}
                           onChange={e => setVehicleClass(e.target.value as VehicleClass)}
-                          className="flex h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-sm mt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-200"
+                          className="flex h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-sm mt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200"
                           required
                         >
                           {VEHICLE_CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
@@ -440,7 +440,7 @@ export default function NewServicePage() {
                         <select
                           value={vehicleTypeLicence}
                           onChange={e => setVehicleTypeLicence(e.target.value as VehicleTypeLicence)}
-                          className="flex h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-sm mt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-200"
+                          className="flex h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-sm mt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200"
                           required
                         >
                           {VEHICLE_TYPE_LICENCE.map(t => <option key={t} value={t}>{t}</option>)}
@@ -449,7 +449,7 @@ export default function NewServicePage() {
                     </div>
                     <div>
                       <label className="text-[11px] uppercase font-bold tracking-wider text-slate-500">MDL / Application Number</label>
-                      <Input value={mdlNumber} onChange={e => setMdlNumber(e.target.value)} placeholder="Enter MDL or application number" className="mt-2 h-11 bg-slate-50 rounded-lg focus-visible:ring-purple-200" />
+                      <Input value={mdlNumber} onChange={e => setMdlNumber(e.target.value)} placeholder="Enter MDL or application number" className="mt-2 h-11 bg-slate-50 rounded-lg focus-visible:ring-amber-200" />
                     </div>
                   </>
                 )}
@@ -460,13 +460,13 @@ export default function NewServicePage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div>
                     <label className="text-[11px] uppercase font-bold tracking-wider text-slate-500">Issue Date <span className="text-red-500">*</span></label>
-                    <Input type="date" value={issueDate} onChange={e => setIssueDate(e.target.value)} required className="mt-2 h-11 bg-slate-50 rounded-lg focus-visible:ring-purple-200" />
+                    <Input type="date" value={issueDate} onChange={e => setIssueDate(e.target.value)} required className="mt-2 h-11 bg-slate-50 rounded-lg focus-visible:ring-amber-200" />
                   </div>
                   <div>
                     <label className="text-[11px] uppercase font-bold tracking-wider text-slate-500">
                       {category === 'licence' ? 'Renewal / Expiry Date' : 'Expiry Date'}
                     </label>
-                    <Input type="date" value={expiryDate} onChange={e => setExpiryDate(e.target.value)} className="mt-2 h-11 bg-slate-50 rounded-lg focus-visible:ring-purple-200" />
+                    <Input type="date" value={expiryDate} onChange={e => setExpiryDate(e.target.value)} className="mt-2 h-11 bg-slate-50 rounded-lg focus-visible:ring-amber-200" />
                   </div>
                 </div>
                 
@@ -495,15 +495,15 @@ export default function NewServicePage() {
                 
                 <div>
                   <label className="text-[11px] uppercase font-bold tracking-wider text-slate-500">Notes & Comments</label>
-                  <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any additional notes for this service..." className="mt-2 h-11 bg-slate-50 rounded-lg focus-visible:ring-purple-200" />
+                  <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any additional notes for this service..." className="mt-2 h-11 bg-slate-50 rounded-lg focus-visible:ring-amber-200" />
                 </div>
               </div>
 
               <div className="flex gap-4 pt-4">
-                <Button type="submit" className="flex-1 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-black rounded-2xl h-14 text-base font-bold shadow-md tracking-wide" disabled={submitting}>
+                <Button type="submit" className="flex-1 bg-gradient-to-r from-amber-400 to-amber-600 hover:from-amber-500 hover:to-amber-700 text-black rounded-xl h-10 text-base font-bold shadow-md tracking-wide" disabled={submitting}>
                   {submitting ? <><Loader2 className="h-5 w-5 animate-spin mr-2" /> Creating Record...</> : <><Check className="h-6 w-6 mr-2" /> Confirm & Create Service</>}
                 </Button>
-                <Button type="button" variant="outline" className="h-14 px-8 rounded-2xl font-bold bg-white" onClick={() => { setStep(2); setCategory(null); }}>
+                <Button type="button" variant="outline" className="h-10 px-8 rounded-xl font-bold bg-white" onClick={() => { setStep(2); setCategory(null); }}>
                   Back
                 </Button>
               </div>
