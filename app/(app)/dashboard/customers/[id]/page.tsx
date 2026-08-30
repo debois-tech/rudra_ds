@@ -72,7 +72,7 @@ export default function CustomerDetailPage() {
   if (loading) {
     return (
       <div className="flex justify-center items-center py-40">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500" />
       </div>
     );
   }
@@ -97,7 +97,7 @@ export default function CustomerDetailPage() {
             </Button>
           </Link>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900">{customer.c_name}</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">{customer.c_name}</h1>
             <p className="text-sm font-medium text-slate-500 mt-1 uppercase tracking-wide">ID: <span className="font-mono text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded">{customer.c_registration_id}</span></p>
           </div>
         </div>
@@ -108,7 +108,7 @@ export default function CustomerDetailPage() {
             </Button>
           )}
           <Link href={`/dashboard/services/new?customer=${customer.c_id}`}>
-            <Button className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl h-10 px-5 font-medium shadow-sm border border-purple-700/20">
+            <Button className="bg-gradient-to-r from-amber-400 to-amber-600 hover:from-amber-500 hover:to-amber-700 text-black rounded-xl h-10 px-5 font-medium shadow-sm border border-amber-600/20">
               <Wrench className="h-4 w-4 mr-2" /> Give Service
             </Button>
           </Link>
@@ -128,31 +128,31 @@ export default function CustomerDetailPage() {
                   <div className="space-y-3">
                     <div>
                       <label className="text-[11px] uppercase tracking-wider font-semibold text-slate-500">Full Name</label>
-                      <Input className="mt-1 bg-slate-50 focus-visible:ring-purple-200 border-slate-200 rounded-lg" value={editForm.c_name} onChange={e => setEditForm({ ...editForm, c_name: e.target.value })} />
+                      <Input className="mt-1 bg-slate-50 focus-visible:ring-amber-200 border-slate-200 rounded-lg" value={editForm.c_name} onChange={e => setEditForm({ ...editForm, c_name: e.target.value })} />
                     </div>
                     <div>
                       <label className="text-[11px] uppercase tracking-wider font-semibold text-slate-500">Mobile</label>
-                      <Input className="mt-1 bg-slate-50 focus-visible:ring-purple-200 border-slate-200 rounded-lg" value={editForm.c_mobile} onChange={e => setEditForm({ ...editForm, c_mobile: e.target.value })} maxLength={10} />
+                      <Input className="mt-1 bg-slate-50 focus-visible:ring-amber-200 border-slate-200 rounded-lg" value={editForm.c_mobile} onChange={e => setEditForm({ ...editForm, c_mobile: e.target.value })} maxLength={10} />
                     </div>
                     <div>
                       <label className="text-[11px] uppercase tracking-wider font-semibold text-slate-500">WhatsApp</label>
-                      <Input className="mt-1 bg-slate-50 focus-visible:ring-purple-200 border-slate-200 rounded-lg" value={editForm.c_whatsapp} onChange={e => setEditForm({ ...editForm, c_whatsapp: e.target.value })} maxLength={10} />
+                      <Input className="mt-1 bg-slate-50 focus-visible:ring-amber-200 border-slate-200 rounded-lg" value={editForm.c_whatsapp} onChange={e => setEditForm({ ...editForm, c_whatsapp: e.target.value })} maxLength={10} />
                     </div>
                     <div>
                       <label className="text-[11px] uppercase tracking-wider font-semibold text-slate-500">Email</label>
-                      <Input className="mt-1 bg-slate-50 focus-visible:ring-purple-200 border-slate-200 rounded-lg" value={editForm.c_email} onChange={e => setEditForm({ ...editForm, c_email: e.target.value })} type="email" />
+                      <Input className="mt-1 bg-slate-50 focus-visible:ring-amber-200 border-slate-200 rounded-lg" value={editForm.c_email} onChange={e => setEditForm({ ...editForm, c_email: e.target.value })} type="email" />
                     </div>
                     <div>
                       <label className="text-[11px] uppercase tracking-wider font-semibold text-slate-500">Date of Birth</label>
-                      <Input className="mt-1 bg-slate-50 focus-visible:ring-purple-200 border-slate-200 rounded-lg" value={editForm.c_dob} onChange={e => setEditForm({ ...editForm, c_dob: e.target.value })} type="date" />
+                      <Input className="mt-1 bg-slate-50 focus-visible:ring-amber-200 border-slate-200 rounded-lg" value={editForm.c_dob} onChange={e => setEditForm({ ...editForm, c_dob: e.target.value })} type="date" />
                     </div>
                     <div>
                       <label className="text-[11px] uppercase tracking-wider font-semibold text-slate-500">Address</label>
-                      <Textarea className="mt-1 bg-slate-50 focus-visible:ring-purple-200 border-slate-200 rounded-lg" value={editForm.c_address} onChange={e => setEditForm({ ...editForm, c_address: e.target.value })} rows={2} />
+                      <Textarea className="mt-1 bg-slate-50 focus-visible:ring-amber-200 border-slate-200 rounded-lg" value={editForm.c_address} onChange={e => setEditForm({ ...editForm, c_address: e.target.value })} rows={2} />
                     </div>
                   </div>
                   <div className="flex gap-2 pt-2">
-                    <Button onClick={handleSave} disabled={saving} className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg flex-1 shadow-sm">
+                    <Button onClick={handleSave} disabled={saving} className="bg-gradient-to-r from-amber-400 to-amber-600 hover:from-amber-500 hover:to-amber-700 text-black rounded-lg flex-1 shadow-sm">
                       {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />} Save
                     </Button>
                     <Button variant="outline" onClick={() => setEditing(false)} className="rounded-lg"><X className="h-4 w-4 mr-1" /> Cancel</Button>
@@ -162,10 +162,10 @@ export default function CustomerDetailPage() {
                 <div className="space-y-4">
                   {[
                     { icon: Phone, label: 'Mobile', value: customer.c_mobile, isLink: true, prefix: 'tel:' },
-                    { icon: Phone, label: 'WhatsApp', value: customer.c_whatsapp || 'â€”', isLink: !!customer.c_whatsapp, prefix: 'https://wa.me/91' },
-                    { icon: Mail, label: 'Email', value: customer.c_email || 'â€”', isLink: !!customer.c_email, prefix: 'mailto:' },
-                    { icon: MapPin, label: 'Address', value: customer.c_address || 'â€”' },
-                    { icon: Calendar, label: 'Birthday', value: customer.c_dob ? format(new Date(customer.c_dob), 'dd MMM yyyy') : 'â€”' },
+                    { icon: Phone, label: 'WhatsApp', value: customer.c_whatsapp || '—', isLink: !!customer.c_whatsapp, prefix: 'https://wa.me/91' },
+                    { icon: Mail, label: 'Email', value: customer.c_email || '—', isLink: !!customer.c_email, prefix: 'mailto:' },
+                    { icon: MapPin, label: 'Address', value: customer.c_address || '—' },
+                    { icon: Calendar, label: 'Birthday', value: customer.c_dob ? format(new Date(customer.c_dob), 'dd MMM yyyy') : '—' },
                     { icon: Clock, label: 'Joined', value: format(new Date(customer.created_at), 'dd MMM yyyy') },
                   ].map((item, i) => (
                     <div key={i} className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
@@ -175,7 +175,7 @@ export default function CustomerDetailPage() {
                       <div className="min-w-0">
                         <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400">{item.label}</p>
                         {item.isLink ? (
-                          <a href={`${item.prefix}${item.value}`} className="text-sm font-semibold text-purple-600 hover:underline truncate block">
+                          <a href={`${item.prefix}${item.value}`} className="text-sm font-semibold text-amber-700 hover:underline truncate block">
                             {item.value}
                           </a>
                         ) : (
@@ -195,7 +195,7 @@ export default function CustomerDetailPage() {
           {/* Vehicles List */}
           <Card className="rounded-2xl shadow-sm border-slate-200 overflow-hidden">
             <CardHeader className="bg-white border-b border-slate-100 pb-3 pt-5 px-6 flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-lg"><Car className="h-5 w-5 text-indigo-500" /> Vehicles <span className="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full">{vehicles.length}</span></CardTitle>
+              <CardTitle className="flex items-center gap-2 text-lg"><Car className="h-5 w-5 text-amber-500" /> Vehicles <span className="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full">{vehicles.length}</span></CardTitle>
             </CardHeader>
             <CardContent className="p-0 bg-slate-50/30">
               {vehicles.length === 0 ? (
@@ -206,14 +206,14 @@ export default function CustomerDetailPage() {
               ) : (
                 <div className="divide-y divide-slate-100">
                   {vehicles.map(v => (
-                    <div key={v.v_id} className="flex items-center justify-between p-4 bg-white hover:bg-indigo-50/30 transition-colors">
+                    <div key={v.v_id} className="flex items-center justify-between p-4 bg-white hover:bg-amber-50/30 transition-colors">
                       <div className="flex items-center gap-4">
-                        <div className="h-10 w-10 flex items-center justify-center bg-indigo-50 rounded-lg border border-indigo-100 text-indigo-600 font-bold tracking-tight">
+                        <div className="h-10 w-10 flex items-center justify-center bg-amber-50 rounded-lg border border-amber-100 text-amber-700 font-bold tracking-tight">
                           {v.v_type.slice(0, 2).toUpperCase()}
                         </div>
                         <div>
                           <p className="font-bold text-slate-900 tracking-wide font-mono text-sm">{v.v_number}</p>
-                          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{v.v_name || 'Unnamed'} Â· {v.v_type}</p>
+                          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{v.v_name || 'Unnamed'} · {v.v_type}</p>
                         </div>
                       </div>
                     </div>
@@ -226,9 +226,9 @@ export default function CustomerDetailPage() {
           {/* Services List */}
           <Card className="rounded-2xl shadow-sm border-slate-200 overflow-hidden">
             <CardHeader className="bg-white border-b border-slate-100 pb-3 pt-5 px-6 flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-lg"><Wrench className="h-5 w-5 text-purple-500" /> Service History <span className="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full">{services.length}</span></CardTitle>
+              <CardTitle className="flex items-center gap-2 text-lg"><Wrench className="h-5 w-5 text-amber-500" /> Service History <span className="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full">{services.length}</span></CardTitle>
               <Link href={`/dashboard/services/new?customer=${customer.c_id}`}>
-                <Button variant="outline" size="sm" className="h-8 rounded-lg border-slate-200 text-slate-600 text-xs font-semibold hover:bg-purple-50 hover:text-purple-700 hover:border-purple-200"><Plus className="h-3 w-3 mr-1" /> Add Record</Button>
+                <Button variant="outline" size="sm" className="h-8 rounded-lg border-slate-200 text-slate-600 text-xs font-semibold hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200"><Plus className="h-3 w-3 mr-1" /> Add Record</Button>
               </Link>
             </CardHeader>
             <CardContent className="p-0">
@@ -249,11 +249,11 @@ export default function CustomerDetailPage() {
                     </thead>
                     <tbody className="divide-y divide-slate-100 bg-white">
                       {services.map(s => (
-                        <tr key={s.s_id} className="hover:bg-purple-50/20 transition-colors">
+                        <tr key={s.s_id} className="hover:bg-amber-50/30 transition-colors">
                           <td className="py-3 px-4">
                             <p className="font-semibold text-slate-900">{s.service_name}</p>
                             <span className={`inline-block mt-0.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                              s.category === 'vehicle' ? 'bg-indigo-50 text-indigo-700' : 'bg-purple-50 text-purple-700'
+                              s.category === 'vehicle' ? 'bg-amber-50 text-amber-700' : 'bg-violet-50 text-violet-700'
                             }`}>
                               {s.category}
                             </span>
@@ -262,7 +262,7 @@ export default function CustomerDetailPage() {
                             <p className="text-xs font-semibold text-slate-700">{format(new Date(s.issue_date), 'dd MMM yyyy')}</p>
                             <p className="text-xs text-slate-500">{s.expiry_date ? format(new Date(s.expiry_date), 'dd MMM yyyy') : 'No Expiry'}</p>
                           </td>
-                          <td className="py-3 px-4 text-right font-bold text-slate-900">â‚¹{Number(s.total_cost).toLocaleString()}</td>
+                          <td className="py-3 px-4 text-right font-bold text-slate-900">₹{Number(s.total_cost).toLocaleString()}</td>
                         </tr>
                       ))}
                     </tbody>

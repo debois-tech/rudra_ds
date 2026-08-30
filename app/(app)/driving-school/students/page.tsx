@@ -50,7 +50,7 @@ export default function StudentsPage() {
     if (loading) return <div className="text-center py-12 text-slate-400 text-sm">Loading...</div>
 
     return (
-        <div className="space-y-6 animate-fade-in">
+        <div className="space-y-6 animate-fade-in max-w-7xl mx-auto">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Students</h1>
@@ -84,7 +84,7 @@ export default function StudentsPage() {
                                     <CardContent className="py-4">
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-4">
-                                                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white text-sm font-bold">
+                                                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-white text-sm font-bold">
                                                     {student.name.charAt(0)}
                                                 </div>
                                                 <div className="flex-1 min-w-0">

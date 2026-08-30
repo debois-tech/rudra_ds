@@ -103,7 +103,7 @@ export default function EditCustomerPage() {
     if (fetching) {
         return (
             <div className="flex items-center justify-center py-40">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500" />
             </div>
         );
     }
@@ -130,7 +130,7 @@ export default function EditCustomerPage() {
                     </Button>
                 </Link>
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900">Edit Customer</h1>
+                    <h1 className="text-2xl font-bold tracking-tight text-slate-900">Edit Customer</h1>
                     <p className="text-slate-500 text-sm font-medium mt-1">
                         ID: <span className="font-mono text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded">{customer.c_registration_id}</span>
                     </p>
@@ -140,7 +140,7 @@ export default function EditCustomerPage() {
             <Card className="rounded-2xl shadow-sm border-slate-200 overflow-hidden">
                 <CardHeader className="bg-white border-b border-slate-100 pb-4 pt-5 px-6">
                     <CardTitle className="flex items-center gap-2 text-lg">
-                        <User className="h-5 w-5 text-purple-600" /> Customer Details
+                        <User className="h-5 w-5 text-amber-600" /> Customer Details
                     </CardTitle>
                     <CardDescription>Update the customer&apos;s information below.</CardDescription>
                 </CardHeader>
@@ -155,7 +155,7 @@ export default function EditCustomerPage() {
                                     <FormItem>
                                         <FormLabel className="text-xs font-semibold uppercase tracking-wider text-slate-500">Full Name <span className="text-red-500">*</span></FormLabel>
                                         <FormControl>
-                                            <Input placeholder="e.g. Rahul Sharma" className="bg-white rounded-xl focus-visible:ring-purple-200 h-11" {...field} />
+                                            <Input placeholder="e.g. Rahul Sharma" className="bg-white rounded-xl focus-visible:ring-amber-200 h-11" {...field} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -170,7 +170,7 @@ export default function EditCustomerPage() {
                                         <FormItem>
                                             <FormLabel className="text-xs font-semibold uppercase tracking-wider text-slate-500">Mobile Number <span className="text-red-500">*</span></FormLabel>
                                             <FormControl>
-                                                <Input placeholder="9876543210" maxLength={10} className="bg-white rounded-xl focus-visible:ring-purple-200 h-11" {...field} />
+                                                <Input placeholder="9876543210" maxLength={10} className="bg-white rounded-xl focus-visible:ring-amber-200 h-11" {...field} />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -184,7 +184,7 @@ export default function EditCustomerPage() {
                                         <FormItem>
                                             <FormLabel className="text-xs font-semibold uppercase tracking-wider text-slate-500">WhatsApp Number</FormLabel>
                                             <FormControl>
-                                                <Input placeholder="Same as mobile if empty" maxLength={10} className="bg-white rounded-xl focus-visible:ring-purple-200 h-11" {...field} />
+                                                <Input placeholder="Same as mobile if empty" maxLength={10} className="bg-white rounded-xl focus-visible:ring-amber-200 h-11" {...field} />
                                             </FormControl>
                                             <FormDescription className="text-[10px] uppercase font-semibold">Leave empty to use mobile number</FormDescription>
                                             <FormMessage />
@@ -200,7 +200,7 @@ export default function EditCustomerPage() {
                                     <FormItem>
                                         <FormLabel className="text-xs font-semibold uppercase tracking-wider text-slate-500">Email Address</FormLabel>
                                         <FormControl>
-                                            <Input placeholder="rahul@example.com" type="email" className="bg-white rounded-xl focus-visible:ring-purple-200 h-11" {...field} />
+                                            <Input placeholder="rahul@example.com" type="email" className="bg-white rounded-xl focus-visible:ring-amber-200 h-11" {...field} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -214,7 +214,7 @@ export default function EditCustomerPage() {
                                     <FormItem>
                                         <FormLabel className="text-xs font-semibold uppercase tracking-wider text-slate-500">Address</FormLabel>
                                         <FormControl>
-                                            <Textarea placeholder="Full residential address" className="resize-none bg-white rounded-xl focus-visible:ring-purple-200" rows={3} {...field} />
+                                            <Textarea placeholder="Full residential address" className="resize-none bg-white rounded-xl focus-visible:ring-amber-200" rows={3} {...field} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -228,7 +228,7 @@ export default function EditCustomerPage() {
                                     <FormItem>
                                         <FormLabel className="text-xs font-semibold uppercase tracking-wider text-slate-500">Date of Birth</FormLabel>
                                         <FormControl>
-                                            <Input type="date" className="bg-white rounded-xl focus-visible:ring-purple-200 h-11" {...field} />
+                                            <Input type="date" className="bg-white rounded-xl focus-visible:ring-amber-200 h-11" {...field} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -238,7 +238,7 @@ export default function EditCustomerPage() {
                             <div className="flex gap-4 pt-4">
                                 <Button
                                     type="submit"
-                                    className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-2xl h-14 text-base font-bold shadow-md tracking-wide border border-purple-700/20"
+                                    className="flex-1 bg-gradient-to-r from-amber-400 to-amber-600 hover:from-amber-500 hover:to-amber-700 text-black rounded-xl h-10 text-base font-bold shadow-md tracking-wide border border-amber-600/20"
                                     disabled={loading}
                                 >
                                     {loading ? (
@@ -248,7 +248,7 @@ export default function EditCustomerPage() {
                                     )}
                                 </Button>
                                 <Link href={`/dashboard/customers/${customerId}`}>
-                                    <Button type="button" variant="outline" className="h-14 px-8 rounded-2xl font-bold">
+                                    <Button type="button" variant="outline" className="h-10 px-8 rounded-xl font-bold">
                                         Cancel
                                     </Button>
                                 </Link>

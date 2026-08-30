@@ -58,7 +58,7 @@ export default function StudentProfilePage() {
     const pct = student.total_fee > 0 ? Math.min((student.total_paid / student.total_fee) * 100, 100) : 0
 
     return (
-        <div className="space-y-6 animate-fade-in">
+        <div className="space-y-6 animate-fade-in max-w-5xl mx-auto">
             {/* Back + Header */}
             <div className="flex items-center gap-4">
                 <Link href="/driving-school/students">
@@ -67,12 +67,12 @@ export default function StudentProfilePage() {
                     </Button>
                 </Link>
                 <div className="flex items-center gap-4 flex-1">
-                    <div className="h-12 w-12 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white text-lg font-bold shrink-0">
+                    <div className="h-12 w-12 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-white text-lg font-bold shrink-0">
                         {student.name.charAt(0)}
                     </div>
                     <div className="flex-1">
                         <div className="flex items-center gap-2">
-                            <h1 className="text-xl font-bold text-slate-900">{student.name}</h1>
+                            <h1 className="text-2xl font-bold tracking-tight text-slate-900">{student.name}</h1>
                             <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-50 text-emerald-600 capitalize">{student.status}</span>
                         </div>
                         <p className="text-[13px] text-slate-400">{student.course_type} &middot; Enrolled {new Date(student.enrollment_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
@@ -97,7 +97,7 @@ export default function StudentProfilePage() {
                         <Button
                             size="sm"
                             onClick={() => setPaymentSheetOpen(true)}
-                            className="rounded-xl h-8 px-3 text-[12px] font-medium bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer"
+                            className="rounded-xl h-8 px-3 text-[12px] font-medium bg-amber-500 hover:bg-amber-600 text-black cursor-pointer"
                         >
                             <Plus className="h-3 w-3 mr-1" />
                             Record Payment

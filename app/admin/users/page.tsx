@@ -45,7 +45,7 @@ export default function AllUsersPage() {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-3xl font-bold text-white">All Users</h1>
+                <h1 className="text-3xl font-bold text-foreground">All Users</h1>
                 <p className="text-slate-400 mt-1">Manage all users across the platform</p>
             </div>
 

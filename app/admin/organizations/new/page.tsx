@@ -75,7 +75,7 @@ export default function NewOrganizationPage() {
                     </Button>
                 </Link>
                 <div>
-                    <h1 className="text-2xl font-bold text-white">New Organization</h1>
+                    <h1 className="text-3xl font-bold text-foreground">New Organization</h1>
                     <p className="text-slate-400 text-sm">Create a new driving school + its first admin user</p>
                 </div>
             </div>
