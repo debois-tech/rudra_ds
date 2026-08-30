@@ -107,14 +107,16 @@ order by conrelid::regclass::text;
 - [ ] **Human-side only**: set env vars on this project to the Phase 3 Supabase credentials — `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`. Paste these directly into Vercel's dashboard, not into chat.
 - [ ] **Needs your input**: domain for this deployment — a Vercel-provided `*.vercel.app` URL to start, or a custom domain from day one?
 
-## Phase 5 — First admin user on the new project
+## Phase 5 — First admin user on the new project ✅ done
 
-- [ ] **Human-side only**: bootstrap the first super_admin on the *new* company Supabase project — same steps as `README.md` already documents: Supabase Dashboard → Authentication → Users → Add User, then `UPDATE profiles SET role = 'super_admin', org_id = NULL WHERE email = '...'` against the new project. (The current/trial Supabase project already has its own admin — untouched.)
+- [x] Super admin created on the new company Supabase project (`publicmotosupadmin@debois.com`), promoted via Table Editor after the SQL `UPDATE` unexpectedly matched 0 rows (root cause not chased down — likely an email mismatch against the placeholder in the command; manual edit confirmed correct via `SELECT` — one row, `role = super_admin`, `org_id = null`).
+- [x] Logged in locally against the new project (`.env.local` pointed at it) — success, confirming the full connection chain (Next.js → Supabase client → RLS → `/admin`) works end to end on the new DB.
 
-## Phase 6 — Verify both deployments independently
+## Phase 6 — Verify parity — partially done
 
-- [ ] **Claude-fixable**: walk through a smoke test on the new company deployment with you — login, create a test org via `/admin`, create a customer/service, create an instructor/student in the driving-school module, confirm RLS isolation holds (same multi-tenancy check already validated once).
-- [ ] **Claude-fixable**: confirm the existing/trial deployment still builds and runs correctly post-transfer — nothing about its code or DB changed, but worth confirming the Vercel↔GitHub link survived Phase 2 cleanly.
+- [x] Core smoke test passed: login works end-to-end on the new company Supabase project.
+- [ ] Not yet done: create a test org, customer/service, driving-school instructor/student, and confirm RLS isolation on the new project specifically (already validated once on the trial project — worth repeating here before calling it production-ready, but not blocking).
+- [ ] Not yet done: confirm the *existing/trial* deployment still builds/runs post repo-ownership-transfer (Vercel↔GitHub link check, still outstanding from Phase 2 — you said skip Vercel for now).
 
 ## Phase 7 — Documentation
 
@@ -125,8 +127,14 @@ order by conrelid::regclass::text;
 
 ## Deferred / not blocking this migration
 
-- `scripts/send-notifications.js` (WhatsApp reminders) — still doesn't exist per `fixes.md`; the workflow no-ops on the current repo already. Not part of this migration either way — fix it once, on the shared repo, and both deployments get it for free once it exists (that's the whole point of the single-repo approach).
-- `demo_requests` table + `student_1-5` column cleanup on the *current* Supabase project — separate from this migration, still pending from `fixes.md`, only affects the trial instance.
+- `scripts/send-notifications.js` (WhatsApp reminders) — still doesn't exist per `fixes.md`; the workflow no-ops on the current repo already. Not part of this migration either way — fix it once, on the shared repo, and both deployments get it for free once it exists (that's the whole point of the single-repo approach). Confirmed with you: `demo_requests` on the *new* project needs no action (already correctly created via `schema.sql`) — it was never actually part of this list, just a source of confusion, now resolved.
+- `student_1-5` unused column cleanup on the *current/trial* Supabase project — separate from this migration, still pending from `fixes.md`, only affects the trial instance, doesn't exist on the new project (never included in `schema.sql`).
+
+## What's actually left
+
+1. **Phase 4 — deploy to Vercel**: new company Vercel project, import the (now company-owned) repo, set env vars to the new Supabase project's creds (already in `.env.local`'s commented block, ready to copy over).
+2. **WhatsApp notification script**: `scripts/send-notifications.js` — doesn't exist yet, needs writing (blocked on a decision about the trigger rule, see `fixes.md`).
+3. Optional, non-blocking: repeat the Phase 6 smoke test (org/customer/instructor creation + RLS check) on the new project before calling it production-ready.
 
 ## What I need from you to start
 
