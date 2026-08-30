@@ -95,11 +95,11 @@ order by conrelid::regclass::text;
 - [x] Collaborator access: confirmed you have owner access on the company account, and no one else has a local clone of this repo — nothing further needed here.
 - [ ] **Needs your input / verify**: check the current Vercel project's Git integration still shows the repo as connected (Project Settings → Git) — the GitHub App connection can need re-authorization after an ownership change. If it shows disconnected or asks to re-approve, that's a few clicks, not a rebuild.
 
-## Phase 3 — New company Supabase project
+## Phase 3 — New company Supabase project ✅ done
 
-- [ ] **Human-side only**: create the new Supabase project under the company account.
-- [ ] **Human-side only**: run the Phase-0-verified `supabase/schema.sql` in the new project's SQL Editor. Do **not** run `seed.sql` here — it's sample/demo data, has no place in the production database.
-- [ ] **Needs your input**: grab the new project's URL, anon key, and service role key from Settings → API — needed for Phase 4.
+- [x] New Supabase project created under the company account (`fihwnfjiabsvqkkwalgq`).
+- [x] `supabase/schema.sql` run against it — completed with no errors. `seed.sql` intentionally not run (sample/demo data, has no place in production).
+- [x] Credentials captured and added to `.env.local` locally as a commented-out second block (current/trial project stays active) — see Phase 4 for getting these into the actual Vercel deployment's env vars.
 
 ## Phase 4 — New company Vercel project
 
