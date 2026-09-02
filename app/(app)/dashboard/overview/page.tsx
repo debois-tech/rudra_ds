@@ -199,7 +199,6 @@ export default function DashboardPage() {
                         </div>
                         <div>
                             <h2 className="text-[15px] font-semibold text-slate-900">Documents Expiring Soon</h2>
-                            <p className="text-[12px] text-slate-400 mt-0.5">Services with upcoming expiry dates</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-1.5 bg-slate-100 rounded-lg p-0.5">
