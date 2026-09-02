@@ -279,11 +279,10 @@ export const serviceApi = {
         const supabase = getClient();
         const orgId = await getOrgId();
         const { data, error } = await supabase
-            .from('services')
+            .from('vehicle_services')
             .insert([{
                 customer_id: formData.customer_id,
                 service_type_id: formData.service_type_id,
-                category: 'vehicle' as const,
                 vehicle_id: formData.vehicle_id || null,
                 vehicle_type: formData.vehicle_type,
                 vehicle_number: formData.vehicle_number,
@@ -303,11 +302,10 @@ export const serviceApi = {
         const supabase = getClient();
         const orgId = await getOrgId();
         const { data, error } = await supabase
-            .from('services')
+            .from('document_services')
             .insert([{
                 customer_id: formData.customer_id,
                 service_type_id: formData.service_type_id,
-                category: 'licence' as const,
                 vehicle_class: formData.vehicle_class,
                 vehicle_type_licence: formData.vehicle_type_licence,
                 mdl_number: formData.mdl_number || null,
@@ -326,19 +324,18 @@ export const serviceApi = {
 
     async updateStatus(id: string, status: 'active' | 'completed' | 'cancelled'): Promise<Service> {
         const supabase = getClient();
-        const { data, error } = await supabase
-            .from('services')
-            .update({ status })
-            .eq('s_id', id)
-            .select()
-            .single();
+        const { data: existing, error: lookupError } = await supabase.from('v_services_overview').select('category').eq('s_id', id).single();
+        if (lookupError) throw lookupError;
+        const { data, error } = await supabase.from(existing.category === 'vehicle' ? 'vehicle_services' : 'document_services').update({ status }).eq('s_id', id).select().single();
         if (error) throw error;
         return data;
     },
 
     async delete(id: string): Promise<void> {
         const supabase = getClient();
-        const { error } = await supabase.from('services').delete().eq('s_id', id);
+        const { data: existing, error: lookupError } = await supabase.from('v_services_overview').select('category').eq('s_id', id).single();
+        if (lookupError) throw lookupError;
+        const { error } = await supabase.from(existing.category === 'vehicle' ? 'vehicle_services' : 'document_services').delete().eq('s_id', id);
         if (error) throw error;
     },
 };

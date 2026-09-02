@@ -11,6 +11,7 @@ import { ArrowLeft, Loader2, Save, User } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { DateTimePicker } from '@/components/ui/date-time-picker';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
     Form,
@@ -228,7 +229,7 @@ export default function EditCustomerPage() {
                                     <FormItem>
                                         <FormLabel className="text-xs font-semibold uppercase tracking-wider text-slate-500">Date of Birth</FormLabel>
                                         <FormControl>
-                                            <Input type="date" className="bg-white rounded-xl focus-visible:ring-amber-200 h-11" {...field} />
+                                            <DateTimePicker value={field.value} onChange={field.onChange} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>

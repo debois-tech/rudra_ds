@@ -291,6 +291,7 @@ export const studentApi = {
                 address: data.address || null,
                 dob: data.dob || null,
                 enrollment_date: data.enrollment_date || new Date().toISOString().split('T')[0],
+                completion_date: data.completion_date || null,
                 course_type: data.course_type || 'LMV',
                 total_fee: data.total_fee ?? 0,
                 notes: data.notes || null,
@@ -321,6 +322,7 @@ export const studentApi = {
         if (data.total_fee !== undefined) payload.total_fee = data.total_fee ?? 0;
         if (data.notes !== undefined) payload.notes = data.notes || null;
         if (data.status !== undefined) payload.status = data.status;
+        if (data.completion_date !== undefined) payload.completion_date = data.completion_date || null;
 
         const { data: result, error } = await supabase
             .from('ds_students')
@@ -352,6 +354,7 @@ export const feePaymentApi = {
     },
 
     async create(data: DsFeePaymentFormData): Promise<DsFeePayment> {
+        if (!Number.isFinite(data.amount) || data.amount <= 0) throw new Error('Payment must be greater than zero.')
         const supabase = getClient();
         const orgId = await getOrgId();
         const { data: result, error } = await supabase
@@ -368,6 +371,12 @@ export const feePaymentApi = {
             .single();
         if (error) throw error;
         return result;
+    },
+
+    async delete(id: string): Promise<void> {
+        const supabase = getClient();
+        const { error } = await supabase.from('ds_fee_payments').delete().eq('id', id);
+        if (error) throw error;
     },
 };
 

@@ -6,6 +6,8 @@ import { Label } from '@/components/ui/label'
 import { feePaymentApi } from '@/lib/ds-api'
 import { toast } from 'sonner'
 import { Loader2, IndianRupee, Banknote, Smartphone, Building2, CreditCard } from 'lucide-react'
+import { DateTimePicker } from '@/components/ui/date-time-picker'
+import { getErrorMessage, logClientError } from '@/lib/error-message'
 
 interface RecordPaymentSheetProps {
     open: boolean
@@ -49,7 +51,11 @@ export function RecordPaymentSheet({ open, onOpenChange, studentId, studentName,
 
         const numericAmount = parseFloat(amount)
         if (isNaN(numericAmount) || numericAmount <= 0) {
-            toast.error('Please enter a valid amount')
+            toast.error('Enter an amount greater than zero.')
+            return
+        }
+        if (pendingBalance !== undefined && pendingBalance > 0 && numericAmount > pendingBalance) {
+            toast.error(`Amount cannot exceed ₹${pendingBalance.toLocaleString('en-IN')}.`)
             return
         }
 
@@ -66,8 +72,8 @@ export function RecordPaymentSheet({ open, onOpenChange, studentId, studentName,
             onSuccess()
             onOpenChange(false)
         } catch (error) {
-            console.error('Failed to record payment:', error)
-            toast.error('Failed to record payment')
+            logClientError('create-payment', error, { studentId, amount: numericAmount, paymentDate, paymentMode })
+            toast.error(getErrorMessage(error, 'Could not record payment.'))
         } finally {
             setSaving(false)
         }
@@ -146,13 +152,7 @@ export function RecordPaymentSheet({ open, onOpenChange, studentId, studentName,
                         {/* Date */}
                         <div className="space-y-2">
                             <Label className="text-sm font-semibold text-slate-700">Payment Date <span className="text-red-500">*</span></Label>
-                            <Input
-                                type="date"
-                                required
-                                value={paymentDate}
-                                onChange={e => setPaymentDate(e.target.value)}
-                                className="h-10 bg-slate-50 border-slate-200"
-                            />
+                            <DateTimePicker value={paymentDate} onChange={setPaymentDate} required />
                         </div>
 
                         {/* Note */}

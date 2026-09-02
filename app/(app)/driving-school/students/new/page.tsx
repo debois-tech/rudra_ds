@@ -9,6 +9,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { studentApi } from '@/lib/ds-api'
 import Link from 'next/link'
 import { toast } from 'sonner'
+import { DateTimePicker } from '@/components/ui/date-time-picker'
+import { getErrorMessage, logClientError } from '@/lib/error-message'
 
 const courseTypes = ['LMV', 'MCWG', 'HMV', 'LMV+MCWG', 'Transport', 'Conductor', 'Others']
 
@@ -19,14 +21,15 @@ export default function EnrollStudentPage() {
     const [email, setEmail] = useState('')
     const [address, setAddress] = useState('')
     const [dob, setDob] = useState('')
+    const [enrollmentDate, setEnrollmentDate] = useState(new Date().toISOString().split('T')[0])
     const [course, setCourse] = useState('LMV')
     const [fee, setFee] = useState('')
     const [submitting, setSubmitting] = useState(false)
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!name || !phone) {
-            toast.error('Name and phone are required')
+        if (!name || !/^\d{10}$/.test(phone)) {
+            toast.error('Enter a valid 10-digit phone number.')
             return
         }
         setSubmitting(true)
@@ -37,6 +40,7 @@ export default function EnrollStudentPage() {
                 email: email || undefined,
                 address: address || undefined,
                 dob: dob || undefined,
+                enrollment_date: enrollmentDate,
                 course_type: course,
                 total_fee: Number(fee) || 0,
             })
@@ -44,8 +48,8 @@ export default function EnrollStudentPage() {
             // Redirect to student profile and auto-open payment sheet
             router.push(`/driving-school/students/${student.id}?openPayment=true`)
         } catch (err) {
-            console.error(err)
-            toast.error('Failed to enroll student. Please try again.')
+            logClientError('create-student', err, { phone, course })
+            toast.error(getErrorMessage(err, 'Could not enroll student.'))
             setSubmitting(false)
         }
     }
@@ -71,6 +75,10 @@ export default function EnrollStudentPage() {
                             <h2 className="text-[15px] font-semibold text-slate-900 mb-4">Personal Information</h2>
                             <div className="grid md:grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
+                                    <label className="text-[13px] font-medium text-slate-700">Start Date <span className="text-red-500">*</span></label>
+                                    <DateTimePicker value={enrollmentDate} onChange={setEnrollmentDate} required />
+                                </div>
+                                <div className="space-y-1.5">
                                     <label className="text-[13px] font-medium text-slate-700">Full Name <span className="text-red-500">*</span></label>
                                     <Input
                                         value={name}
@@ -84,7 +92,7 @@ export default function EnrollStudentPage() {
                                     <label className="text-[13px] font-medium text-slate-700">Phone <span className="text-red-500">*</span></label>
                                     <Input
                                         value={phone}
-                                        onChange={e => setPhone(e.target.value)}
+                        onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                                         required
                                         placeholder="10-digit mobile"
                                         className="rounded-xl border-slate-200 h-9 text-sm"
@@ -102,12 +110,7 @@ export default function EnrollStudentPage() {
                                 </div>
                                 <div className="space-y-1.5">
                                     <label className="text-[13px] font-medium text-slate-700">Date of Birth</label>
-                                    <Input
-                                        type="date"
-                                        value={dob}
-                                        onChange={e => setDob(e.target.value)}
-                                        className="rounded-xl border-slate-200 h-9 text-sm"
-                                    />
+                                    <DateTimePicker value={dob} onChange={setDob} />
                                 </div>
                                 <div className="md:col-span-2 space-y-1.5">
                                     <label className="text-[13px] font-medium text-slate-700">Address</label>

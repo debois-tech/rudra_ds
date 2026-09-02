@@ -36,11 +36,11 @@ const servicesNav = [
 
 const drivingNav = [
     { href: "/driving-school", label: "Overview", icon: BarChart3 },
-    { href: "/driving-school/instructors", label: "Instructors", icon: UserCircle },
-    { href: "/driving-school/fleet", label: "Fleet", icon: Car },
-    { href: "/driving-school/logs", label: "Daily Logs", icon: CalendarClock },
     { href: "/driving-school/students", label: "Students", icon: GraduationCap },
     { href: "/driving-school/attendance", label: "Attendance", icon: BookOpenCheck },
+    { href: "/driving-school/logs", label: "Daily Logs", icon: CalendarClock },
+    { href: "/driving-school/fleet", label: "Fleet", icon: Car },
+    { href: "/driving-school/instructors", label: "Instructor", icon: UserCircle },
 ]
 
 export function AppShell({ profile, orgName, children }: AppShellProps) {
@@ -100,8 +100,8 @@ export function AppShell({ profile, orgName, children }: AppShellProps) {
                                 {initials}
                             </div>
                             <div className="hidden lg:block text-left">
-                                <p className="text-[12px] font-medium text-white leading-tight">
-                                    {profile.full_name || 'User'}
+                                <p className="text-[13px] font-semibold text-amber-500 leading-tight truncate max-w-48">
+                                    {orgName || 'Driving School'}
                                 </p>
                                 <p className="text-[11px] text-gray-500 leading-tight">
                                     {profile.email}

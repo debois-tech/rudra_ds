@@ -4,7 +4,7 @@
 import type { ServiceOverview } from './types';
 import { format } from 'date-fns';
 
-export function generateInvoice(service: ServiceOverview) {
+export function generateInvoice(service: ServiceOverview, organizationName = 'Driving School') {
   const invoiceWindow = window.open('', '_blank');
   if (!invoiceWindow) {
     throw new Error('Please allow popups to download invoices');
@@ -48,8 +48,8 @@ export function generateInvoice(service: ServiceOverview) {
 <body>
   <div class="header">
     <div class="brand">
-      <h1>MotoAdmin</h1>
-      <p>Service Management Platform</p>
+      <h1>${organizationName}</h1>
+      <p>Service Invoice</p>
     </div>
     <div class="invoice-meta">
       <h2>INVOICE</h2>

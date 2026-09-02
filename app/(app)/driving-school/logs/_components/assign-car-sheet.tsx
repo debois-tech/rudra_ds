@@ -8,6 +8,7 @@ import { instructorApi, fleetVehicleApi, drivingLogApi } from '@/lib/ds-api'
 import type { DsInstructor, DsFleetVehicle, DsDrivingLogView } from '@/lib/types'
 import { toast } from 'sonner'
 import { Loader2, Car } from 'lucide-react'
+import { DateTimePicker } from '@/components/ui/date-time-picker'
 
 interface AssignCarSheetProps {
     open: boolean
@@ -129,23 +130,11 @@ export function AssignCarSheet({ open, onOpenChange, defaultDate, onSuccess, act
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label className="text-sm font-semibold text-slate-700">Date <span className="text-red-500">*</span></Label>
-                                    <Input
-                                        type="date"
-                                        required
-                                        value={logDate}
-                                        onChange={e => setLogDate(e.target.value)}
-                                        className="h-10 bg-slate-50 border-slate-200"
-                                    />
+                                    <DateTimePicker value={logDate} onChange={setLogDate} required />
                                 </div>
                                 <div className="space-y-2">
                                     <Label className="text-sm font-semibold text-slate-700">Opted At <span className="text-red-500">*</span></Label>
-                                    <Input
-                                        type="time"
-                                        required
-                                        value={optedAtTime}
-                                        onChange={e => setOptedAtTime(e.target.value)}
-                                        className="h-10 bg-slate-50 border-slate-200"
-                                    />
+                                    <DateTimePicker value={optedAtTime} onChange={setOptedAtTime} mode="time" required />
                                 </div>
                             </div>
 

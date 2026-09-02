@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useContext } from 'react';
+import { DashboardOrgContext } from '../../../app-shell';
 import { serviceApi } from '@/lib/api';
 import type { ServiceOverview } from '@/lib/types';
 import { FileText, Loader2, Download, Search, Wrench, Car } from 'lucide-react';
@@ -12,6 +13,7 @@ import { toast } from 'sonner';
 import { generateInvoice } from '@/lib/invoice';
 
 export default function ServiceOverviewPage() {
+  const orgName = useContext(DashboardOrgContext);
   const [services, setServices] = useState<ServiceOverview[]>([]);
   const [filtered, setFiltered] = useState<ServiceOverview[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,7 +57,7 @@ export default function ServiceOverviewPage() {
 
   function handleInvoice(service: ServiceOverview) {
     try {
-      generateInvoice(service);
+      generateInvoice(service, orgName || 'Driving School');
       toast.success('Invoice downloaded!');
     } catch (error) {
       console.error(error);

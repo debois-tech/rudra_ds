@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { attendanceApi, studentApi } from '@/lib/ds-api'
 import type { DsAttendanceView, DsStudentDashboardView } from '@/lib/types'
 import { toast } from 'sonner'
+import { DateTimePicker } from '@/components/ui/date-time-picker'
 
 export default function AttendancePage() {
     const [date, setDate] = useState(new Date().toISOString().split('T')[0])
@@ -33,7 +34,7 @@ export default function AttendancePage() {
                 studentApi.getAll(),
             ])
             setRecords(recs)
-            setStudents(studs.filter(s => s.status === 'active'))
+            setStudents(studs.filter(s => s.status === 'active' && s.enrollment_date <= d && (!s.completion_date || s.completion_date >= d)))
         } catch {
             toast.error('Failed to load attendance data')
         } finally {
@@ -140,12 +141,7 @@ export default function AttendancePage() {
                         </p>
                     </div>
                     <div className="flex items-center gap-3">
-                        <input
-                            type="date"
-                            value={date}
-                            onChange={e => setDate(e.target.value)}
-                            className="rounded-xl border border-slate-200 px-3 py-1.5 text-sm text-slate-600 bg-white focus:outline-none focus:ring-2 focus:ring-amber-400/20"
-                        />
+                        <DateTimePicker value={date} onChange={setDate} />
                     </div>
                 </div>
 
@@ -179,7 +175,7 @@ export default function AttendancePage() {
                     <div className="space-y-3">
                         <div className="flex items-center justify-between px-1">
                             <h2 className="text-[13px] font-semibold text-slate-700 uppercase tracking-wide">
-                                Active Students ({filteredStudents.length})
+                                Mark attendance <span className="text-slate-400">· {filteredStudents.length} active</span>
                             </h2>
                             <div className="text-[13px] font-medium text-slate-500">
                                 <span className="text-emerald-600 font-bold">{records.length}</span> Present Today
@@ -206,7 +202,7 @@ export default function AttendancePage() {
                                                 toggleStudent(student)
                                             }}
                                             disabled={isToggling}
-                                            className={`relative w-full flex items-center justify-between gap-4 px-4 py-3 rounded-xl border text-left transition-all cursor-pointer disabled:opacity-70 disabled:pointer-events-none ${
+                                            className={`relative w-full flex items-center justify-between gap-4 px-5 py-3.5 rounded-2xl border text-left shadow-sm transition-all cursor-pointer disabled:opacity-70 disabled:pointer-events-none ${
                                                 isSelected
                                                     ? 'ring-2 ring-amber-400 shadow-md scale-[1.01] z-10'
                                                     : 'hover:border-slate-300'
