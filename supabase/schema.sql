@@ -176,6 +176,8 @@ CREATE INDEX idx_service_types_category ON public.service_types(category);
 -- ============================================
 -- 6. SERVICES (separate document and vehicle tables)
 -- ============================================
+CREATE TYPE public.service_status AS ENUM ('active', 'completed', 'cancelled', 'expired');
+
 CREATE TABLE public.document_services (
     s_id            UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     customer_id     UUID NOT NULL REFERENCES public.customers(c_id) ON DELETE CASCADE,
@@ -189,8 +191,7 @@ CREATE TABLE public.document_services (
     issue_date      DATE NOT NULL,
     expiry_date     DATE,
     total_cost      DECIMAL(10,2) NOT NULL DEFAULT 0,
-    status          VARCHAR(20) DEFAULT 'active'
-                    CHECK (status IN ('active', 'completed', 'cancelled')),
+    status          public.service_status DEFAULT 'active',
     notes           TEXT,
 
     org_id          UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
@@ -205,7 +206,7 @@ CREATE TABLE public.vehicle_services (
     vehicle_id UUID REFERENCES public.vehicles(v_id) ON DELETE SET NULL,
     vehicle_type VARCHAR(50), vehicle_number VARCHAR(20), issue_date DATE NOT NULL, expiry_date DATE,
     total_cost DECIMAL(10,2) NOT NULL DEFAULT 0,
-    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active','completed','cancelled')),
+    status public.service_status DEFAULT 'active',
     notes TEXT, org_id UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ DEFAULT now(), updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -800,16 +801,17 @@ BEGIN
             ) t
         ),
         'revenueByMonth', (
+            -- No date floor here: the UI (month/6m/1y/all tabs) slices this client-side,
+            -- so the RPC must return every month with data or the wider tabs are fake.
             SELECT json_agg(row_to_json(t) ORDER BY t.month_key)
             FROM (
                 SELECT
-                    TO_CHAR(issue_date, 'Mon') as month,
+                    TO_CHAR(issue_date, 'Mon YY') as month,
                     TO_CHAR(issue_date, 'YYYY-MM') as month_key,
                     COALESCE(SUM(total_cost), 0) as revenue
                 FROM service_records
                 WHERE org_id = p_org_id
-                  AND issue_date >= (CURRENT_DATE - INTERVAL '6 months')
-                GROUP BY TO_CHAR(issue_date, 'Mon'), TO_CHAR(issue_date, 'YYYY-MM')
+                GROUP BY TO_CHAR(issue_date, 'YYYY-MM'), TO_CHAR(issue_date, 'Mon YY')
             ) t
         )
     ) INTO v_result;

@@ -3,6 +3,7 @@ export function StatusBadge({ status }: { status: string }) {
         active: 'bg-emerald-50 text-emerald-600 border-emerald-100',
         completed: 'bg-slate-50 text-slate-500 border-slate-200',
         cancelled: 'bg-red-50 text-red-500 border-red-100',
+        expired: 'bg-amber-50 text-amber-600 border-amber-100',
     }
 
     return (

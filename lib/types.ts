@@ -114,7 +114,7 @@ export interface InlineVehicleData {
 // =============================================
 
 export type ServiceCategory = 'vehicle' | 'licence';
-export type ServiceStatus = 'active' | 'completed' | 'cancelled';
+export type ServiceStatus = 'active' | 'completed' | 'cancelled' | 'expired';
 
 export type VehicleClass = 'NT' | 'Transport' | 'Conductor';
 
@@ -224,6 +224,7 @@ export interface ServiceBreakdown {
 
 export interface MonthlyRevenue {
   month: string;
+  month_key: string;
   revenue: number;
 }
 

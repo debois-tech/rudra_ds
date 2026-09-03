@@ -14,6 +14,7 @@ import type {
     InlineVehicleData,
     ServiceType,
     Service,
+    ServiceStatus,
     ServiceOverview,
     VehicleServiceFormData,
     LicenceServiceFormData,
@@ -322,7 +323,7 @@ export const serviceApi = {
         return data;
     },
 
-    async updateStatus(id: string, status: 'active' | 'completed' | 'cancelled'): Promise<Service> {
+    async updateStatus(id: string, status: ServiceStatus): Promise<Service> {
         const supabase = getClient();
         const { data: existing, error: lookupError } = await supabase.from('v_services_overview').select('category').eq('s_id', id).single();
         if (lookupError) throw lookupError;
@@ -377,7 +378,7 @@ export const dashboardApi = {
             },
             serviceBreakdown: result.serviceBreakdown || [],
             statusBreakdown: result.statusBreakdown || [],
-            revenueByMonth: (result.revenueByMonth || []).map(r => ({ month: r.month, revenue: r.revenue })),
+            revenueByMonth: (result.revenueByMonth || []).map(r => ({ month: r.month, month_key: r.month_key, revenue: r.revenue })),
         };
     },
 

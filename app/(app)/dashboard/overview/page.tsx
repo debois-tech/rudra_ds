@@ -5,7 +5,7 @@ import { DashboardOrgContext } from '../../app-shell';
 import { dashboardApi } from '@/lib/api';
 import type {
     DashboardStats, CustomerDashboardView, ServiceOverview,
-    ExpiringDocument, MonthlyRevenue,
+    ExpiringDocument,
 } from '@/lib/types';
 import {
     Users, Car, Wrench, Plus, ArrowUpRight, Shield,
@@ -16,9 +16,8 @@ import Link from 'next/link';
 import { formatDistanceToNow, format } from 'date-fns';
 import { createPortal } from 'react-dom';
 
-import { StatCard, StatCardSkeleton, CardSkeleton } from './_components/stat-card';
+import { StatCard, StatCardSkeleton } from './_components/stat-card';
 import { StatusBadge, UrgencyBadge } from './_components/badges';
-import { RevenueChart } from './_components/revenue-chart';
 import { EmptyState } from './_components/empty-state';
 
 // ═══════════════════════════════════════════
@@ -57,9 +56,7 @@ export default function DashboardPage() {
     });
     const [activities, setActivities] = useState<ActivityItem[]>([]);
     const [expiringDocs, setExpiringDocs] = useState<ExpiringDocument[]>([]);
-    const [revenueData, setRevenueData] = useState<MonthlyRevenue[]>([]);
     const [expiryFilter, setExpiryFilter] = useState(15);
-    const [revenueFilter, setRevenueFilter] = useState('6m');
     const [expiryOpen, setExpiryOpen] = useState(false);
     const [expirySearch, setExpirySearch] = useState('');
     const [expiryCategory, setExpiryCategory] = useState('all');
@@ -83,7 +80,6 @@ export default function DashboardPage() {
                     dashboardApi.getRecentServices(8),
                 ]);
                 setStats(allStats.stats);
-                setRevenueData(allStats.revenueByMonth);
 
                 const allActivity: ActivityItem[] = [
                     ...customersData.map((c: CustomerDashboardView) => ({
@@ -279,30 +275,6 @@ export default function DashboardPage() {
                     <div className="max-h-[424px] flex-none overflow-y-auto">{expiringDocs.filter(doc => (expiryCategory === 'all' || doc.category === expiryCategory) && `${doc.customer_name} ${doc.service_name}`.toLowerCase().includes(expirySearch.toLowerCase())).map(doc => <Link key={doc.s_id} href={`/dashboard/customers/${doc.customer_id}`} onClick={() => setExpiryOpen(false)} className="flex items-center gap-3 border-b border-slate-50 px-6 py-3 hover:bg-amber-50/30"><div className="min-w-0 flex-1"><p className="truncate text-[13px] font-semibold text-slate-900">{doc.customer_name}</p><p className="truncate text-xs text-slate-400">{doc.service_name}</p></div><UrgencyBadge days={doc.days_remaining} /></Link>)}{expiringDocs.filter(doc => (expiryCategory === 'all' || doc.category === expiryCategory) && `${doc.customer_name} ${doc.service_name}`.toLowerCase().includes(expirySearch.toLowerCase())).length === 0 && <p className="px-6 py-10 text-center text-sm text-slate-400">No matching documents.</p>}</div>
                 </div>
             </div>, document.body)}
-
-            {/* ── Analytics Grid ── */}
-            <div className="grid gap-4">
-                {/* Revenue Trend */}
-                <div className="bg-white rounded-2xl border border-slate-100 p-6">
-                    <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                            <h3 className="text-[15px] font-semibold text-slate-900">Revenue</h3>
-                            <p className="mt-0.5 text-[12px] text-slate-400">Collected service revenue</p>
-                        </div>
-                        <div className="flex w-fit items-center gap-1.5 rounded-lg bg-slate-100 p-0.5">
-                            {[['month', 'This month'], ['6m', '6 months'], ['1y', '1 year'], ['all', 'All time']].map(([key, label]) => (
-                                <button key={key} type="button" onClick={() => setRevenueFilter(key)} className={`rounded-md px-3 py-1.5 text-[12px] font-semibold transition-all ${revenueFilter === key ? 'bg-amber-400 text-black shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>{label}</button>
-                            ))}
-                        </div>
-                    </div>
-                    {loading ? <CardSkeleton /> : (
-                        revenueData.length > 0
-                            ? <RevenueChart data={revenueFilter === 'month' ? revenueData.slice(-1) : revenueFilter === '6m' ? revenueData.slice(-6) : revenueFilter === '1y' ? revenueData.slice(-12) : revenueData} />
-                            : <p className="text-sm text-slate-400 text-center py-6">No revenue data yet</p>
-                    )}
-                </div>
-
-            </div>
 
             {/* ── Activity Feed ── */}
             <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
