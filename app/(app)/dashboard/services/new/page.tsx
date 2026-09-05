@@ -12,6 +12,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
+import { DateTimePicker } from '@/components/ui/date-time-picker';
+import { getErrorMessage, logClientError } from '@/lib/error-message';
 
 const VEHICLE_CLASSES: VehicleClass[] = ['NT', 'Transport', 'Conductor'];
 const VEHICLE_TYPE_LICENCE: VehicleTypeLicence[] = [
@@ -186,7 +188,8 @@ export default function NewServicePage() {
       toast.success('Service created successfully!');
       resetForm();
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : 'Failed to create service');
+      logClientError(category === 'vehicle' ? 'create-vehicle-service' : 'create-document-service', error, { customerId: selectedCustomer?.c_id, serviceTypeId, form: category });
+      toast.error(getErrorMessage(error, 'Could not create service.'));
     }
     setSubmitting(false);
   }
@@ -460,13 +463,13 @@ export default function NewServicePage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div>
                     <label className="text-[11px] uppercase font-bold tracking-wider text-slate-500">Issue Date <span className="text-red-500">*</span></label>
-                    <Input type="date" value={issueDate} onChange={e => setIssueDate(e.target.value)} required className="mt-2 h-11 bg-slate-50 rounded-lg focus-visible:ring-amber-200" />
+                    <DateTimePicker value={issueDate} onChange={setIssueDate} required className="mt-2" />
                   </div>
                   <div>
                     <label className="text-[11px] uppercase font-bold tracking-wider text-slate-500">
                       {category === 'licence' ? 'Renewal / Expiry Date' : 'Expiry Date'}
                     </label>
-                    <Input type="date" value={expiryDate} onChange={e => setExpiryDate(e.target.value)} className="mt-2 h-11 bg-slate-50 rounded-lg focus-visible:ring-amber-200" />
+                    <DateTimePicker value={expiryDate} onChange={setExpiryDate} className="mt-2" />
                   </div>
                 </div>
                 

@@ -114,7 +114,7 @@ export interface InlineVehicleData {
 // =============================================
 
 export type ServiceCategory = 'vehicle' | 'licence';
-export type ServiceStatus = 'active' | 'completed' | 'cancelled';
+export type ServiceStatus = 'active' | 'completed' | 'cancelled' | 'expired';
 
 export type VehicleClass = 'NT' | 'Transport' | 'Conductor';
 
@@ -224,6 +224,7 @@ export interface ServiceBreakdown {
 
 export interface MonthlyRevenue {
   month: string;
+  month_key: string;
   revenue: number;
 }
 
@@ -333,6 +334,7 @@ export interface DsStudent {
   address: string | null;
   dob: string | null;
   enrollment_date: string;
+  completion_date: string | null;
   course_type: string;
   total_fee: number;
   status: DsStudentStatus;
@@ -350,6 +352,7 @@ export interface DsStudentFormData {
   address?: string;
   dob?: string;
   enrollment_date?: string;
+  completion_date?: string;
   course_type?: string;
   total_fee?: number;
   status?: DsStudentStatus;
@@ -365,6 +368,7 @@ export interface DsStudentDashboardView {
   address: string | null;
   dob: string | null;
   enrollment_date: string;
+  completion_date: string | null;
   course_type: string;
   total_fee: number;
   status: DsStudentStatus;

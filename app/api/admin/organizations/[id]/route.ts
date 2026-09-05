@@ -19,7 +19,7 @@ export async function GET(
             supabase.from('profiles').select('*').eq('org_id', id).order('created_at', { ascending: false }),
             supabase.from('customers').select('*', { count: 'exact', head: true }).eq('org_id', id),
             supabase.from('vehicles').select('*', { count: 'exact', head: true }).eq('org_id', id),
-            supabase.from('services').select('*', { count: 'exact', head: true }).eq('org_id', id),
+            supabase.from('service_records').select('*', { count: 'exact', head: true }).eq('org_id', id),
         ])
 
         if (org.error) throw org.error

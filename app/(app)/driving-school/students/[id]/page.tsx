@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
-import { ArrowLeft, GraduationCap, Phone, Mail, MapPin, Calendar, IndianRupee, Plus, UserCircle, Car, Clock, Pencil } from 'lucide-react'
+import { ArrowLeft, GraduationCap, Phone, Mail, MapPin, Calendar, IndianRupee, Plus, UserCircle, Car, Clock, Pencil, CheckCircle2, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { studentApi, feePaymentApi, attendanceApi } from '@/lib/ds-api'
@@ -10,6 +10,7 @@ import type { DsStudentDashboardView, DsFeePayment, DsAttendanceView } from '@/l
 import Link from 'next/link'
 import { RecordPaymentSheet } from './_components/record-payment-sheet'
 import { EditStudentSheet } from './_components/edit-student-sheet'
+import { toast } from 'sonner'
 
 export default function StudentProfilePage() {
     const params = useParams()
@@ -24,6 +25,7 @@ export default function StudentProfilePage() {
     const [loading, setLoading] = useState(true)
     const [paymentSheetOpen, setPaymentSheetOpen] = useState(false)
     const [editSheetOpen, setEditSheetOpen] = useState(false)
+    const [ending, setEnding] = useState(false)
 
     const fetchAllData = () => {
         Promise.all([
@@ -57,6 +59,21 @@ export default function StudentProfilePage() {
     const pending = student.total_fee - student.total_paid
     const pct = student.total_fee > 0 ? Math.min((student.total_paid / student.total_fee) * 100, 100) : 0
 
+    const deletePayment = async (paymentId: string) => {
+        if (!confirm('Delete this payment record?')) return
+        try { await feePaymentApi.delete(paymentId); fetchAllData(); toast.success('Payment deleted') }
+        catch { toast.error('Could not delete payment.') }
+    }
+
+    const endCourse = async () => {
+        if (!confirm(`Mark ${student.name}'s course completed?`)) return
+        setEnding(true)
+        try {
+            await studentApi.update(student.id, { status: 'completed', completion_date: new Date().toISOString().split('T')[0] })
+            fetchAllData()
+        } catch { toast.error('Could not complete course') } finally { setEnding(false) }
+    }
+
     return (
         <div className="space-y-6 animate-fade-in max-w-5xl mx-auto">
             {/* Back + Header */}
@@ -86,6 +103,7 @@ export default function StudentProfilePage() {
                         <Pencil className="h-3.5 w-3.5 mr-1.5" />
                         Edit
                     </Button>
+                    {student.status === 'active' && <Button variant="outline" size="sm" onClick={endCourse} disabled={ending} className="rounded-xl h-9 px-4 text-[13px] font-medium border-emerald-200 text-emerald-700 cursor-pointer"><CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />End Course</Button>}
                 </div>
             </div>
 
@@ -211,6 +229,7 @@ export default function StudentProfilePage() {
                                         <th className="text-left px-6 py-3 text-[11px] font-semibold text-slate-400 uppercase">Amount</th>
                                         <th className="text-left px-6 py-3 text-[11px] font-semibold text-slate-400 uppercase">Mode</th>
                                         <th className="text-left px-6 py-3 text-[11px] font-semibold text-slate-400 uppercase">Note</th>
+                                        <th />
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50">
@@ -233,6 +252,7 @@ export default function StudentProfilePage() {
                                             <td className="px-6 py-3 text-[13px] text-slate-600">
                                                 {new Date(p.payment_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                                             </td>
+                                            <td className="px-2 py-3 text-right"><button type="button" onClick={() => deletePayment(p.id)} aria-label="Delete payment" className="text-slate-300 hover:text-red-500"><Trash2 className="h-4 w-4" /></button></td>
                                             <td className="px-6 py-3 text-[13px] font-semibold text-slate-900">₹{p.amount.toLocaleString('en-IN')}</td>
                                             <td className="px-6 py-3">
                                                 <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-600 capitalize">{p.payment_mode}</span>

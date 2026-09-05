@@ -22,6 +22,8 @@ import {
 } from "@/components/ui/form";
 import { toast } from "sonner";
 import Link from 'next/link';
+import { DateTimePicker } from '@/components/ui/date-time-picker';
+import { logClientError } from '@/lib/error-message';
 
 const vehicleSchema = z.object({
   v_number: z.string().min(1, "Vehicle number is required"),
@@ -71,7 +73,7 @@ export default function AddCustomerPage() {
         {
           c_name: values.c_name,
           c_mobile: values.c_mobile,
-          c_whatsapp: values.c_whatsapp || undefined,
+          c_whatsapp: values.c_whatsapp || values.c_mobile || undefined,
           c_email: values.c_email || undefined,
           c_address: values.c_address || undefined,
           c_dob: values.c_dob || undefined,
@@ -85,8 +87,8 @@ export default function AddCustomerPage() {
       toast.success(`Customer "${customer.c_name}" added! ID: ${customer.c_registration_id}`);
       router.push('/dashboard/customers');
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      toast.error("Error adding customer: " + message);
+      logClientError('create-customer', error, { mobile: values.c_mobile });
+      toast.error('Could not add customer.');
     }
     setLoading(false);
   }
@@ -127,15 +129,14 @@ export default function AddCustomerPage() {
                 <FormField control={form.control} name="c_mobile" render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-xs font-semibold uppercase tracking-wider text-slate-500">Mobile Number <span className="text-red-500">*</span></FormLabel>
-                    <FormControl><Input placeholder="9876543210" maxLength={10} className="bg-white rounded-xl focus-visible:ring-amber-200" {...field} /></FormControl>
+                    <FormControl><Input placeholder="9876543210" maxLength={10} className="bg-white rounded-xl focus-visible:ring-amber-200" {...field} onChange={e => field.onChange(e.target.value.replace(/\D/g, '').slice(0, 10))} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
                 <FormField control={form.control} name="c_whatsapp" render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-xs font-semibold uppercase tracking-wider text-slate-500">WhatsApp Number</FormLabel>
-                    <FormControl><Input placeholder="Same as mobile if empty" maxLength={10} className="bg-white rounded-xl focus-visible:ring-amber-200" {...field} /></FormControl>
-                    <FormDescription className="text-[10px] uppercase font-semibold">Leave empty to use mobile number</FormDescription>
+                    <FormControl><Input placeholder="Same as mobile if empty" maxLength={10} className="bg-white rounded-xl focus-visible:ring-amber-200" {...field} onChange={e => field.onChange(e.target.value.replace(/\D/g, '').slice(0, 10))} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -153,7 +154,7 @@ export default function AddCustomerPage() {
                 <FormField control={form.control} name="c_dob" render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-xs font-semibold uppercase tracking-wider text-slate-500">Date of Birth</FormLabel>
-                    <FormControl><Input type="date" className="bg-white rounded-xl focus-visible:ring-amber-200" {...field} /></FormControl>
+                    <FormControl><DateTimePicker value={field.value} onChange={field.onChange} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />

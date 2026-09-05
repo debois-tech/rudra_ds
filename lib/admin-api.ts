@@ -94,6 +94,31 @@ export const adminUserApi = {
 };
 
 // =============================================
+// DATA IMPORT
+// =============================================
+
+export interface ImportServicesResult {
+    totalRows: number;
+    customersCreated: number;
+    vehiclesCreated: number;
+    servicesCreated: number;
+    skippedCount: number;
+    skipped: { row: number; reason: string }[];
+}
+
+export const adminImportApi = {
+    async importServices(orgId: string, file: File): Promise<ImportServicesResult> {
+        const body = new FormData();
+        body.append('org_id', orgId);
+        body.append('file', file);
+        const res = await fetch('/api/admin/import-services', { method: 'POST', body });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Import failed');
+        return data as ImportServicesResult;
+    },
+};
+
+// =============================================
 // PLATFORM STATS
 // =============================================
 

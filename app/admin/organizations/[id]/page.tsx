@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { adminOrgApi, adminUserApi } from '@/lib/admin-api'
+import { adminOrgApi, adminUserApi, adminImportApi, type ImportServicesResult } from '@/lib/admin-api'
 import type { Organization, Profile } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ArrowLeft, Building2, UserPlus, Trash2, Power, Loader2, Users, Car, Wrench } from 'lucide-react'
+import { ArrowLeft, Building2, UserPlus, Trash2, Power, Loader2, Users, Car, Wrench, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
 
@@ -27,6 +27,11 @@ export default function OrgDetailPage() {
     const [newUserEmail, setNewUserEmail] = useState('')
     const [newUserPassword, setNewUserPassword] = useState('')
     const [addingUser, setAddingUser] = useState(false)
+
+    // Import service data
+    const [importFile, setImportFile] = useState<File | null>(null)
+    const [importing, setImporting] = useState(false)
+    const [importResult, setImportResult] = useState<ImportServicesResult | null>(null)
 
     const loadData = async () => {
         try {
@@ -78,6 +83,23 @@ export default function OrgDetailPage() {
         } catch {
             toast.error('Failed to delete user')
         }
+    }
+
+    const handleImport = async () => {
+        if (!importFile) return
+        if (!confirm(`Import "${importFile.name}" into ${org?.name}? This creates customers, vehicles, and service records — it can take several minutes for large files and cannot be undone by this tool.`)) return
+        setImporting(true)
+        setImportResult(null)
+        try {
+            const result = await adminImportApi.importServices(orgId, importFile)
+            setImportResult(result)
+            toast.success(`Import done: ${result.customersCreated} customers, ${result.vehiclesCreated} vehicles, ${result.servicesCreated} services created`)
+            loadData()
+        } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : 'Import failed'
+            toast.error(msg)
+        }
+        setImporting(false)
     }
 
     if (loading) {
@@ -272,6 +294,78 @@ export default function OrgDetailPage() {
                                     </div>
                                 </div>
                             ))}
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            {/* Import Vehicle Service Data */}
+            <Card className="bg-slate-800/50 border-slate-700/50">
+                <CardHeader>
+                    <CardTitle className="text-white flex items-center gap-2">
+                        <Upload className="h-5 w-5 text-amber-400" />
+                        Import Vehicle Service Data
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="flex items-center gap-3">
+                        <Input
+                            type="file"
+                            accept=".xlsx,.xls"
+                            disabled={importing}
+                            onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                            className="bg-slate-900 border-slate-600 text-white h-9 text-sm file:text-white file:text-xs"
+                        />
+                        <Button
+                            size="sm"
+                            disabled={!importFile || importing}
+                            onClick={handleImport}
+                            className="bg-amber-600 hover:bg-amber-700 shrink-0"
+                        >
+                            {importing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Upload className="h-3.5 w-3.5 mr-1" />}
+                            {importing ? 'Importing…' : 'Import'}
+                        </Button>
+                    </div>
+                    {importing && (
+                        <p className="text-amber-400 text-xs">
+                            Large files take a while (customers are created one at a time to keep registration
+                            numbers correct). Keep this tab open.
+                        </p>
+                    )}
+                    {importResult && (
+                        <div className="p-3 rounded-lg bg-slate-900/50 border border-slate-700 space-y-2 text-sm">
+                            <div className="grid grid-cols-4 gap-2 text-center">
+                                <div>
+                                    <p className="text-white font-bold">{importResult.totalRows}</p>
+                                    <p className="text-slate-400 text-xs">Rows</p>
+                                </div>
+                                <div>
+                                    <p className="text-emerald-400 font-bold">{importResult.customersCreated}</p>
+                                    <p className="text-slate-400 text-xs">Customers</p>
+                                </div>
+                                <div>
+                                    <p className="text-emerald-400 font-bold">{importResult.vehiclesCreated}</p>
+                                    <p className="text-slate-400 text-xs">Vehicles</p>
+                                </div>
+                                <div>
+                                    <p className="text-emerald-400 font-bold">{importResult.servicesCreated}</p>
+                                    <p className="text-slate-400 text-xs">Services</p>
+                                </div>
+                            </div>
+                            {importResult.skippedCount > 0 && (
+                                <details className="text-xs">
+                                    <summary className="text-red-400 cursor-pointer">
+                                        {importResult.skippedCount} row(s) skipped — click to view {importResult.skipped.length < importResult.skippedCount ? `(first ${importResult.skipped.length})` : ''}
+                                    </summary>
+                                    <ul className="mt-2 space-y-1 max-h-60 overflow-y-auto">
+                                        {importResult.skipped.map((s, i) => (
+                                            <li key={i} className="text-slate-400">
+                                                {s.row > 0 ? `Row ${s.row}: ` : ''}{s.reason}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </details>
+                            )}
                         </div>
                     )}
                 </CardContent>

@@ -9,6 +9,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFo
 import { instructorApi } from '@/lib/ds-api'
 import type { DsInstructor } from '@/lib/types'
 import { toast } from 'sonner'
+import { logClientError } from '@/lib/error-message'
 
 export default function InstructorsPage() {
     const [instructors, setInstructors] = useState<DsInstructor[]>([])
@@ -78,7 +79,7 @@ export default function InstructorsPage() {
             }
             setSheetOpen(false)
             fetchList()
-        } catch { toast.error('Failed to save instructor') }
+        } catch (error) { logClientError('create-or-update-instructor', error, { editing: !!editTarget, phone: formPhone }); toast.error('Could not save instructor.') }
         finally { setSaving(false) }
     }
 
@@ -211,7 +212,7 @@ export default function InstructorsPage() {
                         </div>
                         <div className="space-y-1.5">
                             <label className="text-[13px] font-medium text-slate-700">Phone *</label>
-                            <Input value={formPhone} onChange={e => setFormPhone(e.target.value)} required placeholder="Phone number" className="rounded-xl border-slate-200 h-9 text-sm" />
+                            <Input value={formPhone} onChange={e => setFormPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} maxLength={10} required placeholder="10-digit phone number" className="rounded-xl border-slate-200 h-9 text-sm" />
                         </div>
                         <div className="space-y-1.5">
                             <label className="text-[13px] font-medium text-slate-700">Licence Number</label>

@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { DateTimePicker } from '@/components/ui/date-time-picker';
 
 export default function CustomerDetailPage() {
   const params = useParams();
@@ -132,7 +133,7 @@ export default function CustomerDetailPage() {
                     </div>
                     <div>
                       <label className="text-[11px] uppercase tracking-wider font-semibold text-slate-500">Mobile</label>
-                      <Input className="mt-1 bg-slate-50 focus-visible:ring-amber-200 border-slate-200 rounded-lg" value={editForm.c_mobile} onChange={e => setEditForm({ ...editForm, c_mobile: e.target.value })} maxLength={10} />
+                      <Input className="mt-1 bg-slate-50 focus-visible:ring-amber-200 border-slate-200 rounded-lg" value={editForm.c_mobile} onChange={e => setEditForm({ ...editForm, c_mobile: e.target.value.replace(/\D/g, '').slice(0, 10) })} maxLength={10} />
                     </div>
                     <div>
                       <label className="text-[11px] uppercase tracking-wider font-semibold text-slate-500">WhatsApp</label>
@@ -144,7 +145,7 @@ export default function CustomerDetailPage() {
                     </div>
                     <div>
                       <label className="text-[11px] uppercase tracking-wider font-semibold text-slate-500">Date of Birth</label>
-                      <Input className="mt-1 bg-slate-50 focus-visible:ring-amber-200 border-slate-200 rounded-lg" value={editForm.c_dob} onChange={e => setEditForm({ ...editForm, c_dob: e.target.value })} type="date" />
+                      <DateTimePicker value={editForm.c_dob} onChange={value => setEditForm({ ...editForm, c_dob: value })} />
                     </div>
                     <div>
                       <label className="text-[11px] uppercase tracking-wider font-semibold text-slate-500">Address</label>

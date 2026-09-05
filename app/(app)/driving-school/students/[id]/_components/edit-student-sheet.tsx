@@ -45,8 +45,8 @@ export function EditStudentSheet({ open, onOpenChange, student, onSuccess }: Edi
         }
 
         const feeNum = parseFloat(totalFee)
-        if (isNaN(feeNum) || feeNum < 0) {
-            toast.error('Please enter a valid total fee')
+        if (isNaN(feeNum) || feeNum < 0 || feeNum < student.total_paid) {
+            toast.error(feeNum < student.total_paid ? `Fee cannot be below paid amount (₹${student.total_paid.toLocaleString('en-IN')}).` : 'Enter a valid total fee.')
             return
         }
 
@@ -99,7 +99,8 @@ export function EditStudentSheet({ open, onOpenChange, student, onSuccess }: Edi
                                 required
                                 type="tel"
                                 value={phone}
-                                onChange={e => setPhone(e.target.value)}
+                                onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                                maxLength={10}
                                 className="h-10 bg-slate-50 border-slate-200"
                             />
                         </div>

@@ -9,6 +9,8 @@ import type { DsDrivingLogView } from '@/lib/types'
 import { AssignCarSheet } from './_components/assign-car-sheet'
 import { ReleaseCarSheet } from './_components/release-car-sheet'
 import { toast } from 'sonner'
+import { DateTimePicker } from '@/components/ui/date-time-picker'
+import { getErrorMessage } from '@/lib/error-message'
 
 export default function DailyLogsPage() {
     const [date, setDate] = useState(new Date().toISOString().split('T')[0])
@@ -23,7 +25,7 @@ export default function DailyLogsPage() {
         setLoading(true)
         drivingLogApi.getByDate(d)
             .then(data => { setLogs(data); setLoading(false) })
-            .catch(() => { toast.error('Failed to load logs'); setLoading(false) })
+            .catch(error => { toast.error(getErrorMessage(error, 'Could not load daily logs.')); setLoading(false) })
     }, [])
 
     useEffect(() => { fetchLogs(date) }, [date, fetchLogs])
@@ -50,12 +52,7 @@ export default function DailyLogsPage() {
                     <p className="text-[14px] text-slate-400 mt-1">Track which instructor is using which car</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <input
-                        type="date"
-                        value={date}
-                        onChange={e => setDate(e.target.value)}
-                        className="rounded-xl border border-slate-200 px-3 py-1.5 text-sm text-slate-600 bg-white focus:outline-none focus:ring-2 focus:ring-amber-400/20"
-                    />
+                    <DateTimePicker value={date} onChange={setDate} />
                     <Button
                         onClick={() => setSheetOpen(true)}
                         className="rounded-xl h-9 px-4 text-[13px] font-medium bg-amber-500 hover:bg-amber-600 text-black shadow-sm cursor-pointer"

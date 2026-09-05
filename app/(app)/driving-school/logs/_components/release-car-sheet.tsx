@@ -7,6 +7,7 @@ import { drivingLogApi } from '@/lib/ds-api'
 import type { DsDrivingLogView } from '@/lib/types'
 import { toast } from 'sonner'
 import { Loader2, LogOut } from 'lucide-react'
+import { DateTimePicker } from '@/components/ui/date-time-picker'
 
 interface ReleaseCarSheetProps {
     open: boolean
@@ -84,13 +85,7 @@ export function ReleaseCarSheet({ open, onOpenChange, log, onSuccess }: ReleaseC
                     <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5">
                         <div className="space-y-2">
                             <Label className="text-sm font-semibold text-slate-700">Opt Out Time <span className="text-red-500">*</span></Label>
-                            <Input
-                                type="time"
-                                required
-                                value={releaseTime}
-                                onChange={e => setReleaseTime(e.target.value)}
-                                className="h-10 bg-slate-50 border-slate-200"
-                            />
+                            <DateTimePicker value={releaseTime} onChange={setReleaseTime} mode="time" required />
                             <p className="text-xs text-slate-500 mt-1">
                                 By default, the current time is selected. Adjust it if the car was opted out earlier.
                             </p>

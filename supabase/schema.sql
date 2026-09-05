@@ -174,20 +174,14 @@ CREATE TABLE public.service_types (
 CREATE INDEX idx_service_types_category ON public.service_types(category);
 
 -- ============================================
--- 6. SERVICES (core business table)
+-- 6. SERVICES (separate document and vehicle tables)
 -- ============================================
-CREATE TABLE public.services (
+CREATE TYPE public.service_status AS ENUM ('active', 'completed', 'cancelled', 'expired');
+
+CREATE TABLE public.document_services (
     s_id            UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     customer_id     UUID NOT NULL REFERENCES public.customers(c_id) ON DELETE CASCADE,
     service_type_id INT NOT NULL REFERENCES public.service_types(st_id),
-    category        VARCHAR(20) NOT NULL CHECK (category IN ('vehicle', 'licence')),
-
-    -- Vehicle service fields (populated when category = 'vehicle')
-    vehicle_id          UUID REFERENCES public.vehicles(v_id) ON DELETE SET NULL,
-    vehicle_type        VARCHAR(50),
-    vehicle_number      VARCHAR(20),
-
-    -- Licence service fields (populated when category = 'licence')
     vehicle_class       VARCHAR(20),
     vehicle_type_licence VARCHAR(20),
     mdl_number          VARCHAR(50),
@@ -197,8 +191,7 @@ CREATE TABLE public.services (
     issue_date      DATE NOT NULL,
     expiry_date     DATE,
     total_cost      DECIMAL(10,2) NOT NULL DEFAULT 0,
-    status          VARCHAR(20) DEFAULT 'active'
-                    CHECK (status IN ('active', 'completed', 'cancelled')),
+    status          public.service_status DEFAULT 'active',
     notes           TEXT,
 
     org_id          UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
@@ -206,14 +199,39 @@ CREATE TABLE public.services (
     updated_at      TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE INDEX idx_services_org ON public.services(org_id);
-CREATE INDEX idx_services_org_customer ON public.services(org_id, customer_id);
-CREATE INDEX idx_services_customer ON public.services(customer_id);
-CREATE INDEX idx_services_category ON public.services(category);
+CREATE TABLE public.vehicle_services (
+    s_id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    customer_id UUID NOT NULL REFERENCES public.customers(c_id) ON DELETE CASCADE,
+    service_type_id INT NOT NULL REFERENCES public.service_types(st_id),
+    vehicle_id UUID REFERENCES public.vehicles(v_id) ON DELETE SET NULL,
+    vehicle_type VARCHAR(50), vehicle_number VARCHAR(20), issue_date DATE NOT NULL, expiry_date DATE,
+    total_cost DECIMAL(10,2) NOT NULL DEFAULT 0,
+    status public.service_status DEFAULT 'active',
+    notes TEXT, org_id UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT now(), updated_at TIMESTAMPTZ DEFAULT now()
+);
 
-CREATE TRIGGER set_services_updated_at
-    BEFORE UPDATE ON public.services
+CREATE INDEX idx_document_services_org ON public.document_services(org_id);
+CREATE INDEX idx_document_services_customer ON public.document_services(customer_id);
+CREATE INDEX idx_vehicle_services_org ON public.vehicle_services(org_id);
+CREATE INDEX idx_vehicle_services_customer ON public.vehicle_services(customer_id);
+
+CREATE TRIGGER set_document_services_updated_at
+    BEFORE UPDATE ON public.document_services
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+CREATE TRIGGER set_vehicle_services_updated_at
+    BEFORE UPDATE ON public.vehicle_services
+    FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+CREATE VIEW public.service_records WITH (security_invoker = true) AS
+SELECT s_id, customer_id, service_type_id, 'licence'::varchar(20) AS category,
+       NULL::uuid AS vehicle_id, NULL::varchar(50) AS vehicle_type, NULL::varchar(20) AS vehicle_number,
+       vehicle_class, vehicle_type_licence, mdl_number, renewal_date, issue_date, expiry_date, total_cost, status, notes, org_id, created_at, updated_at
+FROM public.document_services
+UNION ALL
+SELECT s_id, customer_id, service_type_id, 'vehicle'::varchar(20), vehicle_id, vehicle_type, vehicle_number,
+       NULL::varchar(20), NULL::varchar(20), NULL::varchar(50), NULL::date, issue_date, expiry_date, total_cost, status, notes, org_id, created_at, updated_at
+FROM public.vehicle_services;
 
 -- ============================================
 -- 7. DEMO REQUESTS
@@ -301,6 +319,7 @@ CREATE TRIGGER set_ds_driving_logs_updated_at
 -- ============================================
 -- 11. DS_STUDENTS — Enrolled driving students
 -- ============================================
+CREATE TYPE public.student_status AS ENUM ('active', 'completed', 'dropped');
 CREATE TABLE public.ds_students (
     id              UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     name            TEXT NOT NULL,
@@ -309,10 +328,10 @@ CREATE TABLE public.ds_students (
     address         TEXT,
     dob             DATE,
     enrollment_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    completion_date DATE,
     course_type     VARCHAR(50) DEFAULT 'LMV',
     total_fee       DECIMAL(10,2) NOT NULL DEFAULT 0,
-    status          VARCHAR(20) DEFAULT 'active'
-                    CHECK (status IN ('active', 'completed', 'dropped')),
+    status          public.student_status DEFAULT 'active',
     notes           TEXT,
     customer_id     UUID REFERENCES public.customers(c_id),
     org_id          UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
@@ -367,6 +386,15 @@ CREATE TABLE public.ds_attendance (
 CREATE INDEX idx_ds_attendance_org ON public.ds_attendance(org_id);
 CREATE INDEX idx_ds_attendance_org_date ON public.ds_attendance(org_id, attendance_date);
 CREATE INDEX idx_ds_attendance_date ON public.ds_attendance(attendance_date);
+
+CREATE OR REPLACE FUNCTION public.prevent_invalid_attendance() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM public.ds_students WHERE id = NEW.student_id AND (NEW.attendance_date < enrollment_date OR (completion_date IS NOT NULL AND NEW.attendance_date > completion_date))) THEN
+        RAISE EXCEPTION 'Attendance date is outside the student course dates';
+    END IF;
+    RETURN NEW;
+END; $$;
+CREATE TRIGGER validate_student_attendance BEFORE INSERT OR UPDATE ON public.ds_attendance FOR EACH ROW EXECUTE FUNCTION public.prevent_invalid_attendance();
 
 -- ============================================
 -- RLS HELPER FUNCTIONS
@@ -461,15 +489,19 @@ CREATE POLICY "user_read_types" ON public.service_types
 -- ============================================
 -- RLS: SERVICES
 -- ============================================
-ALTER TABLE public.services ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.document_services ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.vehicle_services ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "sa_all_services" ON public.services
+CREATE POLICY "sa_all_document_services" ON public.document_services
     FOR ALL USING (public.is_super_admin());
-
-CREATE POLICY "user_crud_services" ON public.services
+CREATE POLICY "user_crud_document_services" ON public.document_services
     FOR ALL
     USING (org_id = public.get_user_org_id())
     WITH CHECK (org_id = public.get_user_org_id());
+CREATE POLICY "sa_all_vehicle_services" ON public.vehicle_services
+    FOR ALL USING (public.is_super_admin());
+CREATE POLICY "user_crud_vehicle_services" ON public.vehicle_services
+    FOR ALL USING (org_id = public.get_user_org_id()) WITH CHECK (org_id = public.get_user_org_id());
 
 -- ============================================
 -- RLS: DEMO_REQUESTS
@@ -610,7 +642,7 @@ LEFT JOIN (
     SELECT customer_id,
            COUNT(*)::int AS service_count,
            SUM(total_cost) AS total_revenue
-    FROM public.services
+    FROM public.service_records
     GROUP BY customer_id
 ) s ON s.customer_id = c.c_id;
 
@@ -641,7 +673,7 @@ SELECT
     st.category AS service_category,
     c.c_name AS customer_name,
     c.c_mobile AS customer_mobile
-FROM public.services s
+FROM public.service_records s
 JOIN public.service_types st ON st.st_id = s.service_type_id
 JOIN public.customers c ON c.c_id = s.customer_id;
 
@@ -704,6 +736,7 @@ SELECT
     s.address,
     s.dob,
     s.enrollment_date,
+    s.completion_date,
     s.course_type,
     s.total_fee,
     s.status,
@@ -747,13 +780,13 @@ BEGIN
     SELECT json_build_object(
         'totalCustomers', (SELECT COUNT(*) FROM customers WHERE org_id = p_org_id),
         'totalVehicles',  (SELECT COUNT(*) FROM vehicles WHERE org_id = p_org_id),
-        'totalServices',  (SELECT COUNT(*) FROM services WHERE org_id = p_org_id),
-        'totalRevenue',   (SELECT COALESCE(SUM(total_cost), 0) FROM services WHERE org_id = p_org_id),
+        'totalServices',  (SELECT COUNT(*) FROM service_records WHERE org_id = p_org_id),
+        'totalRevenue',   (SELECT COALESCE(SUM(total_cost), 0) FROM service_records WHERE org_id = p_org_id),
         'serviceBreakdown', (
             SELECT json_agg(row_to_json(t))
             FROM (
                 SELECT category, COUNT(*) as count
-                FROM services
+                FROM service_records
                 WHERE org_id = p_org_id
                 GROUP BY category
             ) t
@@ -762,22 +795,23 @@ BEGIN
             SELECT json_agg(row_to_json(t))
             FROM (
                 SELECT status, COUNT(*) as count
-                FROM services
+                FROM service_records
                 WHERE org_id = p_org_id
                 GROUP BY status
             ) t
         ),
         'revenueByMonth', (
+            -- No date floor here: the UI (month/6m/1y/all tabs) slices this client-side,
+            -- so the RPC must return every month with data or the wider tabs are fake.
             SELECT json_agg(row_to_json(t) ORDER BY t.month_key)
             FROM (
                 SELECT
-                    TO_CHAR(issue_date, 'Mon') as month,
+                    TO_CHAR(issue_date, 'Mon YY') as month,
                     TO_CHAR(issue_date, 'YYYY-MM') as month_key,
                     COALESCE(SUM(total_cost), 0) as revenue
-                FROM services
+                FROM service_records
                 WHERE org_id = p_org_id
-                  AND issue_date >= (CURRENT_DATE - INTERVAL '6 months')
-                GROUP BY TO_CHAR(issue_date, 'Mon'), TO_CHAR(issue_date, 'YYYY-MM')
+                GROUP BY TO_CHAR(issue_date, 'YYYY-MM'), TO_CHAR(issue_date, 'Mon YY')
             ) t
         )
     ) INTO v_result;

@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { studentApi } from '@/lib/ds-api'
 import type { DsStudentDashboardView } from '@/lib/types'
 import { toast } from 'sonner'
+import { getErrorMessage } from '@/lib/error-message'
 
 const statusStyles: Record<string, string> = {
     active: 'bg-emerald-50 text-emerald-600',
@@ -24,7 +25,7 @@ export default function StudentsPage() {
     const fetchList = () => {
         studentApi.getAll()
             .then(data => { setStudents(data); setLoading(false) })
-            .catch(() => toast.error('Failed to load students'))
+            .catch(error => toast.error(getErrorMessage(error, 'Could not load students.')))
     }
 
     useEffect(() => { fetchList() }, [])
@@ -37,7 +38,7 @@ export default function StudentsPage() {
             await studentApi.delete(id)
             toast.success('Student deleted')
             fetchList()
-        } catch { toast.error('Failed to delete student') }
+        } catch (error) { toast.error(getErrorMessage(error, 'Could not delete student.')) }
     }
 
     const filtered = search
@@ -81,20 +82,20 @@ export default function StudentsPage() {
                         <div key={student.id} className="group relative">
                             <Link href={`/driving-school/students/${student.id}`}>
                                 <Card className="bg-white border-slate-100 hover:border-amber-200 transition-colors cursor-pointer">
-                                    <CardContent className="py-4">
+                                    <CardContent className="py-0.1">
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-4">
                                                 <div className="h-10 w-10 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-white text-sm font-bold">
                                                     {student.name.charAt(0)}
                                                 </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-2">
+                                                <div className="flex min-w-0 flex-1 items-center gap-3">
+                                                    <div className="flex min-w-0 items-center gap-2">
                                                         <p className="text-[14px] font-semibold text-slate-900">{student.name}</p>
                                                         <span className={`px-2 py-0.5 rounded text-[11px] font-medium capitalize ${statusStyles[student.status]}`}>
                                                             {student.status}
                                                         </span>
                                                     </div>
-                                                    <div className="flex items-center gap-4 mt-0.5">
+                                                    <div className="flex items-center gap-3">
                                                         <span className="text-[12px] text-slate-400 flex items-center gap-1">
                                                             <Phone className="h-3 w-3" /> {student.phone}
                                                         </span>

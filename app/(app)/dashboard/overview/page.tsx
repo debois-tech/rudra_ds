@@ -5,21 +5,19 @@ import { DashboardOrgContext } from '../../app-shell';
 import { dashboardApi } from '@/lib/api';
 import type {
     DashboardStats, CustomerDashboardView, ServiceOverview,
-    ExpiringDocument, ServiceBreakdown, MonthlyRevenue, StatusBreakdown,
+    ExpiringDocument,
 } from '@/lib/types';
 import {
-    Users, Car, Wrench, IndianRupee, Plus, Clock, ArrowUpRight,
-    AlertTriangle, TrendingUp, FileText, Shield,
+    Users, Car, Wrench, Plus, ArrowUpRight, Shield,
+    AlertTriangle, FileText, Search, X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { formatDistanceToNow, format } from 'date-fns';
+import { createPortal } from 'react-dom';
 
-import { StatCard, StatCardSkeleton, CardSkeleton } from './_components/stat-card';
+import { StatCard, StatCardSkeleton } from './_components/stat-card';
 import { StatusBadge, UrgencyBadge } from './_components/badges';
-import { RevenueChart } from './_components/revenue-chart';
-import { ServiceDonut } from './_components/service-donut';
-import { StatusBars } from './_components/status-bars';
 import { EmptyState } from './_components/empty-state';
 
 // ═══════════════════════════════════════════
@@ -58,11 +56,20 @@ export default function DashboardPage() {
     });
     const [activities, setActivities] = useState<ActivityItem[]>([]);
     const [expiringDocs, setExpiringDocs] = useState<ExpiringDocument[]>([]);
-    const [serviceBreakdown, setServiceBreakdown] = useState<ServiceBreakdown[]>([]);
-    const [statusBreakdown, setStatusBreakdown] = useState<StatusBreakdown[]>([]);
-    const [revenueData, setRevenueData] = useState<MonthlyRevenue[]>([]);
     const [expiryFilter, setExpiryFilter] = useState(15);
+    const [expiryOpen, setExpiryOpen] = useState(false);
+    const [expirySearch, setExpirySearch] = useState('');
+    const [expiryCategory, setExpiryCategory] = useState('all');
     const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!expiryOpen) return;
+        const previousOverflow = document.body.style.overflow;
+        const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setExpiryOpen(false); };
+        document.body.style.overflow = 'hidden';
+        document.addEventListener('keydown', closeOnEscape);
+        return () => { document.body.style.overflow = previousOverflow; document.removeEventListener('keydown', closeOnEscape); };
+    }, [expiryOpen]);
 
     useEffect(() => {
         async function loadData() {
@@ -73,9 +80,6 @@ export default function DashboardPage() {
                     dashboardApi.getRecentServices(8),
                 ]);
                 setStats(allStats.stats);
-                setServiceBreakdown(allStats.serviceBreakdown);
-                setStatusBreakdown(allStats.statusBreakdown);
-                setRevenueData(allStats.revenueByMonth);
 
                 const allActivity: ActivityItem[] = [
                     ...customersData.map((c: CustomerDashboardView) => ({
@@ -152,13 +156,10 @@ export default function DashboardPage() {
             </div>
 
             {/* ── Stats Grid ── */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 stagger-children">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 stagger-children">
                 {loading ? (
                     <>
-                        <StatCardSkeleton />
-                        <StatCardSkeleton />
-                        <StatCardSkeleton />
-                        <StatCardSkeleton />
+                        <StatCardSkeleton /><StatCardSkeleton /><StatCardSkeleton />
                     </>
                 ) : (
                     <>
@@ -179,12 +180,6 @@ export default function DashboardPage() {
                             value={stats.totalServices.toLocaleString('en-IN')}
                             icon={Wrench}
                             accentColor="bg-violet-50 text-violet-600"
-                        />
-                        <StatCard
-                            label="Revenue"
-                            value={`₹${stats.totalRevenue.toLocaleString('en-IN')}`}
-                            icon={IndianRupee}
-                            accentColor="bg-emerald-50 text-emerald-600"
                         />
                     </>
                 )}
@@ -241,8 +236,8 @@ export default function DashboardPage() {
                         <p className="text-sm text-slate-400">No documents expiring in the next {expiryFilter} days</p>
                     </div>
                 ) : (
-                    <div className="divide-y divide-slate-50">
-                        {expiringDocs.map((doc) => (
+                    <div className="max-h-[280px] overflow-y-auto divide-y divide-slate-50">
+                        {expiringDocs.slice(0, 5).map((doc) => (
                             <Link
                                 key={doc.s_id}
                                 href={`/dashboard/customers/${doc.customer_id}`}
@@ -270,41 +265,16 @@ export default function DashboardPage() {
                         ))}
                     </div>
                 )}
+                {expiringDocs.length > 5 && <button type="button" onClick={() => setExpiryOpen(true)} className="w-full border-t border-slate-100 px-6 py-3 text-left text-[12px] font-semibold text-amber-700 hover:bg-amber-50/40">View all expiring documents</button>}
             </div>
 
-            {/* ── Analytics Grid ── */}
-            <div className="grid md:grid-cols-3 gap-4">
-                {/* Revenue Trend */}
-                <div className="bg-white rounded-2xl border border-slate-100 p-6 md:col-span-1">
-                    <div className="flex items-center gap-2 mb-5">
-                        <TrendingUp className="h-4 w-4 text-amber-500" />
-                        <h3 className="text-[14px] font-semibold text-slate-900">Revenue Trend</h3>
-                    </div>
-                    {loading ? <CardSkeleton /> : (
-                        revenueData.length > 0
-                            ? <RevenueChart data={revenueData} />
-                            : <p className="text-sm text-slate-400 text-center py-6">No revenue data yet</p>
-                    )}
+            {expiryOpen && createPortal(<div className="fixed inset-0 z-[70] flex items-center justify-center overflow-y-auto bg-slate-950/30 p-4" role="presentation" onClick={() => setExpiryOpen(false)}>
+                <div role="dialog" aria-modal="true" aria-labelledby="expiry-dialog-title" className="flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={e => e.stopPropagation()}>
+                    <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4"><div><h2 id="expiry-dialog-title" className="text-[15px] font-semibold text-slate-900">Expiring documents</h2><p className="text-xs text-slate-400">{expiringDocs.length} records in this window</p></div><button type="button" aria-label="Close expiring documents" onClick={() => setExpiryOpen(false)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"><X className="h-4 w-4" /></button></div>
+                    <div className="flex gap-2 border-b border-slate-100 p-4"><div className="relative flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={expirySearch} onChange={e => setExpirySearch(e.target.value)} placeholder="Search customer or service" className="h-9 w-full rounded-lg border border-slate-200 pl-9 pr-3 text-sm outline-none focus:border-amber-400" /></div><select value={expiryCategory} onChange={e => setExpiryCategory(e.target.value)} className="h-9 rounded-lg border border-slate-200 px-2 text-xs text-slate-600"><option value="all">All types</option><option value="vehicle">Vehicle</option><option value="licence">Document</option></select></div>
+                    <div className="max-h-[424px] flex-none overflow-y-auto">{expiringDocs.filter(doc => (expiryCategory === 'all' || doc.category === expiryCategory) && `${doc.customer_name} ${doc.service_name}`.toLowerCase().includes(expirySearch.toLowerCase())).map(doc => <Link key={doc.s_id} href={`/dashboard/customers/${doc.customer_id}`} onClick={() => setExpiryOpen(false)} className="flex items-center gap-3 border-b border-slate-50 px-6 py-3 hover:bg-amber-50/30"><div className="min-w-0 flex-1"><p className="truncate text-[13px] font-semibold text-slate-900">{doc.customer_name}</p><p className="truncate text-xs text-slate-400">{doc.service_name}</p></div><UrgencyBadge days={doc.days_remaining} /></Link>)}{expiringDocs.filter(doc => (expiryCategory === 'all' || doc.category === expiryCategory) && `${doc.customer_name} ${doc.service_name}`.toLowerCase().includes(expirySearch.toLowerCase())).length === 0 && <p className="px-6 py-10 text-center text-sm text-slate-400">No matching documents.</p>}</div>
                 </div>
-
-                {/* Service Distribution */}
-                <div className="bg-white rounded-2xl border border-slate-100 p-6">
-                    <div className="flex items-center gap-2 mb-5">
-                        <Wrench className="h-4 w-4 text-amber-500" />
-                        <h3 className="text-[14px] font-semibold text-slate-900">Service Mix</h3>
-                    </div>
-                    {loading ? <CardSkeleton /> : <ServiceDonut data={serviceBreakdown} />}
-                </div>
-
-                {/* Status Overview */}
-                <div className="bg-white rounded-2xl border border-slate-100 p-6">
-                    <div className="flex items-center gap-2 mb-5">
-                        <Shield className="h-4 w-4 text-amber-500" />
-                        <h3 className="text-[14px] font-semibold text-slate-900">Status Overview</h3>
-                    </div>
-                    {loading ? <CardSkeleton /> : <StatusBars data={statusBreakdown} />}
-                </div>
-            </div>
+            </div>, document.body)}
 
             {/* ── Activity Feed ── */}
             <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">

@@ -1,21 +1,56 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { customerApi } from '@/lib/api';
 import type { CustomerDashboardView } from '@/lib/types';
-import { Users, Plus, Search, Eye, Wrench, Trash2, Loader2, Car } from 'lucide-react';
+import { Users, Plus, Search, Eye, Wrench, Trash2, Loader2, Car, ArrowUpDown } from 'lucide-react';
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+
+type SortKey = 'name' | 'newest' | 'oldest' | 'vehicles' | 'services' | 'revenue';
+type VehicleFilter = 'all' | 'with' | 'without';
+
+const FILTER_TRIGGER_CLASS = 'h-9 gap-1.5 rounded-lg border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 shadow-xs hover:border-amber-200 hover:bg-amber-50/50 hover:text-amber-900 focus-visible:border-amber-300 focus-visible:ring-amber-100 data-[state=open]:border-amber-300 data-[state=open]:ring-2 data-[state=open]:ring-amber-100 transition-colors';
+
+const SORT_OPTIONS: { value: SortKey; label: string }[] = [
+  { value: 'newest', label: 'Newest first' },
+  { value: 'oldest', label: 'Oldest first' },
+  { value: 'name', label: 'Name (A–Z)' },
+  { value: 'vehicles', label: 'Most vehicles' },
+  { value: 'services', label: 'Most services' },
+  { value: 'revenue', label: 'Highest revenue' },
+];
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<CustomerDashboardView[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<SortKey>('newest');
+  const [vehicleFilter, setVehicleFilter] = useState<VehicleFilter>('all');
+
+  const visibleCustomers = useMemo(() => {
+    let list = customers;
+    if (vehicleFilter === 'with') list = list.filter(c => c.vehicle_count > 0);
+    else if (vehicleFilter === 'without') list = list.filter(c => c.vehicle_count === 0);
+
+    const sorted = [...list];
+    switch (sortBy) {
+      case 'name': sorted.sort((a, b) => a.c_name.localeCompare(b.c_name)); break;
+      case 'oldest': sorted.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()); break;
+      case 'vehicles': sorted.sort((a, b) => b.vehicle_count - a.vehicle_count); break;
+      case 'services': sorted.sort((a, b) => b.service_count - a.service_count); break;
+      case 'revenue': sorted.sort((a, b) => b.total_revenue - a.total_revenue); break;
+      case 'newest':
+      default: sorted.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()); break;
+    }
+    return sorted;
+  }, [customers, sortBy, vehicleFilter]);
 
   useEffect(() => {
     let cancelled = false;
@@ -70,7 +105,11 @@ export default function CustomersPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 py-2">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Customers</h1>
-          <p className="text-slate-500 mt-1 font-medium">{customers.length} total customers</p>
+          <p className="text-slate-500 mt-1 font-medium">
+            {visibleCustomers.length === customers.length
+              ? `${customers.length} total customers`
+              : `${visibleCustomers.length} of ${customers.length} customers`}
+          </p>
         </div>
         <Link href="/dashboard/customers/new">
           <Button className="bg-gradient-to-r from-amber-400 to-amber-600 hover:from-amber-500 hover:to-amber-700 text-black rounded-xl h-10 px-5 font-medium shadow-sm border border-amber-600/20">
@@ -81,14 +120,41 @@ export default function CustomersPage() {
 
       <Card className="rounded-2xl shadow-sm border-slate-200 overflow-hidden">
         <CardHeader className="bg-white border-b border-slate-100 pb-4 pt-5 px-6">
-          <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 max-w-sm focus-within:ring-2 focus-within:ring-amber-100 focus-within:border-amber-300 transition-all">
-            <Search className="h-4 w-4 text-slate-400" />
-            <input
-              placeholder="Search by name, mobile, or registration ID..."
-              value={searchQuery}
-              onChange={e => handleSearch(e.target.value)}
-              className="bg-transparent border-none outline-none w-full text-sm text-slate-900 placeholder:text-slate-400"
-            />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 flex-1 min-w-0 sm:max-w-sm focus-within:ring-2 focus-within:ring-amber-100 focus-within:border-amber-300 transition-all">
+              <Search className="h-4 w-4 text-slate-400 shrink-0" />
+              <input
+                placeholder="Search by name, mobile, or registration ID..."
+                value={searchQuery}
+                onChange={e => handleSearch(e.target.value)}
+                className="bg-transparent border-none outline-none w-full text-sm text-slate-900 placeholder:text-slate-400"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Select value={sortBy} onValueChange={v => setSortBy(v as SortKey)}>
+                <SelectTrigger size="sm" aria-label="Sort customers" className={FILTER_TRIGGER_CLASS}>
+                  <ArrowUpDown className="h-3.5 w-3.5 text-slate-400" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl border-slate-200 shadow-lg">
+                  {SORT_OPTIONS.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value} className="rounded-lg text-xs focus:bg-amber-50 focus:text-amber-900">
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={vehicleFilter} onValueChange={v => setVehicleFilter(v as VehicleFilter)}>
+                <SelectTrigger size="sm" aria-label="Filter by vehicle ownership" className={FILTER_TRIGGER_CLASS}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl border-slate-200 shadow-lg">
+                  <SelectItem value="all" className="rounded-lg text-xs focus:bg-amber-50 focus:text-amber-900">All customers</SelectItem>
+                  <SelectItem value="with" className="rounded-lg text-xs focus:bg-amber-50 focus:text-amber-900">With vehicles</SelectItem>
+                  <SelectItem value="without" className="rounded-lg text-xs focus:bg-amber-50 focus:text-amber-900">Without vehicles</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -108,6 +174,14 @@ export default function CustomersPage() {
                 </Link>
               )}
             </div>
+          ) : visibleCustomers.length === 0 ? (
+            <div className="text-center py-20">
+              <div className="h-16 w-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                 <Car className="h-8 w-8 text-slate-300" />
+              </div>
+              <p className="text-slate-500 font-medium mb-4">No customers match this filter</p>
+              <Button variant="outline" className="rounded-xl font-medium" onClick={() => setVehicleFilter('all')}>Clear filter</Button>
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left whitespace-nowrap">
@@ -121,7 +195,7 @@ export default function CustomersPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {customers.map((c) => (
+                  {visibleCustomers.map((c) => (
                     <tr key={c.c_id} className="hover:bg-amber-50/30 transition-colors group">
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-3">
