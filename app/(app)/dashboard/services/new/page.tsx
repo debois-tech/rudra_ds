@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { customerApi, vehicleApi, serviceTypeApi, serviceApi } from '@/lib/api';
 import type {
   CustomerDashboardView, Vehicle, ServiceType,
@@ -23,7 +23,9 @@ const VEHICLE_TYPE_LICENCE: VehicleTypeLicence[] = [
 
 export default function NewServicePage() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const preselectedCustomerId = searchParams.get('customer');
+  const renewOf = searchParams.get('renewOf');
 
   // State
   const [step, setStep] = useState(1); // 1=customer, 2=category, 3=details
@@ -50,9 +52,10 @@ export default function NewServicePage() {
   const [totalCost, setTotalCost] = useState('');
   const [notes, setNotes] = useState('');
 
-  // Load preselected customer
+  // Load preselected customer (skip if this is a renewal — that effect below
+  // does its own fetch plus prefill, no need to double it up).
   useEffect(() => {
-    if (!preselectedCustomerId) return;
+    if (!preselectedCustomerId || renewOf) return;
     const controller = new AbortController();
     customerApi.getByIdWithStats(preselectedCustomerId).then(c => {
       if (!controller.signal.aborted && c) {
@@ -61,7 +64,56 @@ export default function NewServicePage() {
       }
     }).catch(() => {});
     return () => controller.abort();
-  }, [preselectedCustomerId]);
+  }, [preselectedCustomerId, renewOf]);
+
+  // Renewal: prefill everything from buildRenewUrl()'s query params and
+  // jump straight to the details step — category/service type are already
+  // known from the service being renewed.
+  useEffect(() => {
+    if (!renewOf || !preselectedCustomerId) return;
+    const cat = searchParams.get('category') as 'vehicle' | 'licence' | null;
+    if (!cat) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const customer = await customerApi.getByIdWithStats(preselectedCustomerId);
+        if (cancelled || !customer) return;
+        setSelectedCustomer(customer);
+        setCategory(cat);
+
+        const types = await serviceTypeApi.getByCategory(cat);
+        if (cancelled) return;
+        setServiceTypes(types);
+
+        const stId = searchParams.get('serviceTypeId');
+        if (stId) setServiceTypeId(Number(stId));
+
+        if (cat === 'vehicle') {
+          const vehs = await vehicleApi.getByOwner(customer.c_id);
+          if (cancelled) return;
+          setCustomerVehicles(vehs);
+          setVehicleId(searchParams.get('vehicleId') || '');
+          setVehicleNumber(searchParams.get('vehicleNumber') || '');
+          setVehicleType(searchParams.get('vehicleType') || '');
+        } else {
+          setVehicleClass((searchParams.get('vehicleClass') as VehicleClass) || 'NT');
+          setVehicleTypeLicence((searchParams.get('vehicleTypeLicence') as VehicleTypeLicence) || 'LMV');
+          setMdlNumber(searchParams.get('mdlNumber') || '');
+        }
+
+        setIssueDate(searchParams.get('issueDate') || new Date().toISOString().split('T')[0]);
+        setExpiryDate(searchParams.get('expiryDate') || '');
+        setTotalCost(searchParams.get('cost') || '');
+        setStep(3);
+      } catch (error) {
+        if (!cancelled) {
+          console.error(error);
+          toast.error('Failed to prefill renewal — fill the form manually.');
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [renewOf, preselectedCustomerId, searchParams]);
 
   // Search customers with debounce and abort cleanup
   const handleSearch = useCallback(async (query: string) => {
@@ -185,7 +237,19 @@ export default function NewServicePage() {
           notes: notes || undefined,
         });
       }
-      toast.success('Service created successfully!');
+
+      // Renewal supersedes the old record — mark it completed if it was
+      // 'active' or 'expired' (a late renewal), so it drops off the
+      // "Expired" / active-status views. 'cancelled' stays as-is —
+      // that's an explicit void, not a lapse, and renewing doesn't undo it.
+      const oldStatus = searchParams.get('oldStatus');
+      if (renewOf && (oldStatus === 'active' || oldStatus === 'expired')) {
+        try { await serviceApi.updateStatus(renewOf, 'completed'); }
+        catch (error) { console.warn('Could not update renewed service status:', error); }
+      }
+
+      toast.success(renewOf ? 'Service renewed successfully!' : 'Service created successfully!');
+      if (renewOf) router.replace('/dashboard/services/new');
       resetForm();
     } catch (error: unknown) {
       logClientError(category === 'vehicle' ? 'create-vehicle-service' : 'create-document-service', error, { customerId: selectedCustomer?.c_id, serviceTypeId, form: category });

@@ -9,9 +9,12 @@ import type {
 } from '@/lib/types';
 import {
     Users, Car, Wrench, Plus, ArrowUpRight, Shield,
-    AlertTriangle, FileText, Search, X,
+    AlertTriangle, FileText, ArrowUpDown, RefreshCw, Search, X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { FILTER_TRIGGER_CLASS, FILTER_ITEM_CLASS } from '@/lib/ui-constants';
+import { buildRenewUrl } from '@/lib/api';
 import Link from 'next/link';
 import { formatDistanceToNow, format } from 'date-fns';
 import { createPortal } from 'react-dom';
@@ -19,6 +22,8 @@ import { createPortal } from 'react-dom';
 import { StatCard, StatCardSkeleton } from './_components/stat-card';
 import { StatusBadge, UrgencyBadge } from './_components/badges';
 import { EmptyState } from './_components/empty-state';
+
+type ExpiryMode = number | 'expired';
 
 // ═══════════════════════════════════════════
 // Types
@@ -56,7 +61,9 @@ export default function DashboardPage() {
     });
     const [activities, setActivities] = useState<ActivityItem[]>([]);
     const [expiringDocs, setExpiringDocs] = useState<ExpiringDocument[]>([]);
-    const [expiryFilter, setExpiryFilter] = useState(15);
+    const [expiryMode, setExpiryMode] = useState<ExpiryMode>(30);
+    const [showCustomDays, setShowCustomDays] = useState(false);
+    const [customDaysInput, setCustomDaysInput] = useState('');
     const [expiryOpen, setExpiryOpen] = useState(false);
     const [expirySearch, setExpirySearch] = useState('');
     const [expiryCategory, setExpiryCategory] = useState('all');
@@ -114,12 +121,12 @@ export default function DashboardPage() {
     // Charts and expiry alerts must not block the first screen paint.
     useEffect(() => {
         let cancelled = false;
-        dashboardApi.getExpiringDocuments(expiryFilter).then(docs => {
+        dashboardApi.getExpiringDocuments(expiryMode).then(docs => {
             if (cancelled) return;
             setExpiringDocs(docs);
         }).catch(error => console.error('Dashboard secondary data error:', error));
         return () => { cancelled = true; };
-    }, [expiryFilter]);
+    }, [expiryMode]);
 
     return (
         <div className="space-y-8 animate-fade-in max-w-7xl mx-auto">
@@ -196,20 +203,49 @@ export default function DashboardPage() {
                             <h2 className="text-[15px] font-semibold text-slate-900">Documents Expiring Soon</h2>
                         </div>
                     </div>
-                    <div className="flex items-center gap-1.5 bg-slate-100 rounded-lg p-0.5">
-                        {[7, 15, 30].map(d => (
-                            <button
-                                key={d}
-                                onClick={() => setExpiryFilter(d)}
-                                className={`px-3 py-1.5 rounded-md text-[12px] font-semibold transition-all cursor-pointer ${
-                                    expiryFilter === d
-                                        ? 'bg-amber-400 text-black shadow-sm'
-                                        : 'text-slate-500 hover:text-slate-700'
-                                }`}
+                    <div className="flex items-center gap-2">
+                        <Select
+                            value={expiryMode === 'expired' ? 'expired' : (expiryMode === 7 || expiryMode === 30 ? String(expiryMode) : 'custom')}
+                            onValueChange={(v) => {
+                                if (v === 'custom') { setShowCustomDays(true); return; }
+                                setShowCustomDays(false);
+                                setExpiryMode(v === 'expired' ? 'expired' : Number(v));
+                            }}
+                        >
+                            <SelectTrigger size="sm" aria-label="Expiry window" className={FILTER_TRIGGER_CLASS}>
+                                <ArrowUpDown className="h-3.5 w-3.5 text-slate-400" />
+                                <SelectValue>{expiryMode === 'expired' ? 'Expired' : `${expiryMode} days`}</SelectValue>
+                            </SelectTrigger>
+                            <SelectContent className="rounded-xl border-slate-200 shadow-lg">
+                                <SelectItem value="7" className={FILTER_ITEM_CLASS}>7 days</SelectItem>
+                                <SelectItem value="30" className={FILTER_ITEM_CLASS}>30 days</SelectItem>
+                                <SelectItem value="custom" className={FILTER_ITEM_CLASS}>Custom…</SelectItem>
+                                <SelectItem value="expired" className={FILTER_ITEM_CLASS}>Expired</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        {showCustomDays && (
+                            <form
+                                className="flex items-center gap-1.5"
+                                onSubmit={e => {
+                                    e.preventDefault();
+                                    const n = parseInt(customDaysInput, 10);
+                                    if (n > 0) { setExpiryMode(n); setShowCustomDays(false); setCustomDaysInput(''); }
+                                }}
                             >
-                                {d} days
-                            </button>
-                        ))}
+                                <input
+                                    type="number"
+                                    min={1}
+                                    autoFocus
+                                    value={customDaysInput}
+                                    onChange={e => setCustomDaysInput(e.target.value)}
+                                    placeholder="Days"
+                                    className="h-9 w-20 rounded-lg border border-amber-300 bg-white px-2 text-xs font-medium outline-none focus:ring-2 focus:ring-amber-100"
+                                />
+                                <Button type="submit" size="sm" className="h-9 rounded-lg bg-amber-400 px-3 text-xs font-semibold text-black hover:bg-amber-500">
+                                    Set
+                                </Button>
+                            </form>
+                        )}
                     </div>
                 </div>
 
@@ -233,35 +269,45 @@ export default function DashboardPage() {
                             <Shield className="h-5 w-5 text-emerald-500" />
                         </div>
                         <h3 className="text-[14px] font-semibold text-slate-900 mb-1">All clear!</h3>
-                        <p className="text-sm text-slate-400">No documents expiring in the next {expiryFilter} days</p>
+                        <p className="text-sm text-slate-400">
+                            {expiryMode === 'expired' ? 'No overdue documents' : `No documents expiring in the next ${expiryMode} days`}
+                        </p>
                     </div>
                 ) : (
                     <div className="max-h-[280px] overflow-y-auto divide-y divide-slate-50">
-                        {expiringDocs.slice(0, 5).map((doc) => (
-                            <Link
+                        {expiringDocs.map((doc) => (
+                            <div
                                 key={doc.s_id}
-                                href={`/dashboard/customers/${doc.customer_id}`}
                                 className="flex items-center gap-3.5 px-6 py-3 hover:bg-amber-50/30 transition-colors group"
                             >
-                                <div className={`h-9 w-9 rounded-full flex items-center justify-center shrink-0 ${
-                                    doc.category === 'vehicle' ? 'bg-amber-50 text-amber-600' : 'bg-violet-50 text-violet-600'
-                                }`}>
-                                    {doc.category === 'vehicle' ? <Car className="h-3.5 w-3.5" /> : <FileText className="h-3.5 w-3.5" />}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-[13px] font-semibold text-slate-900 truncate">{doc.customer_name}</p>
-                                    <p className="text-[12px] text-slate-400 truncate">
-                                        {doc.service_name}{doc.vehicle_number ? ` · ${doc.vehicle_number}` : ''}
-                                    </p>
-                                </div>
+                                <Link href={`/dashboard/customers/${doc.customer_id}`} className="flex flex-1 min-w-0 items-center gap-3.5">
+                                    <div className={`h-9 w-9 rounded-full flex items-center justify-center shrink-0 ${
+                                        doc.category === 'vehicle' ? 'bg-amber-50 text-amber-600' : 'bg-violet-50 text-violet-600'
+                                    }`}>
+                                        {doc.category === 'vehicle' ? <Car className="h-3.5 w-3.5" /> : <FileText className="h-3.5 w-3.5" />}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-[13px] font-semibold text-slate-900 truncate">{doc.customer_name}</p>
+                                        <p className="text-[12px] text-slate-400 truncate">
+                                            {doc.service_name}{doc.vehicle_number ? ` · ${doc.vehicle_number}` : ''}
+                                        </p>
+                                    </div>
+                                </Link>
                                 <div className="flex items-center gap-3 shrink-0">
                                     <span className="text-[11px] text-slate-400 font-medium hidden sm:block">
                                         {format(new Date(doc.expiry_date), 'dd MMM yyyy')}
                                     </span>
                                     <UrgencyBadge days={doc.days_remaining} />
+                                    <Link
+                                        href={buildRenewUrl(doc)}
+                                        title="Renew this service"
+                                        className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700"
+                                    >
+                                        <RefreshCw className="h-3.5 w-3.5" />
+                                    </Link>
                                     <ArrowUpRight className="h-3.5 w-3.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
                                 </div>
-                            </Link>
+                            </div>
                         ))}
                     </div>
                 )}
@@ -272,7 +318,7 @@ export default function DashboardPage() {
                 <div role="dialog" aria-modal="true" aria-labelledby="expiry-dialog-title" className="flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4"><div><h2 id="expiry-dialog-title" className="text-[15px] font-semibold text-slate-900">Expiring documents</h2><p className="text-xs text-slate-400">{expiringDocs.length} records in this window</p></div><button type="button" aria-label="Close expiring documents" onClick={() => setExpiryOpen(false)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"><X className="h-4 w-4" /></button></div>
                     <div className="flex gap-2 border-b border-slate-100 p-4"><div className="relative flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={expirySearch} onChange={e => setExpirySearch(e.target.value)} placeholder="Search customer or service" className="h-9 w-full rounded-lg border border-slate-200 pl-9 pr-3 text-sm outline-none focus:border-amber-400" /></div><select value={expiryCategory} onChange={e => setExpiryCategory(e.target.value)} className="h-9 rounded-lg border border-slate-200 px-2 text-xs text-slate-600"><option value="all">All types</option><option value="vehicle">Vehicle</option><option value="licence">Document</option></select></div>
-                    <div className="max-h-[424px] flex-none overflow-y-auto">{expiringDocs.filter(doc => (expiryCategory === 'all' || doc.category === expiryCategory) && `${doc.customer_name} ${doc.service_name}`.toLowerCase().includes(expirySearch.toLowerCase())).map(doc => <Link key={doc.s_id} href={`/dashboard/customers/${doc.customer_id}`} onClick={() => setExpiryOpen(false)} className="flex items-center gap-3 border-b border-slate-50 px-6 py-3 hover:bg-amber-50/30"><div className="min-w-0 flex-1"><p className="truncate text-[13px] font-semibold text-slate-900">{doc.customer_name}</p><p className="truncate text-xs text-slate-400">{doc.service_name}</p></div><UrgencyBadge days={doc.days_remaining} /></Link>)}{expiringDocs.filter(doc => (expiryCategory === 'all' || doc.category === expiryCategory) && `${doc.customer_name} ${doc.service_name}`.toLowerCase().includes(expirySearch.toLowerCase())).length === 0 && <p className="px-6 py-10 text-center text-sm text-slate-400">No matching documents.</p>}</div>
+                    <div className="max-h-[424px] flex-none overflow-y-auto">{expiringDocs.filter(doc => (expiryCategory === 'all' || doc.category === expiryCategory) && `${doc.customer_name} ${doc.service_name}`.toLowerCase().includes(expirySearch.toLowerCase())).map(doc => <div key={doc.s_id} className="flex items-center gap-3 border-b border-slate-50 px-6 py-3 hover:bg-amber-50/30"><Link href={`/dashboard/customers/${doc.customer_id}`} onClick={() => setExpiryOpen(false)} className="min-w-0 flex-1"><p className="truncate text-[13px] font-semibold text-slate-900">{doc.customer_name}</p><p className="truncate text-xs text-slate-400">{doc.service_name}</p></Link><UrgencyBadge days={doc.days_remaining} /><Link href={buildRenewUrl(doc)} title="Renew this service" onClick={() => setExpiryOpen(false)} className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700 shrink-0"><RefreshCw className="h-3.5 w-3.5" /></Link></div>)}{expiringDocs.filter(doc => (expiryCategory === 'all' || doc.category === expiryCategory) && `${doc.customer_name} ${doc.service_name}`.toLowerCase().includes(expirySearch.toLowerCase())).length === 0 && <p className="px-6 py-10 text-center text-sm text-slate-400">No matching documents.</p>}</div>
                 </div>
             </div>, document.body)}
 

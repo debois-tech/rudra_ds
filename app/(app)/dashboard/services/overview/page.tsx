@@ -2,19 +2,18 @@
 
 import { useEffect, useMemo, useState, useContext } from 'react';
 import { DashboardOrgContext } from '../../../app-shell';
-import { serviceApi } from '@/lib/api';
+import { serviceApi, buildRenewUrl } from '@/lib/api';
 import type { ServiceOverview } from '@/lib/types';
-import { FileText, Download, Search, Wrench, Car, ArrowUpDown } from 'lucide-react';
+import { FileText, Download, Search, Wrench, Car, ArrowUpDown, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { StatusBadge } from '../../overview/_components/badges';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { FILTER_TRIGGER_CLASS, FILTER_ITEM_CLASS } from '@/lib/ui-constants';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { generateInvoice } from '@/lib/invoice';
-
-const FILTER_TRIGGER_CLASS = 'h-9 gap-1.5 rounded-lg border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 shadow-xs hover:border-amber-200 hover:bg-amber-50/50 hover:text-amber-900 focus-visible:border-amber-300 focus-visible:ring-amber-100 data-[state=open]:border-amber-300 data-[state=open]:ring-2 data-[state=open]:ring-amber-100 transition-colors';
-const FILTER_ITEM_CLASS = 'rounded-lg text-xs focus:bg-amber-50 focus:text-amber-900';
 
 type SortKey = 'newest' | 'oldest' | 'amount-high' | 'amount-low' | 'customer';
 type CategoryFilter = 'all' | 'vehicle' | 'licence';
@@ -191,7 +190,6 @@ export default function ServiceOverviewPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              {/* Issue 4 Fix: Removed "Status" column — not necessary for end users */}
               <table className="w-full text-sm text-left whitespace-nowrap">
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50/50">
@@ -199,8 +197,9 @@ export default function ServiceOverviewPage() {
                     <th className="py-4 px-6 font-semibold text-slate-500 text-xs uppercase tracking-wider">Service Details</th>
                     <th className="py-4 px-6 font-semibold text-slate-500 text-xs uppercase tracking-wider hidden md:table-cell">Vehicle / Licence ID</th>
                     <th className="py-4 px-6 font-semibold text-slate-500 text-xs uppercase tracking-wider hidden lg:table-cell">Dates</th>
+                    <th className="py-4 px-6 font-semibold text-slate-500 text-xs uppercase tracking-wider">Status</th>
                     <th className="py-4 px-6 font-semibold text-slate-500 text-xs uppercase tracking-wider text-right">Amount</th>
-                    <th className="py-4 px-6 font-semibold text-slate-500 text-xs uppercase tracking-wider text-right">Invoice</th>
+                    <th className="py-4 px-6 font-semibold text-slate-500 text-xs uppercase tracking-wider text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -229,20 +228,32 @@ export default function ServiceOverviewPage() {
                         <p className="text-sm font-medium text-slate-700">{format(new Date(s.issue_date), 'dd MMM yy')}</p>
                         <p className="text-xs text-slate-500">Exp: {s.expiry_date ? format(new Date(s.expiry_date), 'dd MMM yy') : '—'}</p>
                       </td>
+                      <td className="py-4 px-6">
+                        <StatusBadge status={s.status} />
+                      </td>
                       <td className="py-4 px-6 text-right font-semibold text-slate-900 text-base">
                         ₹{Number(s.total_cost).toLocaleString()}
                       </td>
-                      {/* Issue 7 Fix: Always visible download button — removed hover-reveal opacity */}
+                      {/* Issue 7 Fix: Always visible action buttons — no hover-reveal opacity */}
                       <td className="py-4 px-6 text-right">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 w-8 p-0 border-slate-200 text-slate-600 hover:text-amber-700 hover:border-amber-200 hover:bg-amber-50 rounded-lg"
-                          onClick={() => handleInvoice(s)}
-                          title="Download Invoice"
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center justify-end gap-2">
+                          <Link
+                            href={buildRenewUrl(s)}
+                            title="Renew this service"
+                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition-colors hover:border-amber-200 hover:bg-amber-50 hover:text-amber-700"
+                          >
+                            <RefreshCw className="h-4 w-4" />
+                          </Link>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 w-8 p-0 border-slate-200 text-slate-600 hover:text-amber-700 hover:border-amber-200 hover:bg-amber-50 rounded-lg"
+                            onClick={() => handleInvoice(s)}
+                            title="Download Invoice"
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}

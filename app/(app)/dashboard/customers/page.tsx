@@ -8,14 +8,13 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { FILTER_TRIGGER_CLASS, FILTER_ITEM_CLASS } from '@/lib/ui-constants';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
 type SortKey = 'name' | 'newest' | 'oldest' | 'vehicles' | 'services' | 'revenue';
 type VehicleFilter = 'all' | 'with' | 'without';
-
-const FILTER_TRIGGER_CLASS = 'h-9 gap-1.5 rounded-lg border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 shadow-xs hover:border-amber-200 hover:bg-amber-50/50 hover:text-amber-900 focus-visible:border-amber-300 focus-visible:ring-amber-100 data-[state=open]:border-amber-300 data-[state=open]:ring-2 data-[state=open]:ring-amber-100 transition-colors';
 
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: 'newest', label: 'Newest first' },
@@ -138,7 +137,7 @@ export default function CustomersPage() {
                 </SelectTrigger>
                 <SelectContent className="rounded-xl border-slate-200 shadow-lg">
                   {SORT_OPTIONS.map(opt => (
-                    <SelectItem key={opt.value} value={opt.value} className="rounded-lg text-xs focus:bg-amber-50 focus:text-amber-900">
+                    <SelectItem key={opt.value} value={opt.value} className={FILTER_ITEM_CLASS}>
                       {opt.label}
                     </SelectItem>
                   ))}
@@ -149,9 +148,9 @@ export default function CustomersPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl border-slate-200 shadow-lg">
-                  <SelectItem value="all" className="rounded-lg text-xs focus:bg-amber-50 focus:text-amber-900">All customers</SelectItem>
-                  <SelectItem value="with" className="rounded-lg text-xs focus:bg-amber-50 focus:text-amber-900">With vehicles</SelectItem>
-                  <SelectItem value="without" className="rounded-lg text-xs focus:bg-amber-50 focus:text-amber-900">Without vehicles</SelectItem>
+                  <SelectItem value="all" className={FILTER_ITEM_CLASS}>All customers</SelectItem>
+                  <SelectItem value="with" className={FILTER_ITEM_CLASS}>With vehicles</SelectItem>
+                  <SelectItem value="without" className={FILTER_ITEM_CLASS}>Without vehicles</SelectItem>
                 </SelectContent>
               </Select>
             </div>

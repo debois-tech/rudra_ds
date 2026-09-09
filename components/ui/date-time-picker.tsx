@@ -30,7 +30,9 @@ export function DateTimePicker({ value = '', onChange, mode = 'date', required, 
   const selected = value && mode === 'date' ? parse(value, 'yyyy-MM-dd', new Date()) : new Date()
   const days = Array.from({ length: 42 }, (_, index) => addDays(startOfMonth(month), index - getDay(startOfMonth(month))))
   const currentYear = new Date().getFullYear()
-  const years = [currentYear, ...Array.from({ length: 10 }, (_, index) => currentYear + index + 1), ...Array.from({ length: 60 }, (_, index) => currentYear - index - 1)]
+  const yearRangeStart = 1950
+  const yearRangeEnd = currentYear + 10
+  const years = Array.from({ length: yearRangeEnd - yearRangeStart + 1 }, (_, index) => yearRangeStart + index)
   const hours = Array.from({ length: 24 }, (_, index) => index)
   const minutes = Array.from({ length: 60 }, (_, index) => index)
 
@@ -55,7 +57,10 @@ export function DateTimePicker({ value = '', onChange, mode = 'date', required, 
   }, [open])
 
   useEffect(() => {
-    if (view === 'years') currentYearRef.current?.focus()
+    if (view === 'years') {
+      currentYearRef.current?.scrollIntoView({ block: 'center' })
+      currentYearRef.current?.focus({ preventScroll: true })
+    }
   }, [view])
 
   useEffect(() => {
