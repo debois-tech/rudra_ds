@@ -14,6 +14,7 @@ import type {
     InlineVehicleData,
     ServiceType,
     Service,
+    ServiceCategory,
     ServiceStatus,
     ServiceOverview,
     VehicleServiceFormData,
@@ -23,6 +24,8 @@ import type {
     ServiceBreakdown,
     MonthlyRevenue,
     StatusBreakdown,
+    VehicleClass,
+    VehicleTypeLicence,
 } from './types';
 
 function getClient() {
@@ -408,30 +411,38 @@ export const dashboardApi = {
      * Get services with expiry dates within the next N days.
      * RLS scopes this to the logged-in user's org automatically.
      */
-    async getExpiringDocuments(daysThreshold: number = 15): Promise<ExpiringDocument[]> {
+    /**
+     * `filter` is either "next N days" (upcoming, still active) or 'expired'
+     * (already past expiry, regardless of stored status — bulk-imported
+     * historical rows often still say 'active' even though they've lapsed).
+     */
+    async getExpiringDocuments(filter: number | 'expired' = 30): Promise<ExpiringDocument[]> {
         const supabase = getClient();
         const today = new Date();
-        const futureDate = new Date();
-        futureDate.setDate(today.getDate() + daysThreshold);
         const todayStr = today.toISOString().split('T')[0];
-        const futureStr = futureDate.toISOString().split('T')[0];
 
-        const { data, error } = await supabase
+        let query = supabase
             .from('v_services_overview')
-            .select('s_id, customer_id, customer_name, service_name, category, expiry_date, vehicle_number')
-            .not('expiry_date', 'is', null)
-            .gte('expiry_date', todayStr)
-            .lte('expiry_date', futureStr)
-            .eq('status', 'active')
-            .order('expiry_date', { ascending: true });
+            .select('s_id, customer_id, customer_name, service_name, category, expiry_date, vehicle_number, service_type_id, issue_date, total_cost, status, vehicle_id, vehicle_type, vehicle_class, vehicle_type_licence, mdl_number')
+            .not('expiry_date', 'is', null);
 
+        if (filter === 'expired') {
+            // Not status = 'active' only — some bulk-imported rows never got
+            // relabeled 'expired' even though the date has passed. But do
+            // exclude 'completed'/'cancelled' — those are resolved (e.g. a
+            // renewal already superseded them) and shouldn't linger here.
+            query = query.lt('expiry_date', todayStr).in('status', ['active', 'expired']).order('expiry_date', { ascending: false });
+        } else {
+            const futureDate = new Date();
+            futureDate.setDate(today.getDate() + filter);
+            const futureStr = futureDate.toISOString().split('T')[0];
+            query = query.gte('expiry_date', todayStr).lte('expiry_date', futureStr).eq('status', 'active').order('expiry_date', { ascending: true });
+        }
+
+        const { data, error } = await query;
         if (error) throw error;
 
-        return (data || []).map((row: {
-            s_id: string; customer_id: string; customer_name: string;
-            service_name: string; category: 'vehicle' | 'licence';
-            expiry_date: string; vehicle_number: string | null;
-        }) => {
+        return (data || []).map((row: Omit<ExpiringDocument, 'days_remaining'>) => {
             const expiry = new Date(row.expiry_date);
             const diffMs = expiry.getTime() - today.getTime();
             const daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
@@ -439,3 +450,55 @@ export const dashboardApi = {
         });
     },
 };
+
+// =============================================
+// RENEW — build a prefilled "New Service" link from any existing
+// service-shaped row (ServiceOverview or ExpiringDocument both qualify).
+// =============================================
+
+export interface RenewableService {
+    s_id: string;
+    customer_id: string;
+    category: ServiceCategory;
+    service_type_id: number;
+    issue_date: string;
+    expiry_date: string | null;
+    total_cost: number;
+    status: ServiceStatus;
+    vehicle_id?: string | null;
+    vehicle_number?: string | null;
+    vehicle_type?: string | null;
+    vehicle_class?: VehicleClass | null;
+    vehicle_type_licence?: VehicleTypeLicence | null;
+    mdl_number?: string | null;
+}
+
+export function buildRenewUrl(s: RenewableService): string {
+    const todayStr = new Date().toISOString().split('T')[0];
+    let newExpiry = '';
+    if (s.expiry_date) {
+        const durationMs = Math.max(new Date(s.expiry_date).getTime() - new Date(s.issue_date).getTime(), 0);
+        newExpiry = new Date(Date.now() + durationMs).toISOString().split('T')[0];
+    }
+
+    const params = new URLSearchParams({
+        customer: s.customer_id,
+        category: s.category,
+        serviceTypeId: String(s.service_type_id),
+        issueDate: todayStr,
+        expiryDate: newExpiry,
+        cost: String(s.total_cost),
+        renewOf: s.s_id,
+        oldStatus: s.status,
+    });
+    if (s.category === 'vehicle') {
+        if (s.vehicle_id) params.set('vehicleId', s.vehicle_id);
+        if (s.vehicle_number) params.set('vehicleNumber', s.vehicle_number);
+        if (s.vehicle_type) params.set('vehicleType', s.vehicle_type);
+    } else {
+        if (s.vehicle_class) params.set('vehicleClass', s.vehicle_class);
+        if (s.vehicle_type_licence) params.set('vehicleTypeLicence', s.vehicle_type_licence);
+        if (s.mdl_number) params.set('mdlNumber', s.mdl_number);
+    }
+    return `/dashboard/services/new?${params.toString()}`;
+}

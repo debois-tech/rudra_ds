@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { customerApi, vehicleApi, serviceApi } from '@/lib/api';
+import { customerApi, vehicleApi, serviceApi, buildRenewUrl } from '@/lib/api';
 import type { Customer, Vehicle, ServiceOverview } from '@/lib/types';
-import { ArrowLeft, Edit2, Car, Wrench, Trash2, Loader2, Save, X, Plus, User, Phone, Mail, MapPin, Calendar, Clock } from 'lucide-react';
+import { ArrowLeft, Edit2, Car, Wrench, Trash2, Loader2, Save, X, Plus, User, Phone, Mail, MapPin, Calendar, Clock, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatusBadge } from '../../overview/_components/badges';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -245,7 +246,9 @@ export default function CustomerDetailPage() {
                       <tr className="border-b border-slate-100 bg-slate-50/50">
                         <th className="py-3 px-4 font-semibold text-slate-500 text-[11px] uppercase tracking-wider">Service</th>
                         <th className="py-3 px-4 font-semibold text-slate-500 text-[11px] uppercase tracking-wider hidden sm:table-cell">Dates (Iss - Exp)</th>
+                        <th className="py-3 px-4 font-semibold text-slate-500 text-[11px] uppercase tracking-wider">Status</th>
                         <th className="py-3 px-4 font-semibold text-slate-500 text-[11px] uppercase tracking-wider text-right">Cost</th>
+                        <th className="py-3 px-4 font-semibold text-slate-500 text-[11px] uppercase tracking-wider text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 bg-white">
@@ -263,7 +266,19 @@ export default function CustomerDetailPage() {
                             <p className="text-xs font-semibold text-slate-700">{format(new Date(s.issue_date), 'dd MMM yyyy')}</p>
                             <p className="text-xs text-slate-500">{s.expiry_date ? format(new Date(s.expiry_date), 'dd MMM yyyy') : 'No Expiry'}</p>
                           </td>
+                          <td className="py-3 px-4">
+                            <StatusBadge status={s.status} />
+                          </td>
                           <td className="py-3 px-4 text-right font-bold text-slate-900">₹{Number(s.total_cost).toLocaleString()}</td>
+                          <td className="py-3 px-4 text-right">
+                            <Link
+                              href={buildRenewUrl(s)}
+                              title="Renew this service"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition-colors hover:border-amber-200 hover:bg-amber-50 hover:text-amber-700"
+                            >
+                              <RefreshCw className="h-4 w-4" />
+                            </Link>
+                          </td>
                         </tr>
                       ))}
                     </tbody>

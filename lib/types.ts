@@ -215,6 +215,17 @@ export interface ExpiringDocument {
   expiry_date: string;
   days_remaining: number;
   vehicle_number: string | null;
+  // Carried through so a "Renew" action can prefill the new-service form
+  // without a second fetch — see buildRenewUrl() in lib/api.ts.
+  service_type_id: number;
+  issue_date: string;
+  total_cost: number;
+  status: ServiceStatus;
+  vehicle_id: string | null;
+  vehicle_type: string | null;
+  vehicle_class: VehicleClass | null;
+  vehicle_type_licence: VehicleTypeLicence | null;
+  mdl_number: string | null;
 }
 
 export interface ServiceBreakdown {

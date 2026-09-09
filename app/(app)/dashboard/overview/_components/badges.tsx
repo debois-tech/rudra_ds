@@ -14,6 +14,13 @@ export function StatusBadge({ status }: { status: string }) {
 }
 
 export function UrgencyBadge({ days }: { days: number }) {
+    if (days < 0) {
+        return (
+            <span className="inline-flex items-center gap-1 rounded-md border border-red-600 bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-700">
+                {Math.abs(days)}d overdue
+            </span>
+        );
+    }
     return (
         <span className={`inline-flex items-center gap-1 rounded-md border bg-white px-2 py-0.5 text-[11px] font-bold ${days < 7 ? 'border-red-500 text-red-600' : 'border-slate-300 text-black'}`}>
             {days}d left
