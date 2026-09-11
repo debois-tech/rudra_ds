@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { addDays, addMonths, format, getDay, getYear, isSameDay, parse, setMonth as setDateMonth, setYear as setDateYear, startOfMonth } from 'date-fns'
+import { autoFormatDateInput, formatManualDate, parseManualDate } from '@/lib/date-format'
 import { CalendarDays, ChevronLeft, ChevronRight, Clock3 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -21,6 +22,7 @@ export function DateTimePicker({ value = '', onChange, mode = 'date', required, 
   const [open, setOpen] = useState(false)
   const [view, setView] = useState<'days' | 'months' | 'years'>('days')
   const buttonRef = useRef<HTMLButtonElement>(null)
+  const dateFieldRef = useRef<HTMLDivElement>(null)
   const rootRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const currentYearRef = useRef<HTMLButtonElement>(null)
@@ -40,11 +42,36 @@ export function DateTimePicker({ value = '', onChange, mode = 'date', required, 
     ? value ? format(parse(value, 'HH:mm', new Date()), 'h:mm a') : 'Select time'
     : value ? format(selected, 'dd MMM yyyy') : 'Select date'
 
+  const [manualText, setManualText] = useState(() => value && mode === 'date' ? formatManualDate(selected) : '')
+
+  // Re-sync typed text when `value` changes from outside (calendar pick, or
+  // a parent prefilling the field) — adjusted during render, React's own
+  // recommended pattern for "reset state when a prop changes" without an
+  // effect (bails out before committing the stale render).
+  const [lastSyncedValue, setLastSyncedValue] = useState(value)
+  if (mode === 'date' && value !== lastSyncedValue) {
+    setLastSyncedValue(value)
+    setManualText(value ? formatManualDate(parse(value, 'yyyy-MM-dd', new Date())) : '')
+  }
+
+  function commitManualText() {
+    const text = manualText.trim()
+    if (!text) { onChange(''); return }
+    const parsed = parseManualDate(text)
+    if (parsed) {
+      onChange(format(parsed, 'yyyy-MM-dd'))
+      setMonth(startOfMonth(parsed))
+    } else {
+      setManualText(value ? formatManualDate(parse(value, 'yyyy-MM-dd', new Date())) : '')
+    }
+  }
+
   useEffect(() => {
-    if (!open || !buttonRef.current) return
-    setPortalTarget((buttonRef.current.closest('[data-slot="sheet-content"]') as HTMLElement | null) || document.body)
+    const anchor = mode === 'date' ? dateFieldRef.current : buttonRef.current
+    if (!open || !anchor) return
+    setPortalTarget((anchor.closest('[data-slot="sheet-content"]') as HTMLElement | null) || document.body)
     const updatePosition = () => {
-      const rect = buttonRef.current!.getBoundingClientRect()
+      const rect = anchor.getBoundingClientRect()
       setPosition({ left: rect.left, top: rect.bottom + 8, width: rect.width })
     }
     updatePosition()
@@ -54,7 +81,7 @@ export function DateTimePicker({ value = '', onChange, mode = 'date', required, 
       window.removeEventListener('resize', updatePosition)
       window.removeEventListener('scroll', updatePosition, true)
     }
-  }, [open])
+  }, [open, mode])
 
   useEffect(() => {
     if (view === 'years') {
@@ -87,11 +114,27 @@ export function DateTimePicker({ value = '', onChange, mode = 'date', required, 
 
   return (
     <div ref={rootRef} className="relative">
-      <button ref={buttonRef} type="button" aria-label={label} aria-expanded={open} onClick={() => { setOpen(!open); setView('days') }} className={cn('flex h-11 w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-left shadow-sm transition hover:border-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200', !value && 'text-slate-400', className)}>
-        <span>{label}</span>
-        <CalendarDays className="h-4 w-4 text-slate-400" />
-      </button>
-      {required && <input tabIndex={-1} required value={value} onChange={() => undefined} className="sr-only" aria-hidden="true" />}
+      <div ref={dateFieldRef} className={cn('flex h-11 w-full items-center rounded-xl border border-slate-200 bg-white shadow-sm transition hover:border-amber-300 focus-within:border-amber-400 focus-within:ring-2 focus-within:ring-amber-100', className)}>
+        <input
+          type="text"
+          inputMode="numeric"
+          placeholder="dd/mm/yyyy"
+          aria-label={label}
+          required={required}
+          value={manualText}
+          onChange={e => setManualText(autoFormatDateInput(e.target.value))}
+          maxLength={10}
+          onBlur={commitManualText}
+          onKeyDown={e => {
+            if (e.key === 'Enter') { e.preventDefault(); commitManualText(); (e.target as HTMLInputElement).blur() }
+            if (e.key === 'Escape') { setManualText(value ? formatManualDate(parse(value, 'yyyy-MM-dd', new Date())) : ''); (e.target as HTMLInputElement).blur() }
+          }}
+          className="h-full flex-1 rounded-l-xl bg-transparent px-3.5 text-sm text-slate-700 outline-none placeholder:text-slate-400"
+        />
+        <button type="button" aria-label="Open calendar" aria-expanded={open} onClick={() => { setOpen(!open); setView('days') }} className="flex h-full items-center px-3 text-slate-400 transition hover:text-amber-600">
+          <CalendarDays className="h-4 w-4" />
+        </button>
+      </div>
       {open && mode === 'date' && (
         portalTarget && createPortal(<div ref={panelRef} style={{ position: 'fixed', left: position.left, top: position.top }} className="z-[100] w-[280px] rounded-2xl border border-slate-200 bg-white p-3 shadow-xl shadow-slate-900/10">
           <div className="mb-2 flex items-center justify-between">

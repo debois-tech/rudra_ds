@@ -2,6 +2,7 @@
 // RLS handles tenant scoping automatically on SELECT/UPDATE/DELETE.
 // For INSERT, we must include org_id in the payload.
 
+import { differenceInCalendarDays } from 'date-fns';
 import { createSupabaseBrowser } from './supabase';
 import { getCurrentProfile, getOrgId } from './auth';
 import type {
@@ -443,9 +444,7 @@ export const dashboardApi = {
         if (error) throw error;
 
         return (data || []).map((row: Omit<ExpiringDocument, 'days_remaining'>) => {
-            const expiry = new Date(row.expiry_date);
-            const diffMs = expiry.getTime() - today.getTime();
-            const daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+            const daysRemaining = differenceInCalendarDays(new Date(row.expiry_date), today);
             return { ...row, days_remaining: daysRemaining };
         });
     },
