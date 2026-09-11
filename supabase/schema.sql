@@ -223,6 +223,24 @@ CREATE TRIGGER set_vehicle_services_updated_at
     BEFORE UPDATE ON public.vehicle_services
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
+-- Dedup log for the WhatsApp expiry-reminder edge function. Reminders fire
+-- at multiple thresholds (e.g. 3 days out, 1 day out) against the same
+-- expiry_date, so days_before is part of the key — one row per
+-- (service, expiry cycle, threshold). A renewal (new expiry_date) is free
+-- to trigger fresh reminders later.
+CREATE TABLE public.notification_log (
+    id          UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    service_id  UUID NOT NULL,
+    org_id      UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+    expiry_date DATE NOT NULL,
+    days_before INT NOT NULL,
+    channel     VARCHAR(20) NOT NULL DEFAULT 'whatsapp',
+    sent_at     TIMESTAMPTZ DEFAULT now(),
+    UNIQUE (service_id, expiry_date, days_before, channel)
+);
+ALTER TABLE public.notification_log ENABLE ROW LEVEL SECURITY;
+-- No client-facing policy: only the edge function (service_role, bypasses RLS) touches this table.
+
 CREATE VIEW public.service_records WITH (security_invoker = true) AS
 SELECT s_id, customer_id, service_type_id, 'licence'::varchar(20) AS category,
        NULL::uuid AS vehicle_id, NULL::varchar(50) AS vehicle_type, NULL::varchar(20) AS vehicle_number,
