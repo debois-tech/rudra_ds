@@ -523,16 +523,13 @@ CREATE POLICY "user_crud_vehicle_services" ON public.vehicle_services
 
 -- ============================================
 -- RLS: DEMO_REQUESTS
--- Public (anonymous) insert from the landing page form; only
--- super_admin can read submissions.
+-- Inserts go through POST /api/demo-request (service role, bypasses RLS —
+-- that route applies the honeypot/timing bot checks). No anon insert policy
+-- on purpose: an anon INSERT policy would let anyone bypass those checks by
+-- calling the Supabase REST endpoint directly with the public anon key.
+-- Only super_admin can read submissions.
 -- ============================================
 ALTER TABLE public.demo_requests ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Allow public insert on demo_requests"
-    ON public.demo_requests
-    FOR INSERT
-    TO anon
-    WITH CHECK (true);
 
 CREATE POLICY "Allow super_admin to read demo_requests"
     ON public.demo_requests
