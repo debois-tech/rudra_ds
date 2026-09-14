@@ -223,18 +223,6 @@
   animation: heroGlowLight2 14s ease-in-out infinite;
 }
 
-/* Animated gradient shimmer for hero text */
-@keyframes gradientShimmer {
-  0%   { background-position: 0% 50%; }
-  50%  { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-
-.gradient-shimmer {
-  background-size: 200% auto;
-  animation: gradientShimmer 6s ease-in-out infinite;
-}
-
 /* Scroll-to-top button */
 .scroll-to-top {
   position: fixed;

@@ -6,10 +6,9 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronDown, ChevronUp, CheckCircle2, Shield, Bell, Receipt,
-  Building2, Menu, X, ArrowRight, TrendingUp,
+  Building2, Menu, X, ArrowRight,
   FileText, Users, Phone, Loader2, Zap, BarChart3
 } from "lucide-react";
-import { createSupabaseBrowser } from "@/lib/supabase";
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
@@ -57,21 +56,9 @@ const documents = [
 ];
 
 const howItWorks = [
-  {
-    step: "01",
-    title: "Add Customer",
-    desc: "Enter customer details and the services they purchased.",
-  },
-  {
-    step: "02",
-    title: "Auto-Track",
-    desc: "MotoAdmin monitors every document expiry and sends WhatsApp reminders.",
-  },
-  {
-    step: "03",
-    title: "Grow Revenue",
-    desc: "Customers return to renew. Record the sale, invoice, repeat.",
-  },
+  { step: "01", title: "Add Customer" },
+  { step: "02", title: "Auto-Track" },
+  { step: "03", title: "Grow Revenue" },
 ];
 
 const faqs = [
@@ -89,7 +76,7 @@ const faqs = [
   },
   {
     q: "Is there a free plan or trial?",
-    a: "MotoAdmin is an enterprise-grade platform offered at a flat ₹999/month for a single driving school. There is no free plan. For chains managing multiple branches, contact us for a custom enterprise quote.",
+    a: "MotoAdmin is an enterprise-grade platform offered at a flat ₹399/month for a single driving school. There is no free plan. For chains managing multiple branches, contact us for a custom enterprise quote.",
   },
   {
     q: "Can I manage multiple branches?",
@@ -125,10 +112,12 @@ const jsonLdOrg = {
 
 // ─── Demo Modal ───────────────────────────────────────────────────────────────
 
-function DemoModal({ onClose }: { onClose: () => void }) {
-  const [form, setForm] = useState({ full_name: "", phone: "", school_name: "" });
+function DemoModal({ variant, onClose }: { variant: "demo" | "enterprise"; onClose: () => void }) {
+  const [form, setForm] = useState({ full_name: "", phone: "", school_name: "", hp: "" });
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const openedAtRef = useRef<number | null>(null);
+  useEffect(() => { openedAtRef.current = Date.now(); }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -136,14 +125,12 @@ function DemoModal({ onClose }: { onClose: () => void }) {
     setErrorMsg("");
 
     try {
-      const supabase = createSupabaseBrowser();
-      const { error } = await supabase.from("demo_requests").insert({
-        full_name: form.full_name.trim(),
-        phone: form.phone.trim(),
-        school_name: form.school_name.trim(),
+      const res = await fetch("/api/demo-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...form, t: openedAtRef.current }),
       });
-
-      if (error) throw error;
+      if (!res.ok) throw new Error("request failed");
       setStatus("success");
     } catch {
       setStatus("error");
@@ -194,13 +181,27 @@ function DemoModal({ onClose }: { onClose: () => void }) {
         ) : (
           <>
             <div className="mb-8">
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">Book a Demo</h3>
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                {variant === "enterprise" ? "Contact Sales" : "Book a Demo"}
+              </h3>
               <p className="text-gray-500 text-sm">
-                Fill in your details and we&apos;ll schedule a personalised walkthrough.
+                {variant === "enterprise"
+                  ? "Tell us about your driving school chain and we'll reach out with a custom plan."
+                  : "Fill in your details and we'll schedule a personalised walkthrough."}
               </p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
+              <input
+                type="text"
+                name="website"
+                value={form.hp}
+                onChange={(e) => setForm({ ...form, hp: e.target.value })}
+                tabIndex={-1}
+                autoComplete="off"
+                aria-hidden="true"
+                className="absolute -left-[9999px] w-px h-px opacity-0"
+              />
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Your Name</label>
                 <input
@@ -249,6 +250,8 @@ function DemoModal({ onClose }: { onClose: () => void }) {
               >
                 {status === "loading" ? (
                   <><Loader2 className="w-4 h-4 animate-spin" /> Submitting&hellip;</>
+                ) : variant === "enterprise" ? (
+                  <>Contact Sales <ArrowRight className="w-4 h-4" /></>
                 ) : (
                   <>Request a Demo <ArrowRight className="w-4 h-4" /></>
                 )}
@@ -268,7 +271,7 @@ export default function LandingPage() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
-  const [demoOpen, setDemoOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<null | "demo" | "enterprise">(null);
   const [activeSection, setActiveSection] = useState("");
   const [showTopBtn, setShowTopBtn] = useState(false);
   const sectionsRef = useRef<string[]>(["features", "pricing", "faq"]);
@@ -302,9 +305,9 @@ export default function LandingPage() {
   }, []);
 
   useEffect(() => {
-    document.body.style.overflow = demoOpen ? "hidden" : "";
+    document.body.style.overflow = modalMode ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
-  }, [demoOpen]);
+  }, [modalMode]);
 
   return (
     <>
@@ -312,7 +315,7 @@ export default function LandingPage() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdOrg) }} />
 
       <AnimatePresence>
-        {demoOpen && <DemoModal onClose={() => setDemoOpen(false)} />}
+        {modalMode && <DemoModal variant={modalMode} onClose={() => setModalMode(null)} />}
       </AnimatePresence>
 
       <div className="min-h-screen bg-white text-gray-900 font-sans selection:bg-amber-200 selection:text-amber-900">
@@ -356,7 +359,7 @@ export default function LandingPage() {
                 Log In
               </Link>
               <button
-                onClick={() => setDemoOpen(true)}
+                onClick={() => setModalMode("demo")}
                 className="px-5 py-2 rounded-full text-sm font-semibold bg-gray-900 text-white hover:bg-gray-800 transition-all shadow-sm"
               >
                 Book a Demo
@@ -394,7 +397,7 @@ export default function LandingPage() {
                   <div className="h-px bg-gray-100 my-2" />
                   <Link href="/login" className="text-base font-medium text-gray-600 py-2.5 px-3">Log In</Link>
                   <button
-                    onClick={() => { setMobileMenuOpen(false); setDemoOpen(true); }}
+                    onClick={() => { setMobileMenuOpen(false); setModalMode("demo"); }}
                     className="py-3 rounded-xl font-semibold bg-gray-900 text-white text-sm mt-1"
                   >
                     Book a Demo
@@ -423,11 +426,9 @@ export default function LandingPage() {
               transition={{ duration: 0.6, delay: 0.2 }}
               className="text-4xl sm:text-5xl md:text-7xl font-extrabold tracking-tight leading-[1.1] mb-6"
             >
-              <span className="text-gray-900">The Smartest Way to Run</span>
+              <span className="text-gray-900">The smartest way to run</span>
               <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-500 via-amber-600 to-orange-500 gradient-shimmer">
-                Your Driving School
-              </span>
+              <span className="text-amber-600">your driving school</span>
             </motion.h1>
 
             <motion.p
@@ -446,7 +447,7 @@ export default function LandingPage() {
               className="flex flex-col sm:flex-row items-center justify-center gap-3"
             >
               <button
-                onClick={() => setDemoOpen(true)}
+                onClick={() => setModalMode("demo")}
                 className="w-full sm:w-auto px-8 py-3.5 rounded-full font-bold bg-gray-900 text-white hover:bg-gray-800 shadow-lg shadow-gray-900/10 hover:shadow-xl hover:shadow-gray-900/15 transition-all hover:-translate-y-0.5 flex items-center justify-center gap-2"
               >
                 Book a Demo <ArrowRight className="w-4 h-4" />
@@ -465,10 +466,7 @@ export default function LandingPage() {
               transition={{ duration: 0.5, delay: 0.8 }}
               className="mt-8 flex items-center justify-center gap-6 flex-wrap text-sm text-gray-400"
             >
-              <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-amber-500" />&#8377;999/month</span>
-              <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-amber-500" />No setup fees</span>
-              <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-amber-500" />WhatsApp alerts</span>
-            </motion.div>
+              </motion.div>
           </motion.div>
         </section>
 
@@ -489,36 +487,38 @@ export default function LandingPage() {
 
         {/* ─── Features ─── */}
         <section id="features" className="py-24 relative">
-          <div className="max-w-6xl mx-auto px-6">
+          <div className="max-w-5xl mx-auto px-6">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              className="text-center max-w-2xl mx-auto mb-16"
+              className="max-w-xl mb-16"
             >
               <h2 className="text-3xl md:text-5xl font-bold mb-4 text-gray-900">
-                Everything You Need
+                Everything you need
               </h2>
               <p className="text-gray-500 text-base">
                 Built exclusively for driving school operators.
               </p>
             </motion.div>
 
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid md:grid-cols-2">
               {features.map((f, i) => (
                 <motion.div
                   key={i}
-                  initial={{ opacity: 0, y: 20 }}
+                  initial={{ opacity: 0, y: 16 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
-                  transition={{ delay: i * 0.06, duration: 0.4 }}
-                  className="group p-6 rounded-2xl bg-white border border-gray-100 hover:border-amber-200 hover:shadow-lg hover:shadow-amber-500/5 transition-all duration-300 hover:-translate-y-0.5"
+                  transition={{ delay: i * 0.05, duration: 0.4 }}
+                  className="group relative flex gap-4 py-7 border-t border-gray-100 md:odd:pr-8 md:odd:border-r md:even:pl-8 md:[&:nth-child(-n+2)]:border-t-0 transition-all duration-300 ease-out hover:z-10 hover:-translate-y-1 hover:scale-[1.015] hover:shadow-[0_16px_32px_-14px_rgba(217,119,6,0.25)]"
                 >
-                  <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 mb-4 group-hover:bg-amber-100 group-hover:scale-105 transition-all">
+                  <div className="shrink-0 w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600 group-hover:bg-amber-100 transition-colors">
                     {f.icon}
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">{f.title}</h3>
-                  <p className="text-sm text-gray-500 leading-relaxed">{f.desc}</p>
+                  <div>
+                    <h3 className="text-base font-semibold text-gray-900 mb-1.5">{f.title}</h3>
+                    <p className="text-sm text-gray-500 leading-relaxed">{f.desc}</p>
+                  </div>
                 </motion.div>
               ))}
             </div>
@@ -537,13 +537,13 @@ export default function LandingPage() {
               className="text-center mb-16"
             >
               <h2 className="text-3xl md:text-5xl font-bold mb-4 text-gray-900">
-                How It Works
+                How it works
               </h2>
               <p className="text-gray-500 text-base">Three steps. No IT team needed.</p>
             </motion.div>
 
             <div className="grid md:grid-cols-3 gap-6 relative">
-              <div className="hidden md:block absolute top-[44px] left-[17%] right-[17%] h-px bg-gradient-to-r from-transparent via-amber-300 to-transparent" />
+              <div className="hidden md:block absolute top-[44px] left-[17%] right-[17%] h-px z-0 bg-gradient-to-r from-transparent via-amber-300 to-transparent" />
 
               {howItWorks.map((s, i) => (
                 <motion.div
@@ -554,11 +554,10 @@ export default function LandingPage() {
                   transition={{ delay: i * 0.15, duration: 0.5 }}
                   className="text-center"
                 >
-                  <div className="w-[72px] h-[72px] mx-auto rounded-2xl bg-white border-2 border-amber-300 flex items-center justify-center text-2xl font-bold text-amber-600 mb-5 shadow-lg shadow-amber-100">
+                  <div className="relative z-10 w-[72px] h-[72px] mx-auto rounded-2xl bg-white border-2 border-amber-300 flex items-center justify-center text-2xl font-bold text-amber-600 mb-5 shadow-lg shadow-black/10 transition-colors duration-300 hover:bg-amber-50 hover:border-amber-400">
                     {s.step}
                   </div>
-                  <h3 className="text-lg font-bold text-gray-900 mb-2">{s.title}</h3>
-                  <p className="text-sm text-gray-500 leading-relaxed max-w-[260px] mx-auto">{s.desc}</p>
+                  <h3 className="text-lg font-bold text-gray-900">{s.title}</h3>
                 </motion.div>
               ))}
             </div>
@@ -575,11 +574,9 @@ export default function LandingPage() {
               className="text-center max-w-2xl mx-auto mb-16"
             >
               <h2 className="text-3xl md:text-5xl font-bold mb-4 text-gray-900">
-                Simple Pricing
+                Simple pricing
               </h2>
-              <p className="text-gray-500 text-base">
-                One flat rate. No hidden fees, no feature paywalls.
-              </p>
+             
             </motion.div>
 
             <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
@@ -597,7 +594,7 @@ export default function LandingPage() {
                   <span className="text-xs font-bold text-amber-600 uppercase tracking-wider">Business</span>
                 </div>
                 <div className="text-4xl font-black text-gray-900 mb-1">
-                  &#8377;999<span className="text-lg text-gray-400 font-normal">/mo</span>
+                  &#8377;399<span className="text-lg text-gray-400 font-normal">/mo</span>
                 </div>
                 <p className="text-sm text-gray-500 mb-6">For a single driving school.</p>
                 <ul className="space-y-3 mb-8">
@@ -616,7 +613,7 @@ export default function LandingPage() {
                   ))}
                 </ul>
                 <button
-                  onClick={() => setDemoOpen(true)}
+                  onClick={() => setModalMode("demo")}
                   className="w-full py-3 rounded-xl font-bold bg-gray-900 text-white hover:bg-gray-800 transition-all"
                 >
                   Book a Demo
@@ -652,12 +649,12 @@ export default function LandingPage() {
                     </li>
                   ))}
                 </ul>
-                <a
-                  href="mailto:connect@deboistech.in?subject=MotoAdmin Enterprise Enquiry"
+                <button
+                  onClick={() => setModalMode("enterprise")}
                   className="block w-full py-3 text-center rounded-xl font-semibold border border-gray-200 text-gray-700 hover:bg-gray-100 transition-colors"
                 >
                   Contact Sales
-                </a>
+                </button>
               </motion.div>
             </div>
           </div>
@@ -670,20 +667,18 @@ export default function LandingPage() {
               <h2 className="text-3xl md:text-5xl font-bold mb-4 text-gray-900">FAQ</h2>
             </div>
 
-            <div className="space-y-3">
+            <div className="border-t border-gray-200">
               {faqs.map((faq, i) => (
-                <div
-                  key={i}
-                  className={`border ${openFaq === i ? "border-amber-200 bg-white shadow-md shadow-amber-50" : "border-gray-200 bg-white"} rounded-xl transition-all duration-300`}
-                >
+                <div key={i} className="border-b border-gray-200">
                   <button
-                    className="w-full px-5 py-4 text-left flex items-center justify-between text-sm font-medium text-gray-900"
+                    className="w-full py-5 text-left flex items-center justify-between gap-4 text-sm font-medium text-gray-900"
                     onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                    aria-expanded={openFaq === i}
                   >
                     <span>{faq.q}</span>
-                    <ChevronDown className={`w-4 h-4 text-amber-500 transition-transform duration-300 shrink-0 ml-4 ${openFaq === i ? "rotate-180" : ""}`} />
+                    <ChevronDown className={`w-4 h-4 text-amber-500 transition-transform duration-300 shrink-0 ${openFaq === i ? "rotate-180" : ""}`} />
                   </button>
-                  <div className={`px-5 text-sm text-gray-500 leading-relaxed overflow-hidden transition-all duration-300 ${openFaq === i ? "max-h-56 pb-4 opacity-100" : "max-h-0 opacity-0"}`}>
+                  <div className={`text-sm text-gray-500 leading-relaxed overflow-hidden transition-all duration-300 ${openFaq === i ? "max-h-56 pb-5 opacity-100" : "max-h-0 opacity-0"}`}>
                     {faq.a}
                   </div>
                 </div>
@@ -693,40 +688,43 @@ export default function LandingPage() {
         </section>
 
         {/* ─── Final CTA ─── */}
-        <section className="relative py-24 overflow-hidden bg-gray-900">
-          <div className="absolute inset-0 opacity-[0.04]" style={{ backgroundImage: "radial-gradient(#fbbf24 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-amber-500/10 rounded-full blur-[120px] pointer-events-none" />
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className="relative max-w-3xl mx-auto px-6 text-center z-10"
-          >
-            <h2 className="text-3xl md:text-5xl font-bold mb-5 text-white">
-              Ready to grow your
-              <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-amber-500">driving school?</span>
-            </h2>
-            <p className="text-base text-gray-400 mb-8 max-w-lg mx-auto">
-              Stop managing customers on paper. Let MotoAdmin handle records, reminders, and revenue.
-            </p>
-            <button
-              onClick={() => setDemoOpen(true)}
-              className="inline-flex items-center gap-2 px-8 py-3.5 rounded-full font-bold bg-white text-gray-900 hover:bg-gray-100 shadow-xl shadow-black/20 transition-all hover:-translate-y-0.5"
+        <section className="py-24">
+          <div className="max-w-5xl mx-auto px-6">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              className="relative overflow-hidden rounded-3xl bg-gray-900 px-8 py-16 md:px-16 md:py-20 text-center"
             >
-              Book a Demo <ArrowRight className="w-5 h-5" />
-            </button>
-            <p className="mt-4 text-xs text-gray-500">&#8377;999/month &middot; No setup fees &middot; Enterprise plans available</p>
-          </motion.div>
+              <div className="absolute inset-0 opacity-[0.05]" style={{ backgroundImage: "radial-gradient(#fbbf24 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-amber-500/10 rounded-full blur-[120px] pointer-events-none" />
+
+              <div className="relative z-10">
+                <h2 className="text-3xl md:text-5xl font-bold mb-5 text-white">
+                  Ready to grow your
+                  <br />
+                  <span className="text-amber-400">driving school?</span>
+                </h2>
+                <p className="text-base text-gray-400 mb-8 max-w-lg mx-auto">
+                  Stop managing customers on paper. Let MotoAdmin handle records, reminders, and revenue.
+                </p>
+                <button
+                  onClick={() => setModalMode("demo")}
+                  className="inline-flex items-center gap-2 px-8 py-3.5 rounded-full font-bold bg-white text-gray-900 hover:bg-gray-100 shadow-xl shadow-black/20 transition-all hover:-translate-y-0.5"
+                >
+                  Book a Demo <ArrowRight className="w-5 h-5" />
+                </button>
+                              </div>
+            </motion.div>
+          </div>
         </section>
 
         {/* ─── Footer ─── */}
         <footer className="border-t border-gray-100 bg-white pt-12 pb-6">
           <div className="max-w-6xl mx-auto px-6">
             <div className="flex flex-col md:flex-row justify-between items-center gap-6 mb-8">
-              <div className="relative h-9 w-[130px]">
+              <div className="relative h-12 w-[180px]">
                 <Image src="/logo_icon.png" alt="MotoAdmin" fill className="object-contain object-left" priority />
               </div>
               <div className="flex gap-6 text-sm text-gray-400">
