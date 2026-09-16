@@ -85,7 +85,7 @@ export default function AddCustomerPage() {
         })) : undefined
       );
       toast.success(`Customer "${customer.c_name}" added! ID: ${customer.c_registration_id}`);
-      router.push('/dashboard/customers');
+      router.push(`/dashboard/services/new?customer=${customer.c_id}&fromCustomer=1`);
     } catch (error: unknown) {
       logClientError('create-customer', error, { mobile: values.c_mobile });
       toast.error('Could not add customer.');

@@ -25,6 +25,7 @@ export default function NewServicePage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const preselectedCustomerId = searchParams.get('customer');
+  const autoFillVehicle = searchParams.get('fromCustomer') === '1';
   const renewOf = searchParams.get('renewOf');
 
   // State
@@ -152,6 +153,13 @@ export default function NewServicePage() {
       if (cat === 'vehicle' && selectedCustomer) {
         const vehs = await vehicleApi.getByOwner(selectedCustomer.c_id);
         setCustomerVehicles(vehs);
+        if (autoFillVehicle && vehs.length === 1) {
+          const vehicle = vehs[0];
+          setVehicleId(vehicle.v_id);
+          setVehicleNumber(vehicle.v_number);
+          setVehicleType(vehicle.v_type);
+          setVehicleName(vehicle.v_name || '');
+        }
       }
     } catch (error) {
       console.error(error);
