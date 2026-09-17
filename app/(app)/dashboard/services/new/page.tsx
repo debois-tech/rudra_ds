@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { customerApi, vehicleApi, serviceTypeApi, serviceApi } from '@/lib/api';
 import type {
@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { DateTimePicker } from '@/components/ui/date-time-picker';
 import { getErrorMessage, logClientError } from '@/lib/error-message';
+import { VEHICLE_NUMBER_REGEX } from '@/lib/utils';
 
 const VEHICLE_CLASSES: VehicleClass[] = ['NT', 'Transport', 'Conductor'];
 const VEHICLE_TYPE_LICENCE: VehicleTypeLicence[] = [
@@ -25,19 +26,36 @@ export default function NewServicePage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const preselectedCustomerId = searchParams.get('customer');
-  const autoFillVehicle = searchParams.get('fromCustomer') === '1';
   const renewOf = searchParams.get('renewOf');
 
   // State
   const [step, setStep] = useState(1); // 1=customer, 2=category, 3=details
-  const [searchQuery, setSearchQuery] = useState('');
+
+  // Step 1: customer name / mobile / car number double as both the
+  // search-as-you-type query and the auto-create payload — one combined
+  // form instead of a separate "add customer" page + form.
+  const [custName, setCustName] = useState('');
+  const [custMobile, setCustMobile] = useState('');
+  const [custCarNumber, setCustCarNumber] = useState('');
+  const [lastEdited, setLastEdited] = useState<'name' | 'mobile' | 'car' | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ name?: string; mobile?: string; carNumber?: string }>({});
   const [searchResults, setSearchResults] = useState<CustomerDashboardView[]>([]);
   const [searching, setSearching] = useState(false);
+  const [creatingCustomer, setCreatingCustomer] = useState(false);
+  const creatingCustomerLock = useRef(false);
+  // Set once we know the customer has exactly one vehicle on file (existing,
+  // just-created, or just-matched) — lets step 3 auto-select it instead of
+  // making them pick from a dropdown of one.
+  const [preferSingleVehicle, setPreferSingleVehicle] = useState(false);
+
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerDashboardView | null>(null);
   const [category, setCategory] = useState<'vehicle' | 'licence' | null>(null);
+  const [categoryLoading, setCategoryLoading] = useState(false);
+  const categoryLock = useRef(false);
   const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([]);
   const [customerVehicles, setCustomerVehicles] = useState<Vehicle[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const submitLock = useRef(false);
 
   // Form fields
   const [serviceTypeId, setServiceTypeId] = useState<number | null>(null);
@@ -116,36 +134,91 @@ export default function NewServicePage() {
     return () => { cancelled = true; };
   }, [renewOf, preselectedCustomerId, searchParams]);
 
-  // Search customers with debounce and abort cleanup
-  const handleSearch = useCallback(async (query: string) => {
-    setSearchQuery(query);
-    if (query.trim().length < 2) {
+  // Search-as-you-type across whichever of the 3 fields the user is
+  // actively editing — customerApi.search() already ORs name/mobile/
+  // registration/plate server-side, so one query string covers all of it.
+  useEffect(() => {
+    if (!lastEdited) return;
+    const value = lastEdited === 'name' ? custName : lastEdited === 'mobile' ? custMobile : custCarNumber;
+    if (value.trim().length < 2) {
       setSearchResults([]);
       return;
     }
+    let cancelled = false;
     setSearching(true);
-    try {
-      const results = await customerApi.search(query);
-      setSearchResults(results);
-    } catch (error) {
-      // Ignore aborted requests silently
-      if (error instanceof Error && error.message !== 'AbortError') {
-        console.error(error);
+    const t = setTimeout(async () => {
+      try {
+        const results = await customerApi.search(value.trim());
+        if (!cancelled) setSearchResults(results);
+      } catch (error) {
+        if (!cancelled) console.error(error);
+      } finally {
+        if (!cancelled) setSearching(false);
       }
-    }
-    setSearching(false);
-  }, []);
+    }, 300);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [custName, custMobile, custCarNumber, lastEdited]);
 
-  // Select customer
-  function selectCustomer(customer: CustomerDashboardView) {
+  // Existing customer picked from the dropdown — autofill everything else,
+  // no re-typing.
+  async function selectCustomer(customer: CustomerDashboardView) {
     setSelectedCustomer(customer);
     setSearchResults([]);
-    setSearchQuery('');
+    setCustName(''); setCustMobile(''); setCustCarNumber('');
+    setLastEdited(null);
+    setFieldErrors({});
+    setPreferSingleVehicle(false);
+    try {
+      const vehs = await vehicleApi.getByOwner(customer.c_id);
+      if (vehs.length === 1) setPreferSingleVehicle(true);
+    } catch (error) {
+      console.error(error);
+    }
     setStep(2);
+  }
+
+  // No match selected — validate and auto-create the customer (+ vehicle if
+  // a car number was given) the moment they move to the next step. No
+  // separate "add customer" button/page needed.
+  async function handleCreateAndNext() {
+    if (creatingCustomerLock.current) return;
+    const errors: typeof fieldErrors = {};
+    if (custName.trim().length < 2) errors.name = 'Name must be at least 2 characters.';
+    if (!/^[0-9]{10}$/.test(custMobile.trim())) errors.mobile = 'Mobile number must be exactly 10 digits.';
+    const plate = custCarNumber.trim().toUpperCase();
+    if (plate && !VEHICLE_NUMBER_REGEX.test(plate)) errors.carNumber = 'Invalid format. Example: MH14EP4332';
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
+    creatingCustomerLock.current = true;
+    setCreatingCustomer(true);
+    try {
+      const { customer, vehicleErrors } = await customerApi.create(
+        { c_name: custName.trim(), c_mobile: custMobile.trim() },
+        plate ? [{ v_number: plate, v_type: 'car' }] : undefined
+      );
+      vehicleErrors.forEach(msg => toast.warning(msg));
+      toast.success(`Customer "${customer.c_name}" added! ID: ${customer.c_registration_id}`);
+      const hasVehicle = !!plate && vehicleErrors.length === 0;
+      // Freshly created — stats are known without a round-trip fetch.
+      setSelectedCustomer({ ...customer, vehicle_count: hasVehicle ? 1 : 0, service_count: 0, total_revenue: 0 });
+      setPreferSingleVehicle(hasVehicle);
+      setCustName(''); setCustMobile(''); setCustCarNumber('');
+      setStep(2);
+    } catch (error: unknown) {
+      logClientError('create-customer', error, { mobile: custMobile });
+      toast.error(getErrorMessage(error, 'Could not create customer.'));
+    } finally {
+      setCreatingCustomer(false);
+      creatingCustomerLock.current = false;
+    }
   }
 
   // Select category and load types + vehicles
   async function selectCategory(cat: 'vehicle' | 'licence') {
+    if (categoryLock.current) return;
+    categoryLock.current = true;
+    setCategoryLoading(true);
     setCategory(cat);
     try {
       const types = await serviceTypeApi.getByCategory(cat);
@@ -153,7 +226,7 @@ export default function NewServicePage() {
       if (cat === 'vehicle' && selectedCustomer) {
         const vehs = await vehicleApi.getByOwner(selectedCustomer.c_id);
         setCustomerVehicles(vehs);
-        if (autoFillVehicle && vehs.length === 1) {
+        if (preferSingleVehicle && vehs.length === 1) {
           const vehicle = vehs[0];
           setVehicleId(vehicle.v_id);
           setVehicleNumber(vehicle.v_number);
@@ -164,12 +237,18 @@ export default function NewServicePage() {
     } catch (error) {
       console.error(error);
       toast.error('Failed to load service types');
+    } finally {
+      setStep(3);
+      setCategoryLoading(false);
+      categoryLock.current = false;
     }
-    setStep(3);
   }
 
   function resetForm() {
     setStep(1);
+    setCustName(''); setCustMobile(''); setCustCarNumber('');
+    setLastEdited(null); setFieldErrors({}); setSearchResults([]);
+    setPreferSingleVehicle(false);
     setSelectedCustomer(null);
     setCategory(null);
     setServiceTypeId(null);
@@ -190,6 +269,7 @@ export default function NewServicePage() {
   // Submit
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (submitLock.current) return;
     if (!selectedCustomer || !serviceTypeId) {
       toast.error('Please fill all required fields');
       return;
@@ -199,6 +279,13 @@ export default function NewServicePage() {
       toast.error('Please enter a valid service cost');
       return;
     }
+    // Hard-check plate format only for a manually-typed number — an
+    // existing vehicle picked from the dropdown is already on file as-is.
+    if (category === 'vehicle' && !vehicleId && vehicleNumber.trim() && !VEHICLE_NUMBER_REGEX.test(vehicleNumber.trim().toUpperCase())) {
+      toast.error('Invalid vehicle number format. Example: MH14EP4332');
+      return;
+    }
+    submitLock.current = true;
     setSubmitting(true);
     try {
       if (category === 'vehicle') {
@@ -264,6 +351,7 @@ export default function NewServicePage() {
       toast.error(getErrorMessage(error, 'Could not create service.'));
     }
     setSubmitting(false);
+    submitLock.current = false;
   }
 
   return (
@@ -307,36 +395,73 @@ export default function NewServicePage() {
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{selectedCustomer.c_mobile} · {selectedCustomer.c_registration_id}</p>
             </div>
           </div>
-          <Button variant="ghost" size="sm" className="hidden sm:inline-flex text-amber-600 hover:text-amber-700 hover:bg-amber-100 rounded-lg" onClick={() => { setStep(1); setSelectedCustomer(null); setCategory(null); }}>
+          <Button variant="ghost" size="sm" className="hidden sm:inline-flex text-amber-600 hover:text-amber-700 hover:bg-amber-100 rounded-lg" onClick={() => { setStep(1); setSelectedCustomer(null); setCategory(null); setCustName(''); setCustMobile(''); setCustCarNumber(''); setFieldErrors({}); }}>
             Change Customer
           </Button>
         </div>
       )}
 
-      {/* Step 1: Select Customer */}
+      {/* Step 1: Customer details — search-as-you-type on all 3 fields; pick a
+          match to autofill, or keep typing and Next auto-creates the profile. */}
       {step === 1 && (
         <Card className="rounded-2xl shadow-sm border-slate-200 overflow-hidden">
           <CardHeader className="bg-white border-b border-slate-100 pb-4 pt-5 px-6">
-            <CardTitle className="text-lg flex items-center gap-2"><User className="h-5 w-5 text-amber-600" /> Select Customer</CardTitle>
-            <CardDescription>Search by name or mobile number</CardDescription>
+            <CardTitle className="text-lg flex items-center gap-2"><User className="h-5 w-5 text-amber-600" /> Customer Details</CardTitle>
+            <CardDescription>Matches show up as you type — pick one, or keep going to add a new customer</CardDescription>
           </CardHeader>
-          <CardContent className="p-6 bg-slate-50/30">
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
-              <Input
-                placeholder="Type customer name or mobile..."
-                value={searchQuery}
-                onChange={e => handleSearch(e.target.value)}
-                className="pl-12 h-12 rounded-xl border-slate-200 focus-visible:ring-amber-200 text-base"
-                autoFocus
-              />
+          <CardContent className="p-6 bg-slate-50/30 space-y-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <div>
+                <label className="text-[11px] uppercase font-bold tracking-wider text-slate-500">Full Name <span className="text-red-500">*</span></label>
+                <div className="relative mt-2">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input
+                    placeholder="e.g. Rahul Sharma"
+                    value={custName}
+                    onChange={e => { setCustName(e.target.value); setLastEdited('name'); }}
+                    className="pl-11 h-12 rounded-xl border-slate-200 focus-visible:ring-amber-200 text-base"
+                    autoFocus
+                  />
+                </div>
+                {fieldErrors.name && <p className="text-xs font-medium text-red-600 mt-1.5">{fieldErrors.name}</p>}
+              </div>
+              <div>
+                <label className="text-[11px] uppercase font-bold tracking-wider text-slate-500">Mobile Number <span className="text-red-500">*</span></label>
+                <div className="relative mt-2">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input
+                    placeholder="9876543210"
+                    maxLength={10}
+                    value={custMobile}
+                    onChange={e => { setCustMobile(e.target.value.replace(/\D/g, '').slice(0, 10)); setLastEdited('mobile'); }}
+                    className="pl-11 h-12 rounded-xl border-slate-200 focus-visible:ring-amber-200 text-base"
+                  />
+                </div>
+                {fieldErrors.mobile && <p className="text-xs font-medium text-red-600 mt-1.5">{fieldErrors.mobile}</p>}
+              </div>
             </div>
-            {searching && <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-amber-600" /></div>}
+
+            <div>
+              <label className="text-[11px] uppercase font-bold tracking-wider text-slate-500">Car Number <span className="text-slate-400 normal-case font-normal">(optional)</span></label>
+              <div className="relative mt-2">
+                <Car className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input
+                  placeholder="MH14EP4332"
+                  value={custCarNumber}
+                  onChange={e => { setCustCarNumber(e.target.value.toUpperCase()); setLastEdited('car'); }}
+                  className="pl-11 h-12 rounded-xl border-slate-200 focus-visible:ring-amber-200 text-base uppercase"
+                />
+              </div>
+              {fieldErrors.carNumber && <p className="text-xs font-medium text-red-600 mt-1.5">{fieldErrors.carNumber}</p>}
+            </div>
+
+            {searching && <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-amber-600" /></div>}
             {searchResults.length > 0 && (
-              <div className="mt-4 border border-slate-200 rounded-xl divide-y divide-slate-100 max-h-72 overflow-y-auto bg-white shadow-sm overflow-hidden">
+              <div className="border border-slate-200 rounded-xl divide-y divide-slate-100 max-h-72 overflow-y-auto bg-white shadow-sm overflow-hidden">
                 {searchResults.map(c => (
                   <button
                     key={c.c_id}
+                    type="button"
                     className="w-full flex items-center justify-between p-4 hover:bg-amber-50/50 transition-colors text-left group"
                     onClick={() => selectCustomer(c)}
                   >
@@ -358,6 +483,15 @@ export default function NewServicePage() {
                 ))}
               </div>
             )}
+
+            <Button
+              type="button"
+              className="w-full bg-gradient-to-r from-amber-400 to-amber-600 hover:from-amber-500 hover:to-amber-700 text-black rounded-xl h-11 font-bold shadow-md"
+              disabled={creatingCustomer}
+              onClick={handleCreateAndNext}
+            >
+              {creatingCustomer ? <><Loader2 className="h-5 w-5 animate-spin mr-2" /> Saving...</> : 'Next'}
+            </Button>
           </CardContent>
         </Card>
       )}
@@ -372,12 +506,18 @@ export default function NewServicePage() {
           <CardContent className="p-6 bg-slate-50/30">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <button
-                className="flex flex-col items-center justify-center gap-4 p-8 bg-white border-2 border-slate-200 rounded-2xl hover:border-amber-400 hover:shadow-md transition-all group"
+                type="button"
+                disabled={categoryLoading}
+                className="flex flex-col items-center justify-center gap-4 p-8 bg-white border-2 border-slate-200 rounded-2xl hover:border-amber-400 hover:shadow-md transition-all group disabled:opacity-50 disabled:pointer-events-none"
                 onClick={() => selectCategory('vehicle')}
               >
-                <div className="h-16 w-16 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center group-hover:bg-amber-100 group-hover:scale-110 transition-all">
-                  <Car className="h-8 w-8 text-amber-600" />
-                </div>
+                {categoryLoading && category === 'vehicle' ? (
+                  <Loader2 className="h-8 w-8 text-amber-600 animate-spin" />
+                ) : (
+                  <div className="h-16 w-16 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center group-hover:bg-amber-100 group-hover:scale-110 transition-all">
+                    <Car className="h-8 w-8 text-amber-600" />
+                  </div>
+                )}
                 <div className="text-center">
                   <p className="font-bold text-slate-900 text-lg">Vehicle Service</p>
                   <p className="text-sm font-medium text-slate-500 mt-1">Fitness, Tax, PUC, Permit, etc.</p>
@@ -385,19 +525,25 @@ export default function NewServicePage() {
               </button>
 
               <button
-                className="flex flex-col items-center justify-center gap-4 p-8 bg-white border-2 border-slate-200 rounded-2xl hover:border-amber-400 hover:shadow-md transition-all group"
+                type="button"
+                disabled={categoryLoading}
+                className="flex flex-col items-center justify-center gap-4 p-8 bg-white border-2 border-slate-200 rounded-2xl hover:border-amber-400 hover:shadow-md transition-all group disabled:opacity-50 disabled:pointer-events-none"
                 onClick={() => selectCategory('licence')}
               >
-                <div className="h-16 w-16 rounded-full bg-violet-50 border border-violet-100 flex items-center justify-center group-hover:bg-violet-100 group-hover:scale-110 transition-all">
-                  <FileText className="h-8 w-8 text-violet-600" />
-                </div>
+                {categoryLoading && category === 'licence' ? (
+                  <Loader2 className="h-8 w-8 text-violet-600 animate-spin" />
+                ) : (
+                  <div className="h-16 w-16 rounded-full bg-violet-50 border border-violet-100 flex items-center justify-center group-hover:bg-violet-100 group-hover:scale-110 transition-all">
+                    <FileText className="h-8 w-8 text-violet-600" />
+                  </div>
+                )}
                 <div className="text-center">
                   <p className="font-bold text-slate-900 text-lg">Licence Service</p>
                   <p className="text-sm font-medium text-slate-500 mt-1">New DL, Learning, Renewal, etc.</p>
                 </div>
               </button>
             </div>
-            
+
             <div className="mt-6 flex justify-start">
                <Button variant="outline" onClick={() => { setStep(1); setSelectedCustomer(null); }} className="rounded-xl font-medium">Back to Customer Search</Button>
             </div>

@@ -70,7 +70,11 @@ export const customerApi = {
         return data;
     },
 
-    async create(customer: CustomerFormData, vehicles?: InlineVehicleData[]): Promise<Customer> {
+    // Returns the created customer plus any per-vehicle failures (e.g. a plate
+    // already registered to another customer) — a failed vehicle insert must
+    // never be reported as "customer not added" since the customer row is
+    // already committed by that point.
+    async create(customer: CustomerFormData, vehicles?: InlineVehicleData[]): Promise<{ customer: Customer; vehicleErrors: string[] }> {
         const supabase = getClient();
         const orgId = await getOrgId();
         const payload = {
@@ -89,22 +93,27 @@ export const customerApi = {
             .single();
         if (error) throw error;
 
-        // Create vehicles if provided
-        if (vehicles && vehicles.length > 0) {
-            const vehiclePayloads = vehicles.map(v => ({
-                owner_id: data.c_id,
-                v_number: v.v_number.toUpperCase(),
-                v_name: v.v_name || null,
-                v_type: v.v_type || 'car',
-                org_id: orgId,
-            }));
+        const vehicleErrors: string[] = [];
+        for (const v of vehicles || []) {
             const { error: vError } = await supabase
                 .from('vehicles')
-                .insert(vehiclePayloads);
-            if (vError) throw vError;
+                .insert([{
+                    owner_id: data.c_id,
+                    v_number: v.v_number.toUpperCase(),
+                    v_name: v.v_name || null,
+                    v_type: v.v_type || 'car',
+                    org_id: orgId,
+                }]);
+            if (vError) {
+                vehicleErrors.push(
+                    vError.code === '23505'
+                        ? `Vehicle ${v.v_number.toUpperCase()} is already registered to another customer — skipped.`
+                        : `Vehicle ${v.v_number.toUpperCase()} could not be added.`
+                );
+            }
         }
 
-        return data;
+        return { customer: data, vehicleErrors };
     },
 
     async update(id: string, customer: CustomerFormData): Promise<Customer> {
@@ -133,15 +142,44 @@ export const customerApi = {
         if (error) throw error;
     },
 
+    // Matches name/mobile/registration directly, plus vehicle plate via a
+    // second query (v_customer_dashboard has no plate column). Top 5 total —
+    // this backs the add-customer search-as-you-type dropdown, so callers
+    // don't need to re-add customers that already exist.
     async search(query: string): Promise<CustomerDashboardView[]> {
         const supabase = getClient();
-        const { data, error } = await supabase
-            .from('v_customer_dashboard')
-            .select('*')
-            .or(`c_name.ilike.%${query}%,c_mobile.ilike.%${query}%,c_registration_id.ilike.%${query}%`)
-            .order('created_at', { ascending: false });
-        if (error) throw error;
-        return data || [];
+        const [direct, byPlate] = await Promise.all([
+            supabase
+                .from('v_customer_dashboard')
+                .select('*')
+                .or(`c_name.ilike.%${query}%,c_mobile.ilike.%${query}%,c_registration_id.ilike.%${query}%`)
+                .order('created_at', { ascending: false })
+                .limit(5),
+            supabase
+                .from('vehicles')
+                .select('owner_id')
+                .ilike('v_number', `%${query}%`)
+                .limit(5),
+        ]);
+        if (direct.error) throw direct.error;
+        if (byPlate.error) throw byPlate.error;
+
+        const directResults: CustomerDashboardView[] = direct.data || [];
+        const plateOwnerIds: string[] = (byPlate.data || []).map((v: { owner_id: string }) => v.owner_id);
+        const extraOwnerIds = [...new Set(plateOwnerIds)]
+            .filter((id: string) => !directResults.some((c: CustomerDashboardView) => c.c_id === id));
+
+        let plateResults: CustomerDashboardView[] = [];
+        if (extraOwnerIds.length > 0) {
+            const { data, error } = await supabase
+                .from('v_customer_dashboard')
+                .select('*')
+                .in('c_id', extraOwnerIds);
+            if (error) throw error;
+            plateResults = data || [];
+        }
+
+        return [...directResults, ...plateResults].slice(0, 5);
     },
 };
 

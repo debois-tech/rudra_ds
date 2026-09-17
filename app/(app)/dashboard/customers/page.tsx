@@ -110,7 +110,7 @@ export default function CustomersPage() {
               : `${visibleCustomers.length} of ${customers.length} customers`}
           </p>
         </div>
-        <Link href="/dashboard/customers/new">
+        <Link href="/dashboard/services/new">
           <Button className="bg-gradient-to-r from-amber-400 to-amber-600 hover:from-amber-500 hover:to-amber-700 text-black rounded-xl h-10 px-5 font-medium shadow-sm border border-amber-600/20">
             <Plus className="h-4 w-4 mr-2" /> New Customer
           </Button>
@@ -168,7 +168,7 @@ export default function CustomersPage() {
               </div>
               <p className="text-slate-500 font-medium mb-4">{searchQuery ? 'No customers found matching that query' : 'No customers yet'}</p>
               {!searchQuery && (
-                <Link href="/dashboard/customers/new">
+                <Link href="/dashboard/services/new">
                   <Button variant="outline" className="rounded-xl font-medium">Add First Customer</Button>
                 </Link>
               )}
