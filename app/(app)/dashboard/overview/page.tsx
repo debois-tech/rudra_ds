@@ -144,7 +144,7 @@ export default function DashboardPage() {
                     </p>
                 </div>
                 <div className="flex gap-2.5">
-                    <Link href="/dashboard/customers/new">
+                    <Link href="/dashboard/services/new">
                         <Button
                             variant="outline"
                             className="rounded-xl h-9 px-4 text-[13px] font-medium border-slate-200 hover:bg-slate-50 shadow-sm cursor-pointer"

@@ -13,7 +13,7 @@ export function EmptyState() {
                 Start by adding your first customer or creating a service record.
             </p>
             <div className="flex items-center justify-center gap-3 mt-5">
-                <Link href="/dashboard/customers/new">
+                <Link href="/dashboard/services/new">
                     <Button
                         variant="outline"
                         className="rounded-xl h-9 px-4 text-[13px] font-medium border-slate-200"
