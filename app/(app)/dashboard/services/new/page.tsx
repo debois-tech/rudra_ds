@@ -193,8 +193,30 @@ export default function NewServicePage() {
     creatingCustomerLock.current = true;
     setCreatingCustomer(true);
     try {
+      // Hard dedupe check — the search dropdown only helps if he notices it.
+      // Mobile is the identity that matters; if it already exists, snap onto
+      // that record instead of letting Next create a duplicate.
+      const mobile = custMobile.trim();
+      const existingByMobile = await customerApi.findByMobile(mobile);
+      if (existingByMobile) {
+        toast.error(`Mobile ${mobile} already belongs to ${existingByMobile.c_name} (${existingByMobile.c_registration_id}) — using that customer.`);
+        await selectCustomer(existingByMobile);
+        return;
+      }
+      if (plate) {
+        const existingVehicle = await vehicleApi.getByNumber(plate);
+        if (existingVehicle) {
+          const owner = await customerApi.getByIdWithStats(existingVehicle.owner_id);
+          if (owner) {
+            toast.error(`Car ${plate} is already registered to ${owner.c_name} — using that customer.`);
+            await selectCustomer(owner);
+            return;
+          }
+        }
+      }
+
       const { customer, vehicleErrors } = await customerApi.create(
-        { c_name: custName.trim(), c_mobile: custMobile.trim() },
+        { c_name: custName.trim(), c_mobile: mobile },
         plate ? [{ v_number: plate, v_type: 'car' }] : undefined
       );
       vehicleErrors.forEach(msg => toast.warning(msg));

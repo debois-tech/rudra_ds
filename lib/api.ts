@@ -70,6 +70,20 @@ export const customerApi = {
         return data;
     },
 
+    // Exact-match dedupe check — used before auto-creating a customer so a
+    // reused mobile number snaps onto the existing record instead of
+    // silently creating a duplicate.
+    async findByMobile(mobile: string): Promise<CustomerDashboardView | null> {
+        const supabase = getClient();
+        const { data, error } = await supabase
+            .from('v_customer_dashboard')
+            .select('*')
+            .eq('c_mobile', mobile)
+            .maybeSingle();
+        if (error) throw error;
+        return data;
+    },
+
     // Returns the created customer plus any per-vehicle failures (e.g. a plate
     // already registered to another customer) — a failed vehicle insert must
     // never be reported as "customer not added" since the customer row is
@@ -206,6 +220,19 @@ export const vehicleApi = {
             .select(`*, customers(c_name, c_mobile)`)
             .eq('v_id', id)
             .single();
+        if (error) throw error;
+        return data;
+    },
+
+    // Exact plate match — vehicles(org_id, v_number) is already unique in
+    // the DB, so this is a same-tenant lookup, not a new constraint.
+    async getByNumber(vNumber: string): Promise<VehicleWithOwner | null> {
+        const supabase = getClient();
+        const { data, error } = await supabase
+            .from('vehicles')
+            .select(`*, customers(c_name, c_mobile)`)
+            .eq('v_number', vNumber.toUpperCase())
+            .maybeSingle();
         if (error) throw error;
         return data;
     },
