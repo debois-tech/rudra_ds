@@ -43,10 +43,6 @@ export default function NewServicePage() {
   const [searching, setSearching] = useState(false);
   const [creatingCustomer, setCreatingCustomer] = useState(false);
   const creatingCustomerLock = useRef(false);
-  // Set once we know the customer has exactly one vehicle on file (existing,
-  // just-created, or just-matched) — lets step 3 auto-select it instead of
-  // making them pick from a dropdown of one.
-  const [preferSingleVehicle, setPreferSingleVehicle] = useState(false);
 
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerDashboardView | null>(null);
   const [category, setCategory] = useState<'vehicle' | 'licence' | null>(null);
@@ -161,19 +157,12 @@ export default function NewServicePage() {
 
   // Existing customer picked from the dropdown — autofill everything else,
   // no re-typing.
-  async function selectCustomer(customer: CustomerDashboardView) {
+  function selectCustomer(customer: CustomerDashboardView) {
     setSelectedCustomer(customer);
     setSearchResults([]);
     setCustName(''); setCustMobile(''); setCustCarNumber('');
     setLastEdited(null);
     setFieldErrors({});
-    setPreferSingleVehicle(false);
-    try {
-      const vehs = await vehicleApi.getByOwner(customer.c_id);
-      if (vehs.length === 1) setPreferSingleVehicle(true);
-    } catch (error) {
-      console.error(error);
-    }
     setStep(2);
   }
 
@@ -200,7 +189,7 @@ export default function NewServicePage() {
       const existingByMobile = await customerApi.findByMobile(mobile);
       if (existingByMobile) {
         toast.error(`Mobile ${mobile} already belongs to ${existingByMobile.c_name} (${existingByMobile.c_registration_id}) — using that customer.`);
-        await selectCustomer(existingByMobile);
+        selectCustomer(existingByMobile);
         return;
       }
       if (plate) {
@@ -209,7 +198,7 @@ export default function NewServicePage() {
           const owner = await customerApi.getByIdWithStats(existingVehicle.owner_id);
           if (owner) {
             toast.error(`Car ${plate} is already registered to ${owner.c_name} — using that customer.`);
-            await selectCustomer(owner);
+            selectCustomer(owner);
             return;
           }
         }
@@ -221,10 +210,8 @@ export default function NewServicePage() {
       );
       vehicleErrors.forEach(msg => toast.warning(msg));
       toast.success(`Customer "${customer.c_name}" added! ID: ${customer.c_registration_id}`);
-      const hasVehicle = !!plate && vehicleErrors.length === 0;
       // Freshly created — stats are known without a round-trip fetch.
-      setSelectedCustomer({ ...customer, vehicle_count: hasVehicle ? 1 : 0, service_count: 0, total_revenue: 0 });
-      setPreferSingleVehicle(hasVehicle);
+      setSelectedCustomer({ ...customer, vehicle_count: plate && vehicleErrors.length === 0 ? 1 : 0, service_count: 0, total_revenue: 0 });
       setCustName(''); setCustMobile(''); setCustCarNumber('');
       setStep(2);
     } catch (error: unknown) {
@@ -248,7 +235,8 @@ export default function NewServicePage() {
       if (cat === 'vehicle' && selectedCustomer) {
         const vehs = await vehicleApi.getByOwner(selectedCustomer.c_id);
         setCustomerVehicles(vehs);
-        if (preferSingleVehicle && vehs.length === 1) {
+        // One car on file — pre-select it; "enter manually" stays in the dropdown.
+        if (vehs.length === 1) {
           const vehicle = vehs[0];
           setVehicleId(vehicle.v_id);
           setVehicleNumber(vehicle.v_number);
@@ -264,20 +252,6 @@ export default function NewServicePage() {
       setCategoryLoading(false);
       categoryLock.current = false;
     }
-  }
-
-  function resetForm() {
-    setStep(1);
-    setCustName(''); setCustMobile(''); setCustCarNumber('');
-    setLastEdited(null); setFieldErrors({}); setSearchResults([]);
-    setPreferSingleVehicle(false);
-    setSelectedCustomer(null);
-    setCategory(null);
-    setServiceTypeId(null);
-    setVehicleId(''); setVehicleType(''); setVehicleNumber(''); setVehicleName('');
-    setMdlNumber('');
-    setExpiryDate(''); setTotalCost(''); setNotes('');
-    setIssueDate(new Date().toISOString().split('T')[0]);
   }
 
   // Validate cost string is a clean integer or decimal
@@ -366,14 +340,15 @@ export default function NewServicePage() {
       }
 
       toast.success(renewOf ? 'Service renewed successfully!' : 'Service created successfully!');
-      if (renewOf) router.replace('/dashboard/services/new');
-      resetForm();
+      // Land on the services table; it offers "add another service" for this
+      // customer. Button stays locked until navigation so a late click can't double-submit.
+      router.push(`/dashboard/services/overview?added=${selectedCustomer.c_id}`);
     } catch (error: unknown) {
       logClientError(category === 'vehicle' ? 'create-vehicle-service' : 'create-document-service', error, { customerId: selectedCustomer?.c_id, serviceTypeId, form: category });
       toast.error(getErrorMessage(error, 'Could not create service.'));
+      setSubmitting(false);
+      submitLock.current = false;
     }
-    setSubmitting(false);
-    submitLock.current = false;
   }
 
   return (
