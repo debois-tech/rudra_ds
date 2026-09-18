@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useState, useContext } from 'react';
+import { useEffect, useMemo, useRef, useState, useContext } from 'react';
 import { DashboardOrgContext } from '../../../app-shell';
 import { serviceApi, buildRenewUrl } from '@/lib/api';
 import type { ServiceOverview } from '@/lib/types';
-import { FileText, Download, Search, Wrench, Car, ArrowUpDown, RefreshCw } from 'lucide-react';
+import { FileText, Download, Search, Wrench, Car, ArrowUpDown, RefreshCw, Trash2, Loader2 } from 'lucide-react';
 import { ServiceAddedDialog } from './_components/service-added-dialog';
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatusBadge } from '../../overview/_components/badges';
@@ -15,6 +15,7 @@ import Link from 'next/link';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { generateInvoice } from '@/lib/invoice';
+import { getErrorMessage, logClientError } from '@/lib/error-message';
 
 type SortKey = 'newest' | 'oldest' | 'amount-high' | 'amount-low' | 'customer';
 type CategoryFilter = 'all' | 'vehicle' | 'licence';
@@ -36,6 +37,8 @@ export default function ServiceOverviewPage() {
   const [sortBy, setSortBy] = useState<SortKey>('newest');
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const deleteLock = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -81,6 +84,27 @@ export default function ServiceOverviewPage() {
 
   function handleSearch(query: string) {
     setSearchQuery(query);
+  }
+
+  // Dashboard totals, revenue, breakdowns and expiry lists all read the
+  // service_records view, so they correct themselves on next load — only this
+  // table's local list needs pruning.
+  async function handleDelete(s: ServiceOverview) {
+    if (deleteLock.current) return;
+    if (!confirm(`Delete "${s.service_name}" for ${s.customer_name}? ₹${Number(s.total_cost).toLocaleString()} will be removed from revenue and reports. This can't be undone.`)) return;
+    deleteLock.current = true;
+    setDeletingId(s.s_id);
+    try {
+      await serviceApi.delete(s.s_id);
+      setServices(prev => prev.filter(x => x.s_id !== s.s_id));
+      toast.success('Service deleted');
+    } catch (error) {
+      logClientError('delete-service', error, { serviceId: s.s_id });
+      toast.error(getErrorMessage(error, 'Could not delete service.'));
+    } finally {
+      setDeletingId(null);
+      deleteLock.current = false;
+    }
   }
 
   function handleInvoice(service: ServiceOverview) {
@@ -255,6 +279,16 @@ export default function ServiceOverviewPage() {
                             title="Download Invoice"
                           >
                             <Download className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 w-8 p-0 border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50 rounded-lg"
+                            onClick={() => handleDelete(s)}
+                            disabled={deletingId === s.s_id}
+                            title="Delete Service"
+                          >
+                            {deletingId === s.s_id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                           </Button>
                         </div>
                       </td>

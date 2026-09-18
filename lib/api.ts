@@ -405,8 +405,10 @@ export const serviceApi = {
         const supabase = getClient();
         const { data: existing, error: lookupError } = await supabase.from('v_services_overview').select('category').eq('s_id', id).single();
         if (lookupError) throw lookupError;
-        const { error } = await supabase.from(existing.category === 'vehicle' ? 'vehicle_services' : 'document_services').delete().eq('s_id', id);
+        // .select() so a delete RLS silently filters to 0 rows is an error, not a fake success.
+        const { data, error } = await supabase.from(existing.category === 'vehicle' ? 'vehicle_services' : 'document_services').delete().eq('s_id', id).select('s_id');
         if (error) throw error;
+        if (!data?.length) throw new Error('Service not found or not permitted.');
     },
 };
 
