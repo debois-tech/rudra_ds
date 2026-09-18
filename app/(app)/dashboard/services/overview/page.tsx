@@ -5,6 +5,7 @@ import { DashboardOrgContext } from '../../../app-shell';
 import { serviceApi, buildRenewUrl } from '@/lib/api';
 import type { ServiceOverview } from '@/lib/types';
 import { FileText, Download, Search, Wrench, Car, ArrowUpDown, RefreshCw } from 'lucide-react';
+import { ServiceAddedDialog } from './_components/service-added-dialog';
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatusBadge } from '../../overview/_components/badges';
 import { Button } from '@/components/ui/button';
@@ -109,6 +110,8 @@ export default function ServiceOverviewPage() {
           </Button>
         </Link>
       </div>
+
+      <ServiceAddedDialog />
 
       <Card className="rounded-2xl shadow-sm border-slate-200 overflow-hidden">
         <CardHeader className="bg-white border-b border-slate-100 pb-4 pt-5 px-6">

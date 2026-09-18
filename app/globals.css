@@ -157,6 +157,30 @@
   animation: fadeIn 0.4s ease-out forwards;
 }
 
+/* Success badge: circle settles in, then the tick draws itself */
+@keyframes checkPop {
+  from { transform: scale(0.6); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+@keyframes checkDraw {
+  to { stroke-dashoffset: 0; }
+}
+.success-check {
+  animation: checkPop 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
+}
+.success-check path {
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+  animation: checkDraw 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.35s forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .success-check,
+  .success-check path {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}
+
 /* Staggered children animation */
 .stagger-children > * {
   opacity: 0;
