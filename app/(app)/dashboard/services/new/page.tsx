@@ -14,7 +14,6 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { DateTimePicker } from '@/components/ui/date-time-picker';
 import { getErrorMessage, logClientError } from '@/lib/error-message';
-import { VEHICLE_NUMBER_REGEX } from '@/lib/utils';
 
 const VEHICLE_CLASSES: VehicleClass[] = ['NT', 'Transport', 'Conductor'];
 const VEHICLE_TYPE_LICENCE: VehicleTypeLicence[] = [
@@ -175,7 +174,6 @@ export default function NewServicePage() {
     if (custName.trim().length < 2) errors.name = 'Name must be at least 2 characters.';
     if (!/^[0-9]{10}$/.test(custMobile.trim())) errors.mobile = 'Mobile number must be exactly 10 digits.';
     const plate = custCarNumber.trim().toUpperCase();
-    if (plate && !VEHICLE_NUMBER_REGEX.test(plate)) errors.carNumber = 'Invalid format. Example: MH14EP4332';
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
@@ -273,12 +271,6 @@ export default function NewServicePage() {
     const cost = parseCost(totalCost);
     if (cost <= 0) {
       toast.error('Please enter a valid service cost');
-      return;
-    }
-    // Hard-check plate format only for a manually-typed number — an
-    // existing vehicle picked from the dropdown is already on file as-is.
-    if (category === 'vehicle' && !vehicleId && vehicleNumber.trim() && !VEHICLE_NUMBER_REGEX.test(vehicleNumber.trim().toUpperCase())) {
-      toast.error('Invalid vehicle number format. Example: MH14EP4332');
       return;
     }
     submitLock.current = true;
