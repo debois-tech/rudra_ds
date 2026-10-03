@@ -245,7 +245,7 @@ export default function CustomerDetailPage() {
                     <thead>
                       <tr className="border-b border-slate-100 bg-slate-50/50">
                         <th className="py-3 px-4 font-semibold text-slate-500 text-[11px] uppercase tracking-wider">Service</th>
-                        <th className="py-3 px-4 font-semibold text-slate-500 text-[11px] uppercase tracking-wider">Car No.</th>
+                        <th className="py-3 px-4 font-semibold text-slate-500 text-[11px] uppercase tracking-wider">Vehicle No.</th>
                         <th className="py-3 px-4 font-semibold text-slate-500 text-[11px] uppercase tracking-wider hidden sm:table-cell">Dates (Iss - Exp)</th>
                         <th className="py-3 px-4 font-semibold text-slate-500 text-[11px] uppercase tracking-wider">Status</th>
                         <th className="py-3 px-4 font-semibold text-slate-500 text-[11px] uppercase tracking-wider text-right">Cost</th>
