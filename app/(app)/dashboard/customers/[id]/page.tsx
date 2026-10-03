@@ -245,6 +245,7 @@ export default function CustomerDetailPage() {
                     <thead>
                       <tr className="border-b border-slate-100 bg-slate-50/50">
                         <th className="py-3 px-4 font-semibold text-slate-500 text-[11px] uppercase tracking-wider">Service</th>
+                        <th className="py-3 px-4 font-semibold text-slate-500 text-[11px] uppercase tracking-wider">Car No.</th>
                         <th className="py-3 px-4 font-semibold text-slate-500 text-[11px] uppercase tracking-wider hidden sm:table-cell">Dates (Iss - Exp)</th>
                         <th className="py-3 px-4 font-semibold text-slate-500 text-[11px] uppercase tracking-wider">Status</th>
                         <th className="py-3 px-4 font-semibold text-slate-500 text-[11px] uppercase tracking-wider text-right">Cost</th>
@@ -262,6 +263,7 @@ export default function CustomerDetailPage() {
                               {s.category}
                             </span>
                           </td>
+                          <td className="py-3 px-4 font-mono text-xs text-slate-700">{s.vehicle_number || '—'}</td>
                           <td className="py-3 px-4 hidden sm:table-cell">
                             <p className="text-xs font-semibold text-slate-700">{format(new Date(s.issue_date), 'dd MMM yyyy')}</p>
                             <p className="text-xs text-slate-500">{s.expiry_date ? format(new Date(s.expiry_date), 'dd MMM yyyy') : 'No Expiry'}</p>
