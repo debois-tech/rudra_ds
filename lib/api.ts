@@ -33,19 +33,48 @@ function getClient() {
     return createSupabaseBrowser();
 }
 
+export const EXPIRED_LIMIT = 500;
+
+// Escapes LIKE wildcards so user text is matched literally.
+const escapeLike = (term: string) => term.replace(/[\\%_]/g, m => '\\' + m);
+
+// `%term%` quoted for use inside a PostgREST .or() string — an unquoted
+// comma/paren in the search text (e.g. "Sharma, Raj") breaks the whole filter.
+const orIlike = (term: string) => `"%${escapeLike(term).replace(/[\\"]/g, m => '\\' + m)}%"`;
+
+export type CustomerSort = 'name' | 'newest' | 'oldest' | 'vehicles' | 'services' | 'revenue';
+export type CustomerVehicleFilter = 'all' | 'with' | 'without';
+export type ServiceSort = 'newest' | 'oldest' | 'amount-high' | 'amount-low' | 'customer';
+export const PAGE_SIZE = 100;
+
 // =============================================
 // CUSTOMER OPERATIONS
 // =============================================
 
 export const customerApi = {
-    async getAll(): Promise<CustomerDashboardView[]> {
+    // Server-side search/sort/filter + paging via get_customers_page, which pages
+    // the customers first and counts vehicles/services only for that page.
+    async list(opts: { search?: string; sort?: CustomerSort; vehicleFilter?: CustomerVehicleFilter; offset?: number }): Promise<{ rows: CustomerDashboardView[]; hasMore: boolean }> {
         const supabase = getClient();
-        const { data, error } = await supabase
-            .from('v_customer_dashboard')
-            .select('*')
-            .order('created_at', { ascending: false });
+        const { search = '', sort = 'newest', vehicleFilter = 'all', offset = 0 } = opts;
+        const { data, error } = await supabase.rpc('get_customers_page', {
+            p_search: search.trim(),
+            p_sort: sort,
+            p_vehicle_filter: vehicleFilter,
+            p_limit: PAGE_SIZE + 1, // one extra row => hasMore
+            p_offset: offset,
+        });
         if (error) throw error;
-        return data || [];
+        const rows = (data || []) as CustomerDashboardView[];
+        return { rows: rows.slice(0, PAGE_SIZE), hasMore: rows.length > PAGE_SIZE };
+    },
+
+    // Cheap head-only count on the base table (the view would aggregate everything).
+    async count(): Promise<number> {
+        const supabase = getClient();
+        const { count, error } = await supabase.from('customers').select('c_id', { count: 'exact', head: true });
+        if (error) throw error;
+        return count || 0;
     },
 
     async getById(id: string): Promise<Customer | null> {
@@ -162,17 +191,18 @@ export const customerApi = {
     // don't need to re-add customers that already exist.
     async search(query: string): Promise<CustomerDashboardView[]> {
         const supabase = getClient();
+        const pat = orIlike(query);
         const [direct, byPlate] = await Promise.all([
             supabase
                 .from('v_customer_dashboard')
                 .select('*')
-                .or(`c_name.ilike.%${query}%,c_mobile.ilike.%${query}%,c_registration_id.ilike.%${query}%`)
+                .or(`c_name.ilike.${pat},c_mobile.ilike.${pat},c_registration_id.ilike.${pat}`)
                 .order('created_at', { ascending: false })
                 .limit(5),
             supabase
                 .from('vehicles')
                 .select('owner_id')
-                .ilike('v_number', `%${query}%`)
+                .ilike('v_number', `%${escapeLike(query)}%`)
                 .limit(5),
         ]);
         if (direct.error) throw direct.error;
@@ -313,14 +343,42 @@ export const serviceTypeApi = {
 // =============================================
 
 export const serviceApi = {
-    async getAll(): Promise<ServiceOverview[]> {
+    // Server-side search/sort/filter + paging, same shape as customerApi.list.
+    async list(opts: { search?: string; sort?: ServiceSort; category?: ServiceCategory | 'all'; status?: ServiceStatus | 'all'; offset?: number }): Promise<{ rows: ServiceOverview[]; hasMore: boolean }> {
         const supabase = getClient();
-        const { data, error } = await supabase
-            .from('v_services_overview')
-            .select('*')
-            .order('created_at', { ascending: false });
+        const { search = '', sort = 'newest', category = 'all', status = 'all', offset = 0 } = opts;
+        let query = supabase.from('v_services_overview').select('*');
+
+        const term = search.trim();
+        if (term) {
+            const pat = orIlike(term);
+            query = query.or(`customer_name.ilike.${pat},service_name.ilike.${pat},vehicle_number.ilike.${pat},customer_mobile.ilike.${pat}`);
+        }
+        if (category !== 'all') query = query.eq('category', category);
+        if (status !== 'all') query = query.eq('status', status);
+
+        const [column, ascending] = ({
+            newest: ['issue_date', false],
+            oldest: ['issue_date', true],
+            'amount-high': ['total_cost', false],
+            'amount-low': ['total_cost', true],
+            customer: ['customer_name', true],
+        } as Record<ServiceSort, [string, boolean]>)[sort];
+
+        const { data, error } = await query
+            .order(column, { ascending })
+            .order('s_id')
+            .range(offset, offset + PAGE_SIZE); // one extra row => hasMore
         if (error) throw error;
-        return data || [];
+        const rows = data || [];
+        return { rows: rows.slice(0, PAGE_SIZE), hasMore: rows.length > PAGE_SIZE };
+    },
+
+    async count(): Promise<number> {
+        const supabase = getClient();
+        const { count, error } = await supabase.from('service_records').select('s_id', { count: 'exact', head: true });
+        if (error) throw error;
+        return count || 0;
     },
 
     async getByCustomer(customerId: string): Promise<ServiceOverview[]> {
@@ -499,7 +557,7 @@ export const dashboardApi = {
             // relabeled 'expired' even though the date has passed. But do
             // exclude 'completed'/'cancelled' — those are resolved (e.g. a
             // renewal already superseded them) and shouldn't linger here.
-            query = query.lt('expiry_date', todayStr).in('status', ['active', 'expired']).order('expiry_date', { ascending: false });
+            query = query.lt('expiry_date', todayStr).in('status', ['active', 'expired']).order('expiry_date', { ascending: false }).limit(EXPIRED_LIMIT);
         } else {
             const futureDate = new Date();
             futureDate.setDate(today.getDate() + filter);

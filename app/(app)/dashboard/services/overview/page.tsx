@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, useContext } from 'react';
+import { useEffect, useRef, useState, useContext } from 'react';
 import { DashboardOrgContext } from '../../../app-shell';
-import { serviceApi, buildRenewUrl } from '@/lib/api';
+import { serviceApi, buildRenewUrl, type ServiceSort as SortKey } from '@/lib/api';
 import type { ServiceOverview } from '@/lib/types';
 import { FileText, Download, Search, Wrench, Car, ArrowUpDown, RefreshCw, Trash2, Loader2 } from 'lucide-react';
 import { ServiceAddedDialog } from './_components/service-added-dialog';
@@ -17,7 +17,6 @@ import { toast } from 'sonner';
 import { generateInvoice } from '@/lib/invoice';
 import { getErrorMessage, logClientError } from '@/lib/error-message';
 
-type SortKey = 'newest' | 'oldest' | 'amount-high' | 'amount-low' | 'customer';
 type CategoryFilter = 'all' | 'vehicle' | 'licence';
 type StatusFilter = 'all' | 'active' | 'expired' | 'completed' | 'cancelled';
 
@@ -32,8 +31,12 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
 export default function ServiceOverviewPage() {
   const orgName = useContext(DashboardOrgContext);
   const [services, setServices] = useState<ServiceOverview[]>([]);
+  const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [sortBy, setSortBy] = useState<SortKey>('newest');
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -41,49 +44,36 @@ export default function ServiceOverviewPage() {
   const deleteLock = useRef(false);
 
   useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const data = await serviceApi.getAll();
-        if (!cancelled) setServices(data);
-      } catch (error) {
-        if (!cancelled) {
-          console.error(error);
-          toast.error('Failed to load services');
-        }
-      }
-      if (!cancelled) setLoading(false);
-    }
-    load();
-    return () => { cancelled = true; };
+    const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    serviceApi.count().then(setTotal).catch(console.error);
   }, []);
 
-  const filtered = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    let list = services.filter(s =>
-      (!q ||
-        s.customer_name.toLowerCase().includes(q) ||
-        s.service_name.toLowerCase().includes(q) ||
-        s.vehicle_number?.toLowerCase().includes(q) ||
-        s.customer_mobile.includes(q)) &&
-      (categoryFilter === 'all' || s.category === categoryFilter) &&
-      (statusFilter === 'all' || s.status === statusFilter)
-    );
+  // Search/sort/filter run server-side and restart from page 1. `cancelled`
+  // drops out-of-order responses so a slow earlier query can't clobber a newer one.
+  useEffect(() => {
+    let cancelled = false;
+    serviceApi.list({ search: debouncedSearch, sort: sortBy, category: categoryFilter, status: statusFilter })
+      .then(({ rows, hasMore }) => { if (!cancelled) { setServices(rows); setHasMore(hasMore); } })
+      .catch(error => { if (!cancelled) { console.error(error); toast.error('Failed to load services'); } })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [debouncedSearch, sortBy, categoryFilter, statusFilter]);
 
-    list = [...list];
-    switch (sortBy) {
-      case 'oldest': list.sort((a, b) => new Date(a.issue_date).getTime() - new Date(b.issue_date).getTime()); break;
-      case 'amount-high': list.sort((a, b) => Number(b.total_cost) - Number(a.total_cost)); break;
-      case 'amount-low': list.sort((a, b) => Number(a.total_cost) - Number(b.total_cost)); break;
-      case 'customer': list.sort((a, b) => a.customer_name.localeCompare(b.customer_name)); break;
-      case 'newest':
-      default: list.sort((a, b) => new Date(b.issue_date).getTime() - new Date(a.issue_date).getTime()); break;
+  async function loadMore() {
+    setLoadingMore(true);
+    try {
+      const { rows, hasMore } = await serviceApi.list({ search: debouncedSearch, sort: sortBy, category: categoryFilter, status: statusFilter, offset: services.length });
+      setServices(prev => [...prev, ...rows.filter(r => !prev.some(p => p.s_id === r.s_id))]);
+      setHasMore(hasMore);
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to load more services');
     }
-    return list;
-  }, [services, searchQuery, categoryFilter, statusFilter, sortBy]);
-
-  function handleSearch(query: string) {
-    setSearchQuery(query);
+    setLoadingMore(false);
   }
 
   // Dashboard totals, revenue, breakdowns and expiry lists all read the
@@ -96,6 +86,7 @@ export default function ServiceOverviewPage() {
     setDeletingId(s.s_id);
     try {
       await serviceApi.delete(s.s_id);
+      setTotal(t => t - 1);
       setServices(prev => prev.filter(x => x.s_id !== s.s_id));
       toast.success('Service deleted');
     } catch (error) {
@@ -123,9 +114,7 @@ export default function ServiceOverviewPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Services</h1>
           <p className="text-slate-500 mt-1 font-medium">
-            {filtered.length === services.length
-              ? `${services.length} total services`
-              : `${filtered.length} of ${services.length} services`}
+            {`${total.toLocaleString('en-IN')} total services`}
           </p>
         </div>
         <Link href="/dashboard/services/new">
@@ -145,7 +134,7 @@ export default function ServiceOverviewPage() {
               <input
                 placeholder="Search by customer, service, vehicle..."
                 value={searchQuery}
-                onChange={e => handleSearch(e.target.value)}
+                onChange={e => setSearchQuery(e.target.value)}
                 className="bg-transparent border-none outline-none w-full text-sm text-slate-900 placeholder:text-slate-400"
               />
             </div>
@@ -191,7 +180,7 @@ export default function ServiceOverviewPage() {
             <div className="flex justify-center py-20">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500" />
             </div>
-          ) : services.length === 0 ? (
+          ) : services.length === 0 && !debouncedSearch && categoryFilter === 'all' && statusFilter === 'all' ? (
             <div className="text-center py-20">
               <div className="h-16 w-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
                  <FileText className="h-8 w-8 text-slate-300" />
@@ -201,7 +190,7 @@ export default function ServiceOverviewPage() {
                 <Button variant="outline" className="rounded-xl font-medium">Create First Service</Button>
               </Link>
             </div>
-          ) : filtered.length === 0 ? (
+          ) : services.length === 0 ? (
             <div className="text-center py-20">
               <div className="h-16 w-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
                  <FileText className="h-8 w-8 text-slate-300" />
@@ -230,7 +219,7 @@ export default function ServiceOverviewPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filtered.map(s => (
+                  {services.map(s => (
                     <tr key={s.s_id} className="hover:bg-amber-50/30 transition-colors">
                       <td className="py-4 px-6">
                         <Link href={`/dashboard/customers/${s.customer_id}`} className="block hover:opacity-80 transition-opacity">
@@ -296,6 +285,13 @@ export default function ServiceOverviewPage() {
                   ))}
                 </tbody>
               </table>
+              {hasMore && (
+                <div className="flex justify-center border-t border-slate-100 p-4">
+                  <Button variant="outline" onClick={loadMore} disabled={loadingMore} className="rounded-xl font-medium">
+                    {loadingMore ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Load more
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </CardContent>

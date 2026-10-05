@@ -14,7 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FILTER_TRIGGER_CLASS, FILTER_ITEM_CLASS } from '@/lib/ui-constants';
-import { buildRenewUrl } from '@/lib/api';
+import { buildRenewUrl, EXPIRED_LIMIT } from '@/lib/api';
 import Link from 'next/link';
 import { formatDistanceToNow, format } from 'date-fns';
 import { createPortal } from 'react-dom';
@@ -67,7 +67,10 @@ export default function DashboardPage() {
     const [expiryOpen, setExpiryOpen] = useState(false);
     const [expirySearch, setExpirySearch] = useState('');
     const [expiryCategory, setExpiryCategory] = useState('all');
-    const [loading, setLoading] = useState(true);
+    const [statsLoading, setStatsLoading] = useState(true);
+    const [activityLoading, setActivityLoading] = useState(true);
+    const [loadedExpiryMode, setLoadedExpiryMode] = useState<ExpiryMode | null>(null);
+    const expiryLoading = loadedExpiryMode !== expiryMode; // true until the list for the current mode arrives
 
     useEffect(() => {
         if (!expiryOpen) return;
@@ -78,17 +81,19 @@ export default function DashboardPage() {
         return () => { document.body.style.overflow = previousOverflow; document.removeEventListener('keydown', closeOnEscape); };
     }, [expiryOpen]);
 
+    // Each section loads and renders on its own — a slow stats RPC no longer
+    // holds back the activity feed or the expiry list (and vice versa).
     useEffect(() => {
-        async function loadData() {
-            try {
-                const [allStats, customersData, servicesData] = await Promise.all([
-                    dashboardApi.getAllStats(),
-                    dashboardApi.getRecentCustomers(8),
-                    dashboardApi.getRecentServices(8),
-                ]);
-                setStats(allStats.stats);
+        dashboardApi.getAllStats()
+            .then(allStats => setStats(allStats.stats))
+            .catch(error => console.error('Dashboard stats error:', error))
+            .finally(() => setStatsLoading(false));
+    }, []);
 
-                const allActivity: ActivityItem[] = [
+    useEffect(() => {
+        Promise.all([dashboardApi.getRecentCustomers(8), dashboardApi.getRecentServices(8)])
+            .then(([customersData, servicesData]) => {
+                setActivities([
                     ...customersData.map((c: CustomerDashboardView) => ({
                         id: `c_${c.c_id}`,
                         type: 'customer' as const,
@@ -106,25 +111,22 @@ export default function DashboardPage() {
                         status: s.status,
                         url: `/dashboard/services/overview`,
                     }))
-                ].sort((a, b) => b.date.getTime() - a.date.getTime());
-
-                setActivities(allActivity);
-
-            } catch (error) {
-                console.error('Dashboard error:', error);
-            }
-            setLoading(false);
-        }
-        loadData();
+                ].sort((a, b) => b.date.getTime() - a.date.getTime()));
+            })
+            .catch(error => console.error('Dashboard activity error:', error))
+            .finally(() => setActivityLoading(false));
     }, []);
 
-    // Charts and expiry alerts must not block the first screen paint.
     useEffect(() => {
         let cancelled = false;
         dashboardApi.getExpiringDocuments(expiryMode).then(docs => {
             if (cancelled) return;
             setExpiringDocs(docs);
-        }).catch(error => console.error('Dashboard secondary data error:', error));
+            setLoadedExpiryMode(expiryMode);
+        }).catch(error => {
+            console.error('Dashboard expiry error:', error);
+            if (!cancelled) { setExpiringDocs([]); setLoadedExpiryMode(expiryMode); } // don't spin forever on error
+        });
         return () => { cancelled = true; };
     }, [expiryMode]);
 
@@ -164,7 +166,7 @@ export default function DashboardPage() {
 
             {/* ── Stats Grid ── */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 stagger-children">
-                {loading ? (
+                {statsLoading ? (
                     <>
                         <StatCardSkeleton /><StatCardSkeleton /><StatCardSkeleton />
                     </>
@@ -205,24 +207,33 @@ export default function DashboardPage() {
                     </div>
                     <div className="flex items-center gap-2">
                         <Select
-                            value={expiryMode === 'expired' ? 'expired' : (expiryMode === 7 || expiryMode === 30 ? String(expiryMode) : 'custom')}
+                            value={expiryMode === 7 || expiryMode === 30 ? String(expiryMode) : 'custom'}
                             onValueChange={(v) => {
                                 if (v === 'custom') { setShowCustomDays(true); return; }
                                 setShowCustomDays(false);
-                                setExpiryMode(v === 'expired' ? 'expired' : Number(v));
+                                setExpiryMode(Number(v));
                             }}
                         >
-                            <SelectTrigger size="sm" aria-label="Expiry window" className={FILTER_TRIGGER_CLASS}>
+                            <SelectTrigger size="sm" aria-label="Expiry window" className={`${FILTER_TRIGGER_CLASS} ${expiryMode === 'expired' ? 'opacity-50' : ''}`}>
                                 <ArrowUpDown className="h-3.5 w-3.5 text-slate-400" />
-                                <SelectValue>{expiryMode === 'expired' ? 'Expired' : `${expiryMode} days`}</SelectValue>
+                                <SelectValue>{expiryMode === 'expired' ? 'Window' : `${expiryMode} days`}</SelectValue>
                             </SelectTrigger>
                             <SelectContent className="rounded-xl border-slate-200 shadow-lg">
                                 <SelectItem value="7" className={FILTER_ITEM_CLASS}>7 days</SelectItem>
                                 <SelectItem value="30" className={FILTER_ITEM_CLASS}>30 days</SelectItem>
                                 <SelectItem value="custom" className={FILTER_ITEM_CLASS}>Custom…</SelectItem>
-                                <SelectItem value="expired" className={FILTER_ITEM_CLASS}>Expired</SelectItem>
                             </SelectContent>
                         </Select>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            aria-pressed={expiryMode === 'expired'}
+                            onClick={() => { setShowCustomDays(false); setExpiryMode(expiryMode === 'expired' ? 30 : 'expired'); }}
+                            className={`h-9 rounded-lg text-xs font-semibold ${expiryMode === 'expired' ? 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                        >
+                            Show expired
+                        </Button>
                         {showCustomDays && (
                             <form
                                 className="flex items-center gap-1.5"
@@ -249,7 +260,7 @@ export default function DashboardPage() {
                     </div>
                 </div>
 
-                {loading ? (
+                {expiryLoading ? (
                     <div className="p-6">
                         <div className="space-y-3">
                             {[1, 2, 3].map(i => (
@@ -311,6 +322,7 @@ export default function DashboardPage() {
                         ))}
                     </div>
                 )}
+                {expiryMode === 'expired' && expiringDocs.length >= EXPIRED_LIMIT && <p className="border-t border-slate-100 px-6 py-2 text-[11px] text-slate-400">Showing the {EXPIRED_LIMIT} most recently expired documents.</p>}
                 {expiringDocs.length > 5 && <button type="button" onClick={() => setExpiryOpen(true)} className="w-full border-t border-slate-100 px-6 py-3 text-left text-[12px] font-semibold text-amber-700 hover:bg-amber-50/40">View all expiring documents</button>}
             </div>
 
@@ -338,7 +350,7 @@ export default function DashboardPage() {
                 </div>
 
                 <div className="divide-y divide-slate-50">
-                    {loading ? (
+                    {activityLoading ? (
                         <div className="p-3">
                             <div className="space-y-3">
                                 {[1, 2, 3, 4, 5].map(i => (

@@ -633,18 +633,19 @@ SELECT
     COALESCE(s.service_count, 0)::int AS service_count,
     COALESCE(s.total_revenue, 0)::numeric(10,2) AS total_revenue
 FROM public.customers c
-LEFT JOIN (
-    SELECT owner_id, COUNT(*)::int AS vehicle_count
+-- LATERAL (not GROUP BY subqueries) so single-customer / LIMIT queries only
+-- aggregate the rows they return instead of the whole vehicles/services tables.
+LEFT JOIN LATERAL (
+    SELECT COUNT(*)::int AS vehicle_count
     FROM public.vehicles
-    GROUP BY owner_id
-) v ON v.owner_id = c.c_id
-LEFT JOIN (
-    SELECT customer_id,
-           COUNT(*)::int AS service_count,
+    WHERE owner_id = c.c_id
+) v ON true
+LEFT JOIN LATERAL (
+    SELECT COUNT(*)::int AS service_count,
            SUM(total_cost) AS total_revenue
     FROM public.service_records
-    GROUP BY customer_id
-) s ON s.customer_id = c.c_id;
+    WHERE customer_id = c.c_id
+) s ON true;
 
 CREATE OR REPLACE VIEW v_services_overview
 WITH (security_invoker = true)
@@ -838,3 +839,153 @@ BEGIN
     RETURN v_result;
 END;
 $function$;
+
+
+-- ============================================
+-- PERFORMANCE (indexes + RLS initplan) — mirrors perf-2026-10.sql
+-- ============================================
+
+-- 1. Trigram indexes: ILIKE '%term%' (customer + plate search) can't use a
+--    btree, so every search was a full table scan.
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+CREATE INDEX IF NOT EXISTS idx_customers_name_trgm   ON public.customers USING gin (c_name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_customers_mobile_trgm ON public.customers USING gin (c_mobile gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_customers_regid_trgm  ON public.customers USING gin (c_registration_id gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_vehicles_number_trgm  ON public.vehicles  USING gin (v_number gin_trgm_ops);
+
+-- 2. Indexes for the list/sort/expiry paths.
+CREATE INDEX IF NOT EXISTS idx_customers_org_created         ON public.customers(org_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_document_services_org_created ON public.document_services(org_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_vehicle_services_org_created  ON public.vehicle_services(org_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_document_services_org_expiry  ON public.document_services(org_id, expiry_date);
+CREATE INDEX IF NOT EXISTS idx_vehicle_services_org_expiry   ON public.vehicle_services(org_id, expiry_date);
+CREATE INDEX IF NOT EXISTS idx_vehicle_services_vehicle      ON public.vehicle_services(vehicle_id);
+
+-- 4. RLS initplan fix: policies calling get_user_org_id() / is_super_admin() /
+--    auth.uid() bare are re-evaluated PER ROW (each one a profiles lookup, and
+--    every table has both an sa_* and a user_* policy). Wrapping the call in
+--    (SELECT ...) makes Postgres evaluate it once per query. Semantics are
+--    identical. Rewrites every public policy in place; skips ones already done.
+DO $$
+DECLARE
+    p record;
+    fn constant text := '((public\.)?(get_user_org_id|is_super_admin)|auth\.uid)\(\)';
+    done constant text := 'select\s+((public\.)?(get_user_org_id|is_super_admin)|auth\.uid)\(\)';
+    u text;
+    w text;
+BEGIN
+    FOR p IN
+        SELECT schemaname, tablename, policyname, qual, with_check
+        FROM pg_policies
+        WHERE schemaname = 'public'
+          AND (coalesce(qual, '') ~ fn OR coalesce(with_check, '') ~ fn)
+          AND coalesce(qual, '') !~* done
+          AND coalesce(with_check, '') !~* done
+    LOOP
+        u := regexp_replace(p.qual,       '(' || fn || ')', '(SELECT \1)', 'g');
+        w := regexp_replace(p.with_check, '(' || fn || ')', '(SELECT \1)', 'g');
+        EXECUTE format('ALTER POLICY %I ON %I.%I%s%s',
+            p.policyname, p.schemaname, p.tablename,
+            CASE WHEN u IS NOT NULL THEN ' USING (' || u || ')' ELSE '' END,
+            CASE WHEN w IS NOT NULL THEN ' WITH CHECK (' || w || ')' ELSE '' END);
+    END LOOP;
+END $$;
+
+
+-- ============================================
+-- CUSTOMER LIST RPC (2026-10-05, follow-up to perf-2026-10.sql)
+-- Safe on a live DB (CREATE OR REPLACE, nothing dropped). Paste into the SQL
+-- editor. Mirrored at the end of schema.sql.
+--
+-- Why: ordering/limiting v_customer_dashboard made Postgres compute vehicle +
+-- service counts for EVERY customer before it could sort and LIMIT (RLS's
+-- "super admin OR own org" check also blocks use of the sort index). This
+-- function picks the page of customers first and only counts for those rows.
+-- SECURITY INVOKER (default), so RLS still scopes everything to the caller's org.
+-- ============================================
+CREATE OR REPLACE FUNCTION public.get_customers_page(
+    p_search         text DEFAULT '',
+    p_sort           text DEFAULT 'newest',   -- newest | oldest | name | vehicles | services | revenue
+    p_vehicle_filter text DEFAULT 'all',      -- all | with | without
+    p_limit          int  DEFAULT 101,
+    p_offset         int  DEFAULT 0
+)
+RETURNS SETOF public.v_customer_dashboard
+LANGUAGE plpgsql
+STABLE
+AS $$
+DECLARE
+    has_search boolean := btrim(p_search) <> '';
+    -- escape LIKE wildcards so the user's text matches literally
+    pat text := '%' || replace(replace(replace(btrim(p_search), '\', '\\'), '%', '\%'), '_', '\_') || '%';
+BEGIN
+    IF p_sort IN ('newest', 'oldest', 'name') AND p_vehicle_filter = 'all' THEN
+        -- Cheap path: page the customers first, then count only for those rows.
+        RETURN QUERY
+        SELECT c.c_id, c.c_name, c.c_mobile, c.c_whatsapp, c.c_email, c.c_address, c.c_dob,
+               c.c_registration_id, c.org_id, c.created_at, c.updated_at,
+               COALESCE(v.vehicle_count, 0)::int,
+               COALESCE(s.service_count, 0)::int,
+               COALESCE(s.total_revenue, 0)::numeric(10,2)
+        FROM (
+            SELECT cu.c_id, cu.c_name, cu.c_mobile, cu.c_whatsapp, cu.c_email, cu.c_address, cu.c_dob,
+                   cu.c_registration_id, cu.org_id, cu.created_at, cu.updated_at
+            FROM public.customers cu
+            WHERE NOT has_search
+               OR cu.c_name ILIKE pat OR cu.c_mobile ILIKE pat OR cu.c_registration_id ILIKE pat
+               OR cu.c_id IN (SELECT owner_id FROM public.vehicles WHERE v_number ILIKE pat)
+            ORDER BY CASE WHEN p_sort = 'name'   THEN cu.c_name    END ASC,
+                     CASE WHEN p_sort = 'oldest' THEN cu.created_at END ASC,
+                     CASE WHEN p_sort = 'newest' THEN cu.created_at END DESC,
+                     cu.c_id
+            LIMIT p_limit OFFSET p_offset
+        ) c
+        LEFT JOIN LATERAL (
+            SELECT COUNT(*)::int AS vehicle_count FROM public.vehicles WHERE owner_id = c.c_id
+        ) v ON true
+        LEFT JOIN LATERAL (
+            SELECT COUNT(*)::int AS service_count, SUM(total_cost) AS total_revenue
+            FROM public.service_records WHERE customer_id = c.c_id
+        ) s ON true
+        ORDER BY CASE WHEN p_sort = 'name'   THEN c.c_name    END ASC,
+                 CASE WHEN p_sort = 'oldest' THEN c.created_at END ASC,
+                 CASE WHEN p_sort = 'newest' THEN c.created_at END DESC,
+                 c.c_id;
+    ELSE
+        -- Sorting/filtering BY the counts needs them for every customer, so
+        -- aggregate each table once (hash aggregate) instead of per-customer probes.
+        RETURN QUERY
+        SELECT x.c_id, x.c_name, x.c_mobile, x.c_whatsapp, x.c_email, x.c_address, x.c_dob,
+               x.c_registration_id, x.org_id, x.created_at, x.updated_at,
+               x.vehicle_count, x.service_count, x.total_revenue
+        FROM (
+            SELECT cu.c_id, cu.c_name, cu.c_mobile, cu.c_whatsapp, cu.c_email, cu.c_address, cu.c_dob,
+                   cu.c_registration_id, cu.org_id, cu.created_at, cu.updated_at,
+                   COALESCE(v.vehicle_count, 0)::int AS vehicle_count,
+                   COALESCE(s.service_count, 0)::int AS service_count,
+                   COALESCE(s.total_revenue, 0)::numeric(10,2) AS total_revenue
+            FROM public.customers cu
+            LEFT JOIN (SELECT owner_id, COUNT(*)::int AS vehicle_count FROM public.vehicles GROUP BY owner_id) v
+                   ON v.owner_id = cu.c_id
+            LEFT JOIN (SELECT customer_id, COUNT(*)::int AS service_count, SUM(total_cost) AS total_revenue
+                       FROM public.service_records GROUP BY customer_id) s
+                   ON s.customer_id = cu.c_id
+            WHERE NOT has_search
+               OR cu.c_name ILIKE pat OR cu.c_mobile ILIKE pat OR cu.c_registration_id ILIKE pat
+               OR cu.c_id IN (SELECT owner_id FROM public.vehicles WHERE v_number ILIKE pat)
+        ) x
+        WHERE p_vehicle_filter = 'all'
+           OR (p_vehicle_filter = 'with'    AND x.vehicle_count > 0)
+           OR (p_vehicle_filter = 'without' AND x.vehicle_count = 0)
+        ORDER BY CASE WHEN p_sort = 'vehicles' THEN x.vehicle_count END DESC,
+                 CASE WHEN p_sort = 'services' THEN x.service_count END DESC,
+                 CASE WHEN p_sort = 'revenue'  THEN x.total_revenue END DESC,
+                 CASE WHEN p_sort = 'name'     THEN x.c_name        END ASC,
+                 CASE WHEN p_sort = 'oldest'   THEN x.created_at    END ASC,
+                 x.created_at DESC,
+                 x.c_id
+        LIMIT p_limit OFFSET p_offset;
+    END IF;
+END;
+$$;
