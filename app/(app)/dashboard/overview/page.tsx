@@ -21,7 +21,7 @@ import { formatDistanceToNow, format } from 'date-fns';
 import { StatCard, StatCardSkeleton } from './_components/stat-card';
 import { StatusBadge, UrgencyBadge } from './_components/badges';
 import { EmptyState } from './_components/empty-state';
-import { ExpiringDialog, expirySortOptions } from './_components/expiring-dialog';
+import { ExpiringDialog, expirySortOptions, expiryPresets } from './_components/expiring-dialog';
 
 const CARD_LIMIT = 10; // the card is a preview; the popup pages through everything
 
@@ -75,7 +75,7 @@ export default function DashboardPage() {
     // One dropdown, two meanings: "due in next N days" or, in expired mode, "expired in last N days".
     const days = expired ? expDays : upDays;
     const setDays = expired ? setExpDays : setUpDays;
-    const presets = expired ? [7, 30, 60, 90] : [7, 30];
+    const presets = expiryPresets(expired);
     const expiryKey = `${expired ? 'expired' : 'upcoming'}:${days}:${expirySort}`;
     const [loadedExpiryKey, setLoadedExpiryKey] = useState<string | null>(null);
     const expiryLoading = loadedExpiryKey !== expiryKey; // true until the list for the current window arrives
@@ -337,7 +337,7 @@ export default function DashboardPage() {
                 {expiringTotal > 5 && <button type="button" onClick={() => setExpiryOpen(true)} className="w-full border-t border-slate-100 px-6 py-3 text-left text-[12px] font-semibold text-amber-700 hover:bg-amber-50/40">View all {expiringTotal.toLocaleString('en-IN')} {expired ? 'expired' : 'expiring'} documents</button>}
             </div>
 
-            {expiryOpen && <ExpiringDialog filter={{ kind: expired ? 'expired' : 'upcoming', days }} sort={expirySort} onSortChange={setExpirySort} onClose={closeExpiry} />}
+            {expiryOpen && <ExpiringDialog filter={{ kind: expired ? 'expired' : 'upcoming', days }} sort={expirySort} onDaysChange={setDays} onSortChange={setExpirySort} onClose={closeExpiry} />}
 
             {/* ── Activity Feed ── */}
             <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">

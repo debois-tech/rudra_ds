@@ -10,6 +10,9 @@ import { UrgencyBadge } from './badges';
 
 const PAGE_SIZE = 25;
 
+// Day-window presets for the dropdown; "Custom" covers anything else.
+export const expiryPresets = (expired: boolean) => (expired ? [7, 30, 60, 90] : [7, 30]);
+
 // Same four sorts in both modes; only the wording of the date ones changes.
 export function expirySortOptions(expired: boolean): { value: ExpirySort; label: string }[] {
     return [
@@ -36,7 +39,7 @@ function pageList(page: number, pages: number): (number | '…')[] {
 
 // Full list for the current expiry window: server-side search, type filter and
 // numbered pages, so any size org can reach every record. Mounted only while open.
-export function ExpiringDialog({ filter, sort, onSortChange, onClose }: { filter: ExpiryFilter; sort: ExpirySort; onSortChange: (s: ExpirySort) => void; onClose: () => void }) {
+export function ExpiringDialog({ filter, sort, onDaysChange, onSortChange, onClose }: { filter: ExpiryFilter; sort: ExpirySort; onDaysChange: (days: number) => void; onSortChange: (s: ExpirySort) => void; onClose: () => void }) {
     const [page, setPage] = useState(1);
     const [search, setSearch] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -45,6 +48,8 @@ export function ExpiringDialog({ filter, sort, onSortChange, onClose }: { filter
     const [total, setTotal] = useState(0);
     const [loadedKey, setLoadedKey] = useState<string | null>(null);
     const [failed, setFailed] = useState(false);
+    const [customOpen, setCustomOpen] = useState(false);
+    const [customInput, setCustomInput] = useState('');
 
     const key = `${filter.kind}:${filter.days}|${sort}|${page}|${debouncedSearch}|${category}`;
     const loading = loadedKey !== key;
@@ -78,6 +83,8 @@ export function ExpiringDialog({ filter, sort, onSortChange, onClose }: { filter
         // eslint-disable-next-line react-hooks/exhaustive-deps -- `key` already encodes filter/sort/page/search/category
     }, [key]);
 
+    const expired = filter.kind === 'expired';
+    const presets = expiryPresets(expired);
     const windowLabel = filter.kind === 'expired' ? `expired in the last ${filter.days} days` : `expiring in the next ${filter.days} days`;
 
     return createPortal(
@@ -91,11 +98,25 @@ export function ExpiringDialog({ filter, sort, onSortChange, onClose }: { filter
                     <button type="button" aria-label="Close" onClick={onClose} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"><X className="h-4 w-4" /></button>
                 </div>
 
-                <div className="flex gap-2 border-b border-slate-100 p-4">
-                    <div className="relative flex-1">
+                <div className="flex flex-wrap gap-2 border-b border-slate-100 p-4">
+                    <div className="relative min-w-[180px] flex-1">
                         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search customer, service or vehicle" className="h-9 w-full rounded-lg border border-slate-200 pl-9 pr-3 text-sm outline-none focus:border-slate-400" />
                     </div>
+                    <select
+                        value={presets.includes(filter.days) ? String(filter.days) : 'custom'}
+                        onChange={e => {
+                            if (e.target.value === 'custom') { setCustomOpen(true); return; }
+                            setCustomOpen(false);
+                            onDaysChange(Number(e.target.value));
+                            setPage(1);
+                        }}
+                        aria-label="Day window"
+                        className="h-9 rounded-lg border border-slate-200 px-2 text-xs text-slate-600"
+                    >
+                        {presets.map(n => <option key={n} value={n}>{expired ? `Last ${n} days` : `${n} days`}</option>)}
+                        <option value="custom">{presets.includes(filter.days) ? 'Custom…' : (expired ? `Last ${filter.days} days` : `${filter.days} days`)}</option>
+                    </select>
                     <select value={sort} onChange={e => { onSortChange(e.target.value as ExpirySort); setPage(1); }} aria-label="Sort" className="h-9 rounded-lg border border-slate-200 px-2 text-xs text-slate-600">
                         {expirySortOptions(filter.kind === 'expired').map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </select>
@@ -105,6 +126,22 @@ export function ExpiringDialog({ filter, sort, onSortChange, onClose }: { filter
                         <option value="licence">Document</option>
                     </select>
                 </div>
+
+                {customOpen && (
+                    <form
+                        className="flex items-center gap-2 border-b border-slate-100 bg-slate-50 px-4 py-2"
+                        onSubmit={e => {
+                            e.preventDefault();
+                            const n = parseInt(customInput, 10);
+                            if (n > 0) { onDaysChange(n); setPage(1); setCustomOpen(false); setCustomInput(''); }
+                        }}
+                    >
+                        <label className="text-xs text-slate-500" htmlFor="expiry-custom-days">{expired ? 'Expired in the last' : 'Expiring in the next'}</label>
+                        <input id="expiry-custom-days" type="number" min={1} autoFocus value={customInput} onChange={e => setCustomInput(e.target.value)} placeholder="N" className="h-8 w-20 rounded-lg border border-slate-300 bg-white px-2 text-xs outline-none focus:border-slate-500" />
+                        <span className="text-xs text-slate-500">days</span>
+                        <button type="submit" className="h-8 rounded-lg bg-slate-900 px-3 text-xs font-semibold text-white hover:bg-slate-700">Set</button>
+                    </form>
+                )}
 
                 <div className={`max-h-[424px] min-h-[120px] flex-none overflow-y-auto transition-opacity duration-150 ${loading && loadedKey !== null ? 'opacity-50' : ''}`}>
                     {failed ? (
