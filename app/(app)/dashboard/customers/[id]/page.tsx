@@ -31,6 +31,8 @@ export default function CustomerDetailPage() {
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [serviceType, setServiceType] = useState<'all' | 'licence' | 'vehicle'>('all');
 
+  const [serviceSearchOpen, setServiceSearchOpen] = useState(false);
+  const [serviceQuery, setServiceQuery] = useState('');
   const [vehicleSearchOpen, setVehicleSearchOpen] = useState(false);
   const [vehicleQuery, setVehicleQuery] = useState('');
 
@@ -44,11 +46,13 @@ export default function CustomerDetailPage() {
   // A selected vehicle only narrows vehicle services — licence services aren't
   // tied to any vehicle, so "Licence" + a car still lists the licence services.
   // vehicle_number fallback covers imported rows that never got a vehicle_id.
+  const sq = serviceQuery.trim().toLowerCase();
   const visibleServices = useMemo(() => services.filter(s => {
     if (serviceType !== 'all' && s.category !== serviceType) return false;
+    if (sq && !`${s.service_name} ${s.category} ${s.status} ${s.vehicle_number || ''} ${s.mdl_number || ''}`.toLowerCase().includes(sq)) return false;
     if (!selectedVehicle || serviceType === 'licence') return true;
     return s.category === 'vehicle' && (s.vehicle_id === selectedVehicle.v_id || s.vehicle_number === selectedVehicle.v_number);
-  }), [services, serviceType, selectedVehicle]);
+  }), [services, serviceType, selectedVehicle, sq]);
 
   const [editForm, setEditForm] = useState({
     c_name: '', c_mobile: '', c_whatsapp: '', c_email: '', c_address: '', c_dob: ''
@@ -299,6 +303,31 @@ export default function CustomerDetailPage() {
               </div>
             </CardHeader>
             <CardContent className="p-0">
+              {services.length > 0 && (
+                <div className="flex items-center justify-end border-b border-slate-100 bg-white px-4 py-2">
+                  {serviceSearchOpen ? (
+                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 w-full focus-within:ring-2 focus-within:ring-amber-100 focus-within:border-amber-300 transition-all">
+                      <Search className="h-4 w-4 text-slate-400 shrink-0" />
+                      <input
+                        autoFocus
+                        aria-label="Search services"
+                        placeholder="Search service, vehicle no., status..."
+                        value={serviceQuery}
+                        onChange={e => setServiceQuery(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Escape') { setServiceQuery(''); setServiceSearchOpen(false); } }}
+                        className="bg-transparent border-none outline-none w-full text-sm text-slate-900 placeholder:text-slate-400"
+                      />
+                      <button type="button" aria-label="Close service search" onClick={() => { setServiceQuery(''); setServiceSearchOpen(false); }} className="text-slate-400 hover:text-slate-700 shrink-0">
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <Button type="button" variant="outline" size="icon" aria-label="Search services" title="Search services" onClick={() => setServiceSearchOpen(true)} className="h-8 w-8 rounded-lg border-slate-200 text-slate-600 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200">
+                      <Search className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              )}
               {selectedVehicle && (
                 <div className="flex items-center justify-between gap-2 border-b border-amber-100 bg-amber-50/60 px-4 py-2 text-xs text-amber-800">
                   <span>
@@ -315,9 +344,9 @@ export default function CustomerDetailPage() {
                  <p className="text-sm text-slate-500 font-medium">{services.length === 0 ? 'No services recorded' : 'No services match this filter'}</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
+                <div className="max-h-[400px] overflow-auto">
                   <table className="w-full text-sm text-left">
-                    <thead>
+                    <thead className="sticky top-0 z-10 bg-slate-50">
                       <tr className="border-b border-slate-100 bg-slate-50/50">
                         <th className="py-3 px-4 font-semibold text-slate-500 text-[11px] uppercase tracking-wider">Service</th>
                         <th className="py-3 px-4 font-semibold text-slate-500 text-[11px] uppercase tracking-wider">Vehicle No.</th>
