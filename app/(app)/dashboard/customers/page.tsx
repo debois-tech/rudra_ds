@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { customerApi } from '@/lib/api';
+import { useEffect, useState } from 'react';
+import { customerApi, type CustomerSort as SortKey, type CustomerVehicleFilter as VehicleFilter } from '@/lib/api';
 import type { CustomerDashboardView } from '@/lib/types';
 import { Users, Plus, Search, Eye, Wrench, Trash2, Loader2, Car, ArrowUpDown } from 'lucide-react';
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -12,9 +12,6 @@ import { FILTER_TRIGGER_CLASS, FILTER_ITEM_CLASS } from '@/lib/ui-constants';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-
-type SortKey = 'name' | 'newest' | 'oldest' | 'vehicles' | 'services' | 'revenue';
-type VehicleFilter = 'all' | 'with' | 'without';
 
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: 'newest', label: 'Newest first' },
@@ -27,62 +24,47 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<CustomerDashboardView[]>([]);
+  const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [deleting, setDeleting] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortKey>('newest');
   const [vehicleFilter, setVehicleFilter] = useState<VehicleFilter>('all');
 
-  const visibleCustomers = useMemo(() => {
-    let list = customers;
-    if (vehicleFilter === 'with') list = list.filter(c => c.vehicle_count > 0);
-    else if (vehicleFilter === 'without') list = list.filter(c => c.vehicle_count === 0);
-
-    const sorted = [...list];
-    switch (sortBy) {
-      case 'name': sorted.sort((a, b) => a.c_name.localeCompare(b.c_name)); break;
-      case 'oldest': sorted.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()); break;
-      case 'vehicles': sorted.sort((a, b) => b.vehicle_count - a.vehicle_count); break;
-      case 'services': sorted.sort((a, b) => b.service_count - a.service_count); break;
-      case 'revenue': sorted.sort((a, b) => b.total_revenue - a.total_revenue); break;
-      case 'newest':
-      default: sorted.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()); break;
-    }
-    return sorted;
-  }, [customers, sortBy, vehicleFilter]);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
 
   useEffect(() => {
+    customerApi.count().then(setTotal).catch(console.error);
+  }, []);
+
+  // Any change to search/sort/filter restarts from page 1. `cancelled` drops
+  // out-of-order responses so a slow earlier query can't overwrite a newer one.
+  useEffect(() => {
     let cancelled = false;
-    customerApi.getAll()
-      .then(data => { if (!cancelled) setCustomers(data); })
+    customerApi.list({ search: debouncedSearch, sort: sortBy, vehicleFilter })
+      .then(({ rows, hasMore }) => { if (!cancelled) { setCustomers(rows); setHasMore(hasMore); } })
       .catch(err => { if (!cancelled) { console.error(err); toast.error('Failed to load customers'); } })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, []);
+  }, [debouncedSearch, sortBy, vehicleFilter]);
 
-  async function loadCustomers() {
+  async function loadMore() {
+    setLoadingMore(true);
     try {
-      const data = await customerApi.getAll();
-      setCustomers(data);
+      const { rows, hasMore } = await customerApi.list({ search: debouncedSearch, sort: sortBy, vehicleFilter, offset: customers.length });
+      setCustomers(prev => [...prev, ...rows.filter(r => !prev.some(p => p.c_id === r.c_id))]);
+      setHasMore(hasMore);
     } catch (error) {
-      console.error('Error loading customers:', error);
-      toast.error('Failed to load customers');
+      console.error(error);
+      toast.error('Failed to load more customers');
     }
-    setLoading(false);
-  }
-
-  async function handleSearch(query: string) {
-    setSearchQuery(query);
-    if (query.trim().length === 0) {
-      loadCustomers();
-      return;
-    }
-    try {
-      const data = await customerApi.search(query);
-      setCustomers(data);
-    } catch (error) {
-      console.error('Search error:', error);
-    }
+    setLoadingMore(false);
   }
 
   async function handleDelete(id: string, name: string) {
@@ -90,6 +72,7 @@ export default function CustomersPage() {
     setDeleting(id);
     try {
       await customerApi.delete(id);
+      setTotal(t => t - 1);
       setCustomers(prev => prev.filter(c => c.c_id !== id));
       toast.success(`Customer "${name}" deleted`);
     } catch (error) {
@@ -105,9 +88,7 @@ export default function CustomersPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Customers</h1>
           <p className="text-slate-500 mt-1 font-medium">
-            {visibleCustomers.length === customers.length
-              ? `${customers.length} total customers`
-              : `${visibleCustomers.length} of ${customers.length} customers`}
+            {`${total.toLocaleString('en-IN')} total customers`}
           </p>
         </div>
         <Link href="/dashboard/services/new">
@@ -125,7 +106,7 @@ export default function CustomersPage() {
               <input
                 placeholder="Search by name, mobile, or registration ID..."
                 value={searchQuery}
-                onChange={e => handleSearch(e.target.value)}
+                onChange={e => setSearchQuery(e.target.value)}
                 className="bg-transparent border-none outline-none w-full text-sm text-slate-900 placeholder:text-slate-400"
               />
             </div>
@@ -161,19 +142,19 @@ export default function CustomersPage() {
             <div className="flex justify-center py-20">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500" />
             </div>
-          ) : customers.length === 0 ? (
+          ) : customers.length === 0 && vehicleFilter === 'all' ? (
             <div className="text-center py-20">
               <div className="h-16 w-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
                  <Users className="h-8 w-8 text-slate-300" />
               </div>
-              <p className="text-slate-500 font-medium mb-4">{searchQuery ? 'No customers found matching that query' : 'No customers yet'}</p>
-              {!searchQuery && (
+              <p className="text-slate-500 font-medium mb-4">{debouncedSearch ? 'No customers found matching that query' : 'No customers yet'}</p>
+              {!debouncedSearch && (
                 <Link href="/dashboard/services/new">
                   <Button variant="outline" className="rounded-xl font-medium">Add First Customer</Button>
                 </Link>
               )}
             </div>
-          ) : visibleCustomers.length === 0 ? (
+          ) : customers.length === 0 ? (
             <div className="text-center py-20">
               <div className="h-16 w-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
                  <Car className="h-8 w-8 text-slate-300" />
@@ -194,7 +175,7 @@ export default function CustomersPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {visibleCustomers.map((c) => (
+                  {customers.map((c) => (
                     <tr key={c.c_id} className="hover:bg-amber-50/30 transition-colors group">
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-3">
@@ -254,6 +235,13 @@ export default function CustomersPage() {
                   ))}
                 </tbody>
               </table>
+              {hasMore && (
+                <div className="flex justify-center border-t border-slate-100 p-4">
+                  <Button variant="outline" onClick={loadMore} disabled={loadingMore} className="rounded-xl font-medium">
+                    {loadingMore ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Load more
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </CardContent>

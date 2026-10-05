@@ -14,7 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FILTER_TRIGGER_CLASS, FILTER_ITEM_CLASS } from '@/lib/ui-constants';
-import { buildRenewUrl } from '@/lib/api';
+import { buildRenewUrl, EXPIRED_LIMIT } from '@/lib/api';
 import Link from 'next/link';
 import { formatDistanceToNow, format } from 'date-fns';
 import { createPortal } from 'react-dom';
@@ -205,24 +205,33 @@ export default function DashboardPage() {
                     </div>
                     <div className="flex items-center gap-2">
                         <Select
-                            value={expiryMode === 'expired' ? 'expired' : (expiryMode === 7 || expiryMode === 30 ? String(expiryMode) : 'custom')}
+                            value={expiryMode === 7 || expiryMode === 30 ? String(expiryMode) : 'custom'}
                             onValueChange={(v) => {
                                 if (v === 'custom') { setShowCustomDays(true); return; }
                                 setShowCustomDays(false);
-                                setExpiryMode(v === 'expired' ? 'expired' : Number(v));
+                                setExpiryMode(Number(v));
                             }}
                         >
-                            <SelectTrigger size="sm" aria-label="Expiry window" className={FILTER_TRIGGER_CLASS}>
+                            <SelectTrigger size="sm" aria-label="Expiry window" className={`${FILTER_TRIGGER_CLASS} ${expiryMode === 'expired' ? 'opacity-50' : ''}`}>
                                 <ArrowUpDown className="h-3.5 w-3.5 text-slate-400" />
-                                <SelectValue>{expiryMode === 'expired' ? 'Expired' : `${expiryMode} days`}</SelectValue>
+                                <SelectValue>{expiryMode === 'expired' ? 'Window' : `${expiryMode} days`}</SelectValue>
                             </SelectTrigger>
                             <SelectContent className="rounded-xl border-slate-200 shadow-lg">
                                 <SelectItem value="7" className={FILTER_ITEM_CLASS}>7 days</SelectItem>
                                 <SelectItem value="30" className={FILTER_ITEM_CLASS}>30 days</SelectItem>
                                 <SelectItem value="custom" className={FILTER_ITEM_CLASS}>Custom…</SelectItem>
-                                <SelectItem value="expired" className={FILTER_ITEM_CLASS}>Expired</SelectItem>
                             </SelectContent>
                         </Select>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            aria-pressed={expiryMode === 'expired'}
+                            onClick={() => { setShowCustomDays(false); setExpiryMode(expiryMode === 'expired' ? 30 : 'expired'); }}
+                            className={`h-9 rounded-lg text-xs font-semibold ${expiryMode === 'expired' ? 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                        >
+                            Show expired
+                        </Button>
                         {showCustomDays && (
                             <form
                                 className="flex items-center gap-1.5"
@@ -311,6 +320,7 @@ export default function DashboardPage() {
                         ))}
                     </div>
                 )}
+                {expiryMode === 'expired' && expiringDocs.length >= EXPIRED_LIMIT && <p className="border-t border-slate-100 px-6 py-2 text-[11px] text-slate-400">Showing the {EXPIRED_LIMIT} most recently expired documents.</p>}
                 {expiringDocs.length > 5 && <button type="button" onClick={() => setExpiryOpen(true)} className="w-full border-t border-slate-100 px-6 py-3 text-left text-[12px] font-semibold text-amber-700 hover:bg-amber-50/40">View all expiring documents</button>}
             </div>
 

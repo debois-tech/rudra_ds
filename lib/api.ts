@@ -33,19 +33,90 @@ function getClient() {
     return createSupabaseBrowser();
 }
 
+export const EXPIRED_LIMIT = 500;
+
+// PostgREST silently truncates any single response at max_rows (1000 by
+// default), so an unpaged "get everything" quietly drops rows on big orgs.
+// `page` must use a stable, unique ordering or rows can repeat/skip across pages.
+async function fetchAll<T>(page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<T[]> {
+    const SIZE = 1000;
+    const rows: T[] = [];
+    for (let from = 0; ; from += SIZE) {
+        const { data, error } = await page(from, from + SIZE - 1);
+        if (error) throw error;
+        rows.push(...(data || []));
+        if (!data || data.length < SIZE) return rows;
+    }
+}
+
+// Escapes LIKE wildcards so user text is matched literally.
+const escapeLike = (term: string) => term.replace(/[\\%_]/g, m => '\\' + m);
+
+// `%term%` quoted for use inside a PostgREST .or() string — an unquoted
+// comma/paren in the search text (e.g. "Sharma, Raj") breaks the whole filter.
+const orIlike = (term: string) => `"%${escapeLike(term).replace(/[\\"]/g, m => '\\' + m)}%"`;
+
+export type CustomerSort = 'name' | 'newest' | 'oldest' | 'vehicles' | 'services' | 'revenue';
+export type CustomerVehicleFilter = 'all' | 'with' | 'without';
+export const CUSTOMER_PAGE_SIZE = 50;
+
 // =============================================
 // CUSTOMER OPERATIONS
 // =============================================
 
 export const customerApi = {
-    async getAll(): Promise<CustomerDashboardView[]> {
+    // Server-side search/sort/filter + paging: one page per call so the list
+    // page never pulls (or searches) the whole customer table in the browser.
+    async list(opts: { search?: string; sort?: CustomerSort; vehicleFilter?: CustomerVehicleFilter; offset?: number }): Promise<{ rows: CustomerDashboardView[]; hasMore: boolean }> {
         const supabase = getClient();
-        const { data, error } = await supabase
-            .from('v_customer_dashboard')
-            .select('*')
-            .order('created_at', { ascending: false });
+        const { search = '', sort = 'newest', vehicleFilter = 'all', offset = 0 } = opts;
+        let query = supabase.from('v_customer_dashboard').select('*');
+
+        const term = search.trim();
+        if (term) {
+            // v_customer_dashboard has no plate column — resolve plate matches to owners first.
+            const { data: plates, error: plateError } = await supabase
+                .from('vehicles')
+                .select('owner_id')
+                .ilike('v_number', `%${escapeLike(term)}%`)
+                .limit(100);
+            if (plateError) throw plateError;
+            const ownerIds = [...new Set((plates || []).map((v: { owner_id: string }) => v.owner_id))];
+            const pat = orIlike(term);
+            query = query.or(
+                `c_name.ilike.${pat},c_mobile.ilike.${pat},c_registration_id.ilike.${pat}` +
+                (ownerIds.length ? `,c_id.in.(${ownerIds.join(',')})` : '')
+            );
+        }
+
+        if (vehicleFilter === 'with') query = query.gt('vehicle_count', 0);
+        else if (vehicleFilter === 'without') query = query.eq('vehicle_count', 0);
+
+        const [column, ascending] = ({
+            name: ['c_name', true],
+            oldest: ['created_at', true],
+            vehicles: ['vehicle_count', false],
+            services: ['service_count', false],
+            revenue: ['total_revenue', false],
+            newest: ['created_at', false],
+        } as Record<CustomerSort, [string, boolean]>)[sort];
+
+        // c_id tiebreak keeps paging stable when many rows share the sort value.
+        const { data, error } = await query
+            .order(column, { ascending })
+            .order('c_id')
+            .range(offset, offset + CUSTOMER_PAGE_SIZE); // one extra row => hasMore
         if (error) throw error;
-        return data || [];
+        const rows = data || [];
+        return { rows: rows.slice(0, CUSTOMER_PAGE_SIZE), hasMore: rows.length > CUSTOMER_PAGE_SIZE };
+    },
+
+    // Cheap head-only count on the base table (the view would aggregate everything).
+    async count(): Promise<number> {
+        const supabase = getClient();
+        const { count, error } = await supabase.from('customers').select('c_id', { count: 'exact', head: true });
+        if (error) throw error;
+        return count || 0;
     },
 
     async getById(id: string): Promise<Customer | null> {
@@ -162,17 +233,18 @@ export const customerApi = {
     // don't need to re-add customers that already exist.
     async search(query: string): Promise<CustomerDashboardView[]> {
         const supabase = getClient();
+        const pat = orIlike(query);
         const [direct, byPlate] = await Promise.all([
             supabase
                 .from('v_customer_dashboard')
                 .select('*')
-                .or(`c_name.ilike.%${query}%,c_mobile.ilike.%${query}%,c_registration_id.ilike.%${query}%`)
+                .or(`c_name.ilike.${pat},c_mobile.ilike.${pat},c_registration_id.ilike.${pat}`)
                 .order('created_at', { ascending: false })
                 .limit(5),
             supabase
                 .from('vehicles')
                 .select('owner_id')
-                .ilike('v_number', `%${query}%`)
+                .ilike('v_number', `%${escapeLike(query)}%`)
                 .limit(5),
         ]);
         if (direct.error) throw direct.error;
@@ -315,12 +387,14 @@ export const serviceTypeApi = {
 export const serviceApi = {
     async getAll(): Promise<ServiceOverview[]> {
         const supabase = getClient();
-        const { data, error } = await supabase
-            .from('v_services_overview')
-            .select('*')
-            .order('created_at', { ascending: false });
-        if (error) throw error;
-        return data || [];
+        return fetchAll<ServiceOverview>((from, to) =>
+            supabase
+                .from('v_services_overview')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .order('s_id')
+                .range(from, to)
+        );
     },
 
     async getByCustomer(customerId: string): Promise<ServiceOverview[]> {
@@ -499,7 +573,7 @@ export const dashboardApi = {
             // relabeled 'expired' even though the date has passed. But do
             // exclude 'completed'/'cancelled' — those are resolved (e.g. a
             // renewal already superseded them) and shouldn't linger here.
-            query = query.lt('expiry_date', todayStr).in('status', ['active', 'expired']).order('expiry_date', { ascending: false });
+            query = query.lt('expiry_date', todayStr).in('status', ['active', 'expired']).order('expiry_date', { ascending: false }).limit(EXPIRED_LIMIT);
         } else {
             const futureDate = new Date();
             futureDate.setDate(today.getDate() + filter);

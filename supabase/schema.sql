@@ -633,18 +633,19 @@ SELECT
     COALESCE(s.service_count, 0)::int AS service_count,
     COALESCE(s.total_revenue, 0)::numeric(10,2) AS total_revenue
 FROM public.customers c
-LEFT JOIN (
-    SELECT owner_id, COUNT(*)::int AS vehicle_count
+-- LATERAL (not GROUP BY subqueries) so single-customer / LIMIT queries only
+-- aggregate the rows they return instead of the whole vehicles/services tables.
+LEFT JOIN LATERAL (
+    SELECT COUNT(*)::int AS vehicle_count
     FROM public.vehicles
-    GROUP BY owner_id
-) v ON v.owner_id = c.c_id
-LEFT JOIN (
-    SELECT customer_id,
-           COUNT(*)::int AS service_count,
+    WHERE owner_id = c.c_id
+) v ON true
+LEFT JOIN LATERAL (
+    SELECT COUNT(*)::int AS service_count,
            SUM(total_cost) AS total_revenue
     FROM public.service_records
-    GROUP BY customer_id
-) s ON s.customer_id = c.c_id;
+    WHERE customer_id = c.c_id
+) s ON true;
 
 CREATE OR REPLACE VIEW v_services_overview
 WITH (security_invoker = true)
@@ -838,3 +839,55 @@ BEGIN
     RETURN v_result;
 END;
 $function$;
+
+
+-- ============================================
+-- PERFORMANCE (indexes + RLS initplan) — mirrors perf-2026-10.sql
+-- ============================================
+
+-- 1. Trigram indexes: ILIKE '%term%' (customer + plate search) can't use a
+--    btree, so every search was a full table scan.
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+CREATE INDEX IF NOT EXISTS idx_customers_name_trgm   ON public.customers USING gin (c_name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_customers_mobile_trgm ON public.customers USING gin (c_mobile gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_customers_regid_trgm  ON public.customers USING gin (c_registration_id gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_vehicles_number_trgm  ON public.vehicles  USING gin (v_number gin_trgm_ops);
+
+-- 2. Indexes for the list/sort/expiry paths.
+CREATE INDEX IF NOT EXISTS idx_customers_org_created         ON public.customers(org_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_document_services_org_created ON public.document_services(org_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_vehicle_services_org_created  ON public.vehicle_services(org_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_document_services_org_expiry  ON public.document_services(org_id, expiry_date);
+CREATE INDEX IF NOT EXISTS idx_vehicle_services_org_expiry   ON public.vehicle_services(org_id, expiry_date);
+CREATE INDEX IF NOT EXISTS idx_vehicle_services_vehicle      ON public.vehicle_services(vehicle_id);
+
+-- 4. RLS initplan fix: policies calling get_user_org_id() / is_super_admin() /
+--    auth.uid() bare are re-evaluated PER ROW (each one a profiles lookup, and
+--    every table has both an sa_* and a user_* policy). Wrapping the call in
+--    (SELECT ...) makes Postgres evaluate it once per query. Semantics are
+--    identical. Rewrites every public policy in place; skips ones already done.
+DO $$
+DECLARE
+    p record;
+    fn constant text := '((public\.)?(get_user_org_id|is_super_admin)|auth\.uid)\(\)';
+    done constant text := 'select\s+((public\.)?(get_user_org_id|is_super_admin)|auth\.uid)\(\)';
+    u text;
+    w text;
+BEGIN
+    FOR p IN
+        SELECT schemaname, tablename, policyname, qual, with_check
+        FROM pg_policies
+        WHERE schemaname = 'public'
+          AND (coalesce(qual, '') ~ fn OR coalesce(with_check, '') ~ fn)
+          AND coalesce(qual, '') !~* done
+          AND coalesce(with_check, '') !~* done
+    LOOP
+        u := regexp_replace(p.qual,       '(' || fn || ')', '(SELECT \1)', 'g');
+        w := regexp_replace(p.with_check, '(' || fn || ')', '(SELECT \1)', 'g');
+        EXECUTE format('ALTER POLICY %I ON %I.%I%s%s',
+            p.policyname, p.schemaname, p.tablename,
+            CASE WHEN u IS NOT NULL THEN ' USING (' || u || ')' ELSE '' END,
+            CASE WHEN w IS NOT NULL THEN ' WITH CHECK (' || w || ')' ELSE '' END);
+    END LOOP;
+END $$;
