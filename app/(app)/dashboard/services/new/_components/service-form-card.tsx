@@ -109,10 +109,17 @@ export function ServiceFormCard({ customer, category, serviceTypes, vehicles, in
     try {
       let newVehicle: Vehicle | undefined;
       if (category === 'vehicle') {
-        // Manual entry: save the vehicle under this customer BEFORE the service,
-        // so it shows up in the dropdown for the next service on this page.
+        // No vehicle picked but a plate typed (or an unlinked old service being
+        // renewed): link to the customer's existing vehicle with that plate
+        // instead of inserting a duplicate. A renewal never creates a vehicle —
+        // the plate stays on the service row; a manual add saves the new vehicle
+        // BEFORE the service so it shows up in the dropdown for the next one.
         let resolvedVehicleId = vehicleId || undefined;
-        if (!vehicleId && vehicleNumber.trim()) {
+        const plate = vehicleNumber.trim().toUpperCase();
+        const existing = !vehicleId && plate ? vehicles.find(v => v.v_number.toUpperCase() === plate) : undefined;
+        if (existing) {
+          resolvedVehicleId = existing.v_id;
+        } else if (!vehicleId && plate && !renewal) {
           try {
             newVehicle = await vehicleApi.create({
               owner_id: customer.c_id,
