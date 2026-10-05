@@ -35,20 +35,6 @@ function getClient() {
 
 export const EXPIRED_LIMIT = 500;
 
-// PostgREST silently truncates any single response at max_rows (1000 by
-// default), so an unpaged "get everything" quietly drops rows on big orgs.
-// `page` must use a stable, unique ordering or rows can repeat/skip across pages.
-async function fetchAll<T>(page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<T[]> {
-    const SIZE = 1000;
-    const rows: T[] = [];
-    for (let from = 0; ; from += SIZE) {
-        const { data, error } = await page(from, from + SIZE - 1);
-        if (error) throw error;
-        rows.push(...(data || []));
-        if (!data || data.length < SIZE) return rows;
-    }
-}
-
 // Escapes LIKE wildcards so user text is matched literally.
 const escapeLike = (term: string) => term.replace(/[\\%_]/g, m => '\\' + m);
 
@@ -58,7 +44,8 @@ const orIlike = (term: string) => `"%${escapeLike(term).replace(/[\\"]/g, m => '
 
 export type CustomerSort = 'name' | 'newest' | 'oldest' | 'vehicles' | 'services' | 'revenue';
 export type CustomerVehicleFilter = 'all' | 'with' | 'without';
-export const CUSTOMER_PAGE_SIZE = 50;
+export type ServiceSort = 'newest' | 'oldest' | 'amount-high' | 'amount-low' | 'customer';
+export const PAGE_SIZE = 100;
 
 // =============================================
 // CUSTOMER OPERATIONS
@@ -105,10 +92,10 @@ export const customerApi = {
         const { data, error } = await query
             .order(column, { ascending })
             .order('c_id')
-            .range(offset, offset + CUSTOMER_PAGE_SIZE); // one extra row => hasMore
+            .range(offset, offset + PAGE_SIZE); // one extra row => hasMore
         if (error) throw error;
         const rows = data || [];
-        return { rows: rows.slice(0, CUSTOMER_PAGE_SIZE), hasMore: rows.length > CUSTOMER_PAGE_SIZE };
+        return { rows: rows.slice(0, PAGE_SIZE), hasMore: rows.length > PAGE_SIZE };
     },
 
     // Cheap head-only count on the base table (the view would aggregate everything).
@@ -385,16 +372,42 @@ export const serviceTypeApi = {
 // =============================================
 
 export const serviceApi = {
-    async getAll(): Promise<ServiceOverview[]> {
+    // Server-side search/sort/filter + paging, same shape as customerApi.list.
+    async list(opts: { search?: string; sort?: ServiceSort; category?: ServiceCategory | 'all'; status?: ServiceStatus | 'all'; offset?: number }): Promise<{ rows: ServiceOverview[]; hasMore: boolean }> {
         const supabase = getClient();
-        return fetchAll<ServiceOverview>((from, to) =>
-            supabase
-                .from('v_services_overview')
-                .select('*')
-                .order('created_at', { ascending: false })
-                .order('s_id')
-                .range(from, to)
-        );
+        const { search = '', sort = 'newest', category = 'all', status = 'all', offset = 0 } = opts;
+        let query = supabase.from('v_services_overview').select('*');
+
+        const term = search.trim();
+        if (term) {
+            const pat = orIlike(term);
+            query = query.or(`customer_name.ilike.${pat},service_name.ilike.${pat},vehicle_number.ilike.${pat},customer_mobile.ilike.${pat}`);
+        }
+        if (category !== 'all') query = query.eq('category', category);
+        if (status !== 'all') query = query.eq('status', status);
+
+        const [column, ascending] = ({
+            newest: ['issue_date', false],
+            oldest: ['issue_date', true],
+            'amount-high': ['total_cost', false],
+            'amount-low': ['total_cost', true],
+            customer: ['customer_name', true],
+        } as Record<ServiceSort, [string, boolean]>)[sort];
+
+        const { data, error } = await query
+            .order(column, { ascending })
+            .order('s_id')
+            .range(offset, offset + PAGE_SIZE); // one extra row => hasMore
+        if (error) throw error;
+        const rows = data || [];
+        return { rows: rows.slice(0, PAGE_SIZE), hasMore: rows.length > PAGE_SIZE };
+    },
+
+    async count(): Promise<number> {
+        const supabase = getClient();
+        const { count, error } = await supabase.from('service_records').select('s_id', { count: 'exact', head: true });
+        if (error) throw error;
+        return count || 0;
     },
 
     async getByCustomer(customerId: string): Promise<ServiceOverview[]> {

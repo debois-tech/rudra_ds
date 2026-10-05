@@ -67,7 +67,10 @@ export default function DashboardPage() {
     const [expiryOpen, setExpiryOpen] = useState(false);
     const [expirySearch, setExpirySearch] = useState('');
     const [expiryCategory, setExpiryCategory] = useState('all');
-    const [loading, setLoading] = useState(true);
+    const [statsLoading, setStatsLoading] = useState(true);
+    const [activityLoading, setActivityLoading] = useState(true);
+    const [loadedExpiryMode, setLoadedExpiryMode] = useState<ExpiryMode | null>(null);
+    const expiryLoading = loadedExpiryMode !== expiryMode; // true until the list for the current mode arrives
 
     useEffect(() => {
         if (!expiryOpen) return;
@@ -78,17 +81,19 @@ export default function DashboardPage() {
         return () => { document.body.style.overflow = previousOverflow; document.removeEventListener('keydown', closeOnEscape); };
     }, [expiryOpen]);
 
+    // Each section loads and renders on its own — a slow stats RPC no longer
+    // holds back the activity feed or the expiry list (and vice versa).
     useEffect(() => {
-        async function loadData() {
-            try {
-                const [allStats, customersData, servicesData] = await Promise.all([
-                    dashboardApi.getAllStats(),
-                    dashboardApi.getRecentCustomers(8),
-                    dashboardApi.getRecentServices(8),
-                ]);
-                setStats(allStats.stats);
+        dashboardApi.getAllStats()
+            .then(allStats => setStats(allStats.stats))
+            .catch(error => console.error('Dashboard stats error:', error))
+            .finally(() => setStatsLoading(false));
+    }, []);
 
-                const allActivity: ActivityItem[] = [
+    useEffect(() => {
+        Promise.all([dashboardApi.getRecentCustomers(8), dashboardApi.getRecentServices(8)])
+            .then(([customersData, servicesData]) => {
+                setActivities([
                     ...customersData.map((c: CustomerDashboardView) => ({
                         id: `c_${c.c_id}`,
                         type: 'customer' as const,
@@ -106,25 +111,22 @@ export default function DashboardPage() {
                         status: s.status,
                         url: `/dashboard/services/overview`,
                     }))
-                ].sort((a, b) => b.date.getTime() - a.date.getTime());
-
-                setActivities(allActivity);
-
-            } catch (error) {
-                console.error('Dashboard error:', error);
-            }
-            setLoading(false);
-        }
-        loadData();
+                ].sort((a, b) => b.date.getTime() - a.date.getTime()));
+            })
+            .catch(error => console.error('Dashboard activity error:', error))
+            .finally(() => setActivityLoading(false));
     }, []);
 
-    // Charts and expiry alerts must not block the first screen paint.
     useEffect(() => {
         let cancelled = false;
         dashboardApi.getExpiringDocuments(expiryMode).then(docs => {
             if (cancelled) return;
             setExpiringDocs(docs);
-        }).catch(error => console.error('Dashboard secondary data error:', error));
+            setLoadedExpiryMode(expiryMode);
+        }).catch(error => {
+            console.error('Dashboard expiry error:', error);
+            if (!cancelled) { setExpiringDocs([]); setLoadedExpiryMode(expiryMode); } // don't spin forever on error
+        });
         return () => { cancelled = true; };
     }, [expiryMode]);
 
@@ -164,7 +166,7 @@ export default function DashboardPage() {
 
             {/* ── Stats Grid ── */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 stagger-children">
-                {loading ? (
+                {statsLoading ? (
                     <>
                         <StatCardSkeleton /><StatCardSkeleton /><StatCardSkeleton />
                     </>
@@ -258,7 +260,7 @@ export default function DashboardPage() {
                     </div>
                 </div>
 
-                {loading ? (
+                {expiryLoading ? (
                     <div className="p-6">
                         <div className="space-y-3">
                             {[1, 2, 3].map(i => (
@@ -348,7 +350,7 @@ export default function DashboardPage() {
                 </div>
 
                 <div className="divide-y divide-slate-50">
-                    {loading ? (
+                    {activityLoading ? (
                         <div className="p-3">
                             <div className="space-y-3">
                                 {[1, 2, 3, 4, 5].map(i => (
