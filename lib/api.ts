@@ -52,49 +52,20 @@ export const PAGE_SIZE = 100;
 // =============================================
 
 export const customerApi = {
-    // Server-side search/sort/filter + paging: one page per call so the list
-    // page never pulls (or searches) the whole customer table in the browser.
+    // Server-side search/sort/filter + paging via get_customers_page, which pages
+    // the customers first and counts vehicles/services only for that page.
     async list(opts: { search?: string; sort?: CustomerSort; vehicleFilter?: CustomerVehicleFilter; offset?: number }): Promise<{ rows: CustomerDashboardView[]; hasMore: boolean }> {
         const supabase = getClient();
         const { search = '', sort = 'newest', vehicleFilter = 'all', offset = 0 } = opts;
-        let query = supabase.from('v_customer_dashboard').select('*');
-
-        const term = search.trim();
-        if (term) {
-            // v_customer_dashboard has no plate column — resolve plate matches to owners first.
-            const { data: plates, error: plateError } = await supabase
-                .from('vehicles')
-                .select('owner_id')
-                .ilike('v_number', `%${escapeLike(term)}%`)
-                .limit(100);
-            if (plateError) throw plateError;
-            const ownerIds = [...new Set((plates || []).map((v: { owner_id: string }) => v.owner_id))];
-            const pat = orIlike(term);
-            query = query.or(
-                `c_name.ilike.${pat},c_mobile.ilike.${pat},c_registration_id.ilike.${pat}` +
-                (ownerIds.length ? `,c_id.in.(${ownerIds.join(',')})` : '')
-            );
-        }
-
-        if (vehicleFilter === 'with') query = query.gt('vehicle_count', 0);
-        else if (vehicleFilter === 'without') query = query.eq('vehicle_count', 0);
-
-        const [column, ascending] = ({
-            name: ['c_name', true],
-            oldest: ['created_at', true],
-            vehicles: ['vehicle_count', false],
-            services: ['service_count', false],
-            revenue: ['total_revenue', false],
-            newest: ['created_at', false],
-        } as Record<CustomerSort, [string, boolean]>)[sort];
-
-        // c_id tiebreak keeps paging stable when many rows share the sort value.
-        const { data, error } = await query
-            .order(column, { ascending })
-            .order('c_id')
-            .range(offset, offset + PAGE_SIZE); // one extra row => hasMore
+        const { data, error } = await supabase.rpc('get_customers_page', {
+            p_search: search.trim(),
+            p_sort: sort,
+            p_vehicle_filter: vehicleFilter,
+            p_limit: PAGE_SIZE + 1, // one extra row => hasMore
+            p_offset: offset,
+        });
         if (error) throw error;
-        const rows = data || [];
+        const rows = (data || []) as CustomerDashboardView[];
         return { rows: rows.slice(0, PAGE_SIZE), hasMore: rows.length > PAGE_SIZE };
     },
 

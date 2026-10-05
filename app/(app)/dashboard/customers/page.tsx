@@ -28,6 +28,9 @@ export default function CustomersPage() {
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [refreshing, setRefreshing] = useState(false); // re-query after a search/sort/filter change
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -35,9 +38,14 @@ export default function CustomersPage() {
   const [vehicleFilter, setVehicleFilter] = useState<VehicleFilter>('all');
 
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300);
+    const t = setTimeout(() => {
+      const next = searchQuery.trim();
+      if (next === debouncedSearch) return;
+      setRefreshing(true);
+      setDebouncedSearch(next);
+    }, 300);
     return () => clearTimeout(t);
-  }, [searchQuery]);
+  }, [searchQuery, debouncedSearch]);
 
   useEffect(() => {
     customerApi.count().then(setTotal).catch(console.error);
@@ -48,11 +56,11 @@ export default function CustomersPage() {
   useEffect(() => {
     let cancelled = false;
     customerApi.list({ search: debouncedSearch, sort: sortBy, vehicleFilter })
-      .then(({ rows, hasMore }) => { if (!cancelled) { setCustomers(rows); setHasMore(hasMore); } })
-      .catch(err => { if (!cancelled) { console.error(err); toast.error('Failed to load customers'); } })
-      .finally(() => { if (!cancelled) setLoading(false); });
+      .then(({ rows, hasMore }) => { if (!cancelled) { setCustomers(rows); setHasMore(hasMore); setLoadError(false); } })
+      .catch(err => { if (!cancelled) { console.error(err); setLoadError(true); toast.error('Failed to load customers'); } })
+      .finally(() => { if (!cancelled) { setLoading(false); setRefreshing(false); } });
     return () => { cancelled = true; };
-  }, [debouncedSearch, sortBy, vehicleFilter]);
+  }, [debouncedSearch, sortBy, vehicleFilter, reloadKey]);
 
   async function loadMore() {
     setLoadingMore(true);
@@ -111,7 +119,7 @@ export default function CustomersPage() {
               />
             </div>
             <div className="flex items-center gap-2">
-              <Select value={sortBy} onValueChange={v => setSortBy(v as SortKey)}>
+              <Select value={sortBy} onValueChange={v => { setRefreshing(true); setSortBy(v as SortKey); }}>
                 <SelectTrigger size="sm" aria-label="Sort customers" className={FILTER_TRIGGER_CLASS}>
                   <ArrowUpDown className="h-3.5 w-3.5 text-slate-400" />
                   <SelectValue />
@@ -124,7 +132,7 @@ export default function CustomersPage() {
                   ))}
                 </SelectContent>
               </Select>
-              <Select value={vehicleFilter} onValueChange={v => setVehicleFilter(v as VehicleFilter)}>
+              <Select value={vehicleFilter} onValueChange={v => { setRefreshing(true); setVehicleFilter(v as VehicleFilter); }}>
                 <SelectTrigger size="sm" aria-label="Filter by vehicle ownership" className={FILTER_TRIGGER_CLASS}>
                   <SelectValue />
                 </SelectTrigger>
@@ -141,6 +149,12 @@ export default function CustomersPage() {
           {loading ? (
             <div className="flex justify-center py-20">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500" />
+            </div>
+          ) : loadError ? (
+            <div className="text-center py-20">
+              <p className="text-slate-700 font-semibold mb-1">Couldn&apos;t load customers</p>
+              <p className="text-slate-500 text-sm mb-4">The request failed or timed out.</p>
+              <Button variant="outline" className="rounded-xl font-medium" onClick={() => { setLoading(true); setLoadError(false); setReloadKey(k => k + 1); }}>Retry</Button>
             </div>
           ) : customers.length === 0 && vehicleFilter === 'all' ? (
             <div className="text-center py-20">
@@ -160,10 +174,10 @@ export default function CustomersPage() {
                  <Car className="h-8 w-8 text-slate-300" />
               </div>
               <p className="text-slate-500 font-medium mb-4">No customers match this filter</p>
-              <Button variant="outline" className="rounded-xl font-medium" onClick={() => setVehicleFilter('all')}>Clear filter</Button>
+              <Button variant="outline" className="rounded-xl font-medium" onClick={() => { setRefreshing(true); setVehicleFilter('all'); }}>Clear filter</Button>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className={`overflow-x-auto transition-opacity ${refreshing ? 'opacity-50 pointer-events-none' : ''}`}>
               <table className="w-full text-sm text-left whitespace-nowrap">
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50/50">
