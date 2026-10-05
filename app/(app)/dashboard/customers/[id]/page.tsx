@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { customerApi, vehicleApi, serviceApi, buildRenewUrl } from '@/lib/api';
 import type { Customer, Vehicle, ServiceOverview } from '@/lib/types';
-import { ArrowLeft, Edit2, Car, Wrench, Trash2, Loader2, Save, X, Plus, User, Phone, Mail, MapPin, Calendar, Clock, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Edit2, Car, Wrench, Trash2, Loader2, Save, X, Plus, User, Phone, Mail, MapPin, Calendar, Clock, RefreshCw, Search } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from '../../overview/_components/badges';
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,14 @@ export default function CustomerDetailPage() {
   const [saving, setSaving] = useState(false);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [serviceType, setServiceType] = useState<'all' | 'licence' | 'vehicle'>('all');
+
+  const [vehicleSearchOpen, setVehicleSearchOpen] = useState(false);
+  const [vehicleQuery, setVehicleQuery] = useState('');
+
+  const vq = vehicleQuery.trim().toLowerCase();
+  const listedVehicles = vq
+    ? vehicles.filter(v => `${v.v_number} ${v.v_name || ''} ${v.v_type}`.toLowerCase().includes(vq))
+    : vehicles;
 
   const selectedVehicle = vehicles.find(v => v.v_id === selectedVehicleId) || null;
 
@@ -213,6 +221,27 @@ export default function CustomerDetailPage() {
           <Card className="rounded-2xl shadow-sm border-slate-200 overflow-hidden">
             <CardHeader className="bg-white border-b border-slate-100 pb-3 pt-5 px-6 flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-lg"><Car className="h-5 w-5 text-amber-500" /> Vehicles <span className="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full">{vehicles.length}</span></CardTitle>
+              {vehicles.length > 0 && (vehicleSearchOpen ? (
+                <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 flex-1 min-w-0 max-w-xs focus-within:ring-2 focus-within:ring-amber-100 focus-within:border-amber-300 transition-all">
+                  <Search className="h-4 w-4 text-slate-400 shrink-0" />
+                  <input
+                    autoFocus
+                    aria-label="Search vehicles"
+                    placeholder="Search number, name, type..."
+                    value={vehicleQuery}
+                    onChange={e => setVehicleQuery(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Escape') { setVehicleQuery(''); setVehicleSearchOpen(false); } }}
+                    className="bg-transparent border-none outline-none w-full text-sm text-slate-900 placeholder:text-slate-400"
+                  />
+                  <button type="button" aria-label="Close vehicle search" onClick={() => { setVehicleQuery(''); setVehicleSearchOpen(false); }} className="text-slate-400 hover:text-slate-700 shrink-0">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <Button type="button" variant="outline" size="icon" aria-label="Search vehicles" title="Search vehicles" onClick={() => setVehicleSearchOpen(true)} className="h-8 w-8 rounded-lg border-slate-200 text-slate-600 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200">
+                  <Search className="h-4 w-4" />
+                </Button>
+              ))}
             </CardHeader>
             <CardContent className="p-0 bg-slate-50/30">
               {vehicles.length === 0 ? (
@@ -221,15 +250,17 @@ export default function CustomerDetailPage() {
                   <p className="text-sm text-slate-500 font-medium">No vehicles registered</p>
                 </div>
               ) : (
-                <div className="divide-y divide-slate-100">
-                  {vehicles.map(v => (
+                // ~5 rows tall (each row is 73px); the rest scrolls inside the card
+                <div className="max-h-[365px] overflow-y-auto divide-y divide-slate-100">
+                  {listedVehicles.length === 0 && <p className="p-6 text-center text-sm text-slate-500 bg-white">No vehicles match &ldquo;{vehicleQuery.trim()}&rdquo;</p>}
+                  {listedVehicles.map(v => (
                     <button
                       type="button"
                       key={v.v_id}
                       aria-pressed={v.v_id === selectedVehicleId}
                       title={v.v_id === selectedVehicleId ? 'Click to show all services' : 'Click to show only this vehicle\'s services'}
                       onClick={() => setSelectedVehicleId(v.v_id === selectedVehicleId ? null : v.v_id)}
-                      className={`flex w-full items-center justify-between p-4 text-left transition-colors ${v.v_id === selectedVehicleId ? 'bg-amber-50 ring-1 ring-inset ring-amber-300' : 'bg-white hover:bg-amber-50/30'}`}
+                      className={`flex w-full items-center justify-between p-4 text-left transition-colors ${v.v_id === selectedVehicleId ? 'bg-slate-100 ring-1 ring-inset ring-slate-300' : `bg-white hover:bg-slate-50 ${selectedVehicleId ? 'opacity-50 hover:opacity-100' : ''}`}`}
                     >
                       <div className="flex items-center gap-4">
                         <div className="h-10 w-10 flex items-center justify-center bg-amber-50 rounded-lg border border-amber-100 text-amber-700 font-bold tracking-tight">
