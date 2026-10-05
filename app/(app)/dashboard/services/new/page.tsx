@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { customerApi, vehicleApi, serviceTypeApi } from '@/lib/api';
-import type { CustomerDashboardView, Vehicle, ServiceType, VehicleClass, VehicleTypeLicence } from '@/lib/types';
+import { customerApi, vehicleApi, serviceTypeApi, serviceApi } from '@/lib/api';
+import type { CustomerDashboardView, Vehicle, ServiceType, ServiceOverview, VehicleClass, VehicleTypeLicence } from '@/lib/types';
 import { Loader2, Search, Check, User, Car, FileText, ArrowLeft } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
@@ -11,14 +11,9 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { getErrorMessage, logClientError } from '@/lib/error-message';
+import { smoothReveal as reveal } from '@/lib/utils';
 import { ServiceFormCard, type AddedService, type Category, type FormInitial } from './_components/service-form-card';
 
-// Cards join the stack top-to-bottom; ease the new one into view (instantly for reduced-motion).
-function reveal(el: HTMLElement | null) {
-  if (!el) return;
-  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
-}
 
 export default function NewServicePage() {
   const searchParams = useSearchParams();
@@ -47,6 +42,8 @@ export default function NewServicePage() {
   // Fetched once and reused: service types per category, and the customer's vehicles.
   const [typesByCategory, setTypesByCategory] = useState<Partial<Record<Category, ServiceType[]>>>({});
   const [vehicles, setVehicles] = useState<Vehicle[] | null>(null);
+  // The customer's existing services, fetched once — the form matches expired ones against it.
+  const [customerServices, setCustomerServices] = useState<ServiceOverview[] | null>(null);
   const [added, setAdded] = useState<AddedService[]>([]);
   const [formKey, setFormKey] = useState(0); // new key = fresh blank form
   const [renewal, setRenewal] = useState<{ id: string; oldStatus: string | null; initial: FormInitial } | null>(null);
@@ -212,6 +209,7 @@ export default function NewServicePage() {
     setCategory(null);
     setAdded([]);
     setVehicles(null);
+    setCustomerServices(null);
     setRenewal(null);
     formDirty.current = false;
     setCustName(''); setCustMobile(''); setCustCarNumber('');
@@ -225,12 +223,14 @@ export default function NewServicePage() {
     categoryLock.current = true;
     setLoadingCategory(cat);
     try {
-      const [types, vehs] = await Promise.all([
+      const [types, vehs, svcs] = await Promise.all([
         typesByCategory[cat] ?? serviceTypeApi.getByCategory(cat),
         cat === 'vehicle' && vehicles === null ? vehicleApi.getByOwner(selectedCustomer.c_id) : Promise.resolve(null),
+        customerServices === null ? serviceApi.getByCustomer(selectedCustomer.c_id) : Promise.resolve(null),
       ]);
       setTypesByCategory(prev => ({ ...prev, [cat]: types }));
       if (vehs) setVehicles(vehs);
+      if (svcs) setCustomerServices(svcs);
       setRenewal(null); // a prefilled renewal only applies to its own category
       formDirty.current = false;
       setFormKey(k => k + 1);
@@ -253,8 +253,9 @@ export default function NewServicePage() {
   }
 
   // Saved: the form collapses into a ✓ row and a fresh one mounts below it.
-  function handleSaved(item: AddedService, newVehicle?: Vehicle) {
+  function handleSaved(item: AddedService, newVehicle?: Vehicle, renewedId?: string) {
     setAdded(prev => [...prev, item]);
+    if (renewedId) setCustomerServices(prev => prev && prev.filter(x => x.s_id !== renewedId)); // now completed, no longer a match
     if (newVehicle) setVehicles(prev => [newVehicle, ...(prev || [])]); // available to the next service
     setRenewal(null); // the old service was marked completed on the first save only
     formDirty.current = false;
@@ -463,6 +464,7 @@ export default function NewServicePage() {
             category={category}
             serviceTypes={types}
             vehicles={vehicles ?? []}
+            services={customerServices ?? []}
             initial={renewal?.initial}
             renewal={renewal ? { id: renewal.id, oldStatus: renewal.oldStatus } : undefined}
             onSaved={handleSaved}

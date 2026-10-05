@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FILTER_TRIGGER_CLASS, FILTER_ITEM_CLASS } from '@/lib/ui-constants';
+import { smoothReveal } from '@/lib/utils';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -39,8 +40,7 @@ export default function CustomerDetailPage() {
   // Deselecting (null) leaves the scroll alone.
   useEffect(() => {
     if (!selectedVehicleId) return;
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    historyRef.current?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
+    smoothReveal(historyRef.current, 'center');
   }, [selectedVehicleId]);
 
   const [vehicleSearchOpen, setVehicleSearchOpen] = useState(false);

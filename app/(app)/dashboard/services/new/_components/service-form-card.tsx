@@ -1,15 +1,18 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { vehicleApi, serviceApi } from '@/lib/api';
-import type { CustomerDashboardView, Vehicle, ServiceType, VehicleClass, VehicleTypeLicence } from '@/lib/types';
-import { Loader2, Car, FileText, Check } from 'lucide-react';
+import { format } from 'date-fns';
+import { vehicleApi, serviceApi, renewalDates } from '@/lib/api';
+import type { CustomerDashboardView, Vehicle, ServiceType, ServiceOverview, VehicleClass, VehicleTypeLicence } from '@/lib/types';
+import { Loader2, Car, FileText, Check, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DateTimePicker } from '@/components/ui/date-time-picker';
 import { toast } from 'sonner';
 import { getErrorMessage, logClientError } from '@/lib/error-message';
+import { smoothReveal } from '@/lib/utils';
+import { ExpiredMatchCard } from './expired-match-card';
 
 export type Category = 'vehicle' | 'licence';
 
@@ -46,21 +49,31 @@ const VEHICLE_TYPE_LICENCE: VehicleTypeLicence[] = [
 
 const today = () => new Date().toISOString().split('T')[0];
 
+// Same rule as the dashboard Expired list: date passed, and not already
+// renewed (completed) or voided (cancelled).
+const isLapsed = (s: ServiceOverview) =>
+  !!s.expiry_date && s.expiry_date < today() && (s.status === 'active' || s.status === 'expired');
+
 // Validate cost string is a clean integer or decimal
 function parseCost(raw: string): number {
   const parsed = parseFloat(raw.replace(/[^0-9.]/g, ''));
   return isNaN(parsed) ? 0 : Math.round(parsed * 100) / 100;
 }
 
+const SELECT_CLASS = 'flex w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-sm mt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 disabled:cursor-not-allowed';
+const LABEL_CLASS = 'text-[11px] uppercase font-bold tracking-wider text-slate-500';
+
 interface Props {
   customer: CustomerDashboardView;
   category: Category;
   serviceTypes: ServiceType[];
   vehicles: Vehicle[];
+  // The customer's existing services — source of the "this one expired, renew it?" match.
+  services: ServiceOverview[];
   initial?: FormInitial;
-  // Set only for the first form of a renewal: the old service to mark completed.
+  // Set only for the first form of a URL renewal (Renew button elsewhere): the old service to mark completed.
   renewal?: { id: string; oldStatus: string | null };
-  onSaved: (added: AddedService, newVehicle?: Vehicle) => void;
+  onSaved: (added: AddedService, newVehicle?: Vehicle, renewedId?: string) => void;
   onChangeCategory: () => void;
   onBack: () => void;
   onDirty: () => void;
@@ -68,7 +81,11 @@ interface Props {
 
 // One service form. The page remounts it (new key) after every save, so each
 // service starts from a clean slate without a pile of reset code.
-export function ServiceFormCard({ customer, category, serviceTypes, vehicles, initial, renewal, onSaved, onChangeCategory, onBack, onDirty }: Props) {
+//
+// Vehicle: vehicle -> service type -> (expired match?) -> dates & cost.
+// Licence: (expired matches?) -> licence details -> dates & cost.
+// Cards appear as the previous one is filled in.
+export function ServiceFormCard({ customer, category, serviceTypes, vehicles, services, initial, renewal, onSaved, onChangeCategory, onBack, onDirty }: Props) {
   // A single car on file is pre-selected; "enter manually" stays in the dropdown.
   const onlyVehicle = category === 'vehicle' && !initial?.vehicleNumber && vehicles.length === 1 ? vehicles[0] : null;
 
@@ -86,11 +103,72 @@ export function ServiceFormCard({ customer, category, serviceTypes, vehicles, in
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const submitLock = useRef(false);
-  const firstField = useRef<HTMLSelectElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const matchRef = useRef<HTMLDivElement>(null);
+  const datesRef = useRef<HTMLDivElement>(null);
 
-  // Land the cursor on the first field without letting focus() yank the scroll
+  // ── Expired-match step ────────────────────────────────────────────────
+  // `decision` remembers what the owner chose for ONE vehicle+type (or the
+  // licence list): renew a specific old service, or skip it. Change the car or
+  // type and the key changes, so the question is asked again.
+  const plate = vehicleNumber.trim().toUpperCase();
+  const vehicleChosen = category === 'licence' || !!vehicleId || (!!plate && !!vehicleType.trim());
+  const key = category === 'licence' ? 'licence' : `${vehicleId || plate}|${serviceTypeId}`;
+  const [decision, setDecision] = useState<{ key: string; renew: ServiceOverview | null } | null>(null);
+  const decided = decision?.key === key;
+  const renewing = decided ? decision.renew : null;
+
+  const matches = (() => {
+    if (renewal || !vehicleChosen) return []; // URL renewal already knows what it renews
+    if (category === 'vehicle' && !serviceTypeId) return [];
+    return services
+      .filter(s => s.category === category && isLapsed(s) && (category === 'licence' || (
+        s.service_type_id === serviceTypeId && ((!!vehicleId && s.vehicle_id === vehicleId) || (!!plate && s.vehicle_number?.toUpperCase() === plate))
+      )))
+      .sort((a, b) => b.expiry_date!.localeCompare(a.expiry_date!)); // newest expiry first
+  })();
+  const needsDecision = matches.length > 0 && !decided;
+  const showTypeCard = category === 'licence' ? !needsDecision : vehicleChosen;
+  const showDates = showTypeCard && !!serviceTypeId && !needsDecision;
+  const activeRenewal = renewing ? { id: renewing.s_id, oldStatus: renewing.status } : renewal;
+
+  function renew(m: ServiceOverview) {
+    const d = renewalDates(m);
+    setDecision({ key, renew: m });
+    setServiceTypeId(m.service_type_id);
+    if (category === 'licence') {
+      setVehicleClass(m.vehicle_class || 'NT');
+      setVehicleTypeLicence(m.vehicle_type_licence || 'LMV');
+      setMdlNumber(m.mdl_number || '');
+    }
+    setIssueDate(d.issueDate);
+    setExpiryDate(d.expiryDate);
+    setTotalCost(String(m.total_cost));
+    onDirty();
+  }
+
+  // "Switch to new service": drop the prefill and unlock.
+  function undoRenewal() {
+    setDecision({ key, renew: null });
+    setVehicleClass('NT');
+    setVehicleTypeLicence('LMV');
+    setMdlNumber('');
+    setIssueDate(today());
+    setExpiryDate('');
+    setTotalCost('');
+  }
+
+  // Cursor on the first field without letting focus() yank the scroll
   // (the page is already easing this card into view).
-  useEffect(() => { firstField.current?.focus({ preventScroll: true }); }, []);
+  useEffect(() => { formRef.current?.querySelector<HTMLElement>('select, input')?.focus({ preventScroll: true }); }, []);
+
+  // Ease newly revealed cards into view (not on first mount).
+  const shown = useRef({ match: needsDecision, dates: showDates });
+  useEffect(() => {
+    if (needsDecision && !shown.current.match) smoothReveal(matchRef.current, 'nearest');
+    if (showDates && !shown.current.dates) smoothReveal(datesRef.current, 'nearest');
+    shown.current = { match: needsDecision, dates: showDates };
+  }, [needsDecision, showDates]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -108,6 +186,7 @@ export function ServiceFormCard({ customer, category, serviceTypes, vehicles, in
     setSubmitting(true);
     try {
       let newVehicle: Vehicle | undefined;
+      let created: { s_id: string };
       if (category === 'vehicle') {
         // No vehicle picked but a plate typed (or an unlinked old service being
         // renewed): link to the customer's existing vehicle with that plate
@@ -115,15 +194,14 @@ export function ServiceFormCard({ customer, category, serviceTypes, vehicles, in
         // the plate stays on the service row; a manual add saves the new vehicle
         // BEFORE the service so it shows up in the dropdown for the next one.
         let resolvedVehicleId = vehicleId || undefined;
-        const plate = vehicleNumber.trim().toUpperCase();
         const existing = !vehicleId && plate ? vehicles.find(v => v.v_number.toUpperCase() === plate) : undefined;
         if (existing) {
           resolvedVehicleId = existing.v_id;
-        } else if (!vehicleId && plate && !renewal) {
+        } else if (!vehicleId && plate && !activeRenewal) {
           try {
             newVehicle = await vehicleApi.create({
               owner_id: customer.c_id,
-              v_number: vehicleNumber.trim().toUpperCase(),
+              v_number: plate,
               v_name: vehicleName.trim() || undefined,
               v_type: vehicleType.trim() || 'car',
             });
@@ -133,7 +211,7 @@ export function ServiceFormCard({ customer, category, serviceTypes, vehicles, in
             console.warn('Vehicle auto-add skipped:', vErr);
           }
         }
-        await serviceApi.createVehicleService({
+        created = await serviceApi.createVehicleService({
           customer_id: customer.c_id,
           service_type_id: serviceTypeId,
           vehicle_id: resolvedVehicleId,
@@ -145,7 +223,7 @@ export function ServiceFormCard({ customer, category, serviceTypes, vehicles, in
           notes: notes || undefined,
         });
       } else {
-        await serviceApi.createLicenceService({
+        created = await serviceApi.createLicenceService({
           customer_id: customer.c_id,
           service_type_id: serviceTypeId,
           vehicle_class: vehicleClass,
@@ -160,15 +238,16 @@ export function ServiceFormCard({ customer, category, serviceTypes, vehicles, in
 
       // A renewal supersedes the old record — mark it completed if it was
       // 'active' or 'expired'. 'cancelled' stays: that's an explicit void.
-      if (renewal && (renewal.oldStatus === 'active' || renewal.oldStatus === 'expired')) {
-        try { await serviceApi.updateStatus(renewal.id, 'completed'); }
+      let renewedId: string | undefined;
+      if (activeRenewal && (activeRenewal.oldStatus === 'active' || activeRenewal.oldStatus === 'expired')) {
+        try { await serviceApi.updateStatus(activeRenewal.id, 'completed'); renewedId = activeRenewal.id; }
         catch (error) { console.warn('Could not update renewed service status:', error); }
       }
 
       const name = serviceTypes.find(t => t.st_id === serviceTypeId)?.name || 'Service';
-      toast.success(renewal ? 'Service renewed successfully!' : `${name} added`);
+      toast.success(activeRenewal ? 'Service renewed successfully!' : `${name} added`);
       onSaved({
-        id: crypto.randomUUID(),
+        id: created.s_id,
         category,
         name,
         detail: category === 'vehicle'
@@ -177,7 +256,7 @@ export function ServiceFormCard({ customer, category, serviceTypes, vehicles, in
         issueDate,
         expiryDate: expiryDate || null,
         cost,
-      }, newVehicle);
+      }, newVehicle, renewedId);
     } catch (error: unknown) {
       logClientError(category === 'vehicle' ? 'create-vehicle-service' : 'create-document-service', error, { customerId: customer.c_id, serviceTypeId, form: category });
       toast.error(getErrorMessage(error, 'Could not create service.'));
@@ -185,6 +264,24 @@ export function ServiceFormCard({ customer, category, serviceTypes, vehicles, in
       submitLock.current = false;
     }
   }
+
+  const typeCard = (
+    <div className="stack-in bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+      <label className={LABEL_CLASS}>Service Type <span className="text-red-500">*</span></label>
+      <select
+        value={serviceTypeId || ''}
+        onChange={e => setServiceTypeId(Number(e.target.value))}
+        disabled={!!renewing}
+        className={`${SELECT_CLASS} h-12 font-medium`}
+        required
+      >
+        <option value="">Select a specific service...</option>
+        {serviceTypes.map(t => (
+          <option key={t.st_id} value={t.st_id}>{t.name}</option>
+        ))}
+      </select>
+    </div>
+  );
 
   return (
     <Card className="rounded-2xl shadow-sm border-slate-200 overflow-hidden">
@@ -196,30 +293,19 @@ export function ServiceFormCard({ customer, category, serviceTypes, vehicles, in
       </CardHeader>
       <CardContent className="p-6 bg-slate-50/30">
         {/* React's onChange bubbles from every input/select, so one handler marks the form dirty. */}
-        <form onSubmit={handleSubmit} onChange={onDirty} className="space-y-6">
-          {/* Service Type */}
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-            <label className="text-[11px] uppercase font-bold tracking-wider text-slate-500">Service Type <span className="text-red-500">*</span></label>
-            <select
-              ref={firstField}
-              value={serviceTypeId || ''}
-              onChange={e => setServiceTypeId(Number(e.target.value))}
-              className="flex h-12 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-sm mt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 font-medium"
-              required
-            >
-              <option value="">Select a specific service...</option>
-              {serviceTypes.map(t => (
-                <option key={t.st_id} value={t.st_id}>{t.name}</option>
-              ))}
-            </select>
-          </div>
+        <form ref={formRef} onSubmit={handleSubmit} onChange={onDirty} className="space-y-6">
+          {/* Licence: expired services come first. */}
+          {category === 'licence' && needsDecision && (
+            <ExpiredMatchCard ref={matchRef} matches={matches} onRenew={renew} onSkip={() => setDecision({ key, renew: null })} />
+          )}
 
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-5">
+          {/* Vehicle first, then service type. Both lock once a renewal is picked. */}
+          <fieldset disabled={!!renewing} className="m-0 min-w-0 space-y-6 border-0 p-0">
             {category === 'vehicle' && (
-              <>
+              <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-5">
                 {vehicles.length > 0 && (
                   <div>
-                    <label className="text-[11px] uppercase font-bold tracking-wider text-slate-500">Select Customer&apos;s Existing Vehicle</label>
+                    <label className={LABEL_CLASS}>Select Customer&apos;s Existing Vehicle</label>
                     <select
                       value={vehicleId}
                       onChange={e => {
@@ -228,7 +314,7 @@ export function ServiceFormCard({ customer, category, serviceTypes, vehicles, in
                         if (v) { setVehicleNumber(v.v_number); setVehicleType(v.v_type); setVehicleName(v.v_name || ''); }
                         else { setVehicleNumber(''); setVehicleType(''); setVehicleName(''); }
                       }}
-                      className="flex h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-sm mt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 font-medium"
+                      className={`${SELECT_CLASS} h-11 font-medium`}
                     >
                       <option value="">— Enter details manually (will be saved to customer) —</option>
                       {vehicles.map(v => (
@@ -237,9 +323,9 @@ export function ServiceFormCard({ customer, category, serviceTypes, vehicles, in
                     </select>
                   </div>
                 )}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div>
-                    <label className="text-[11px] uppercase font-bold tracking-wider text-slate-500">Vehicle Number <span className="text-red-500">*</span></label>
+                    <label className={LABEL_CLASS}>Vehicle Number <span className="text-red-500">*</span></label>
                     <Input
                       value={vehicleNumber}
                       onChange={e => setVehicleNumber(e.target.value.toUpperCase())}
@@ -250,7 +336,7 @@ export function ServiceFormCard({ customer, category, serviceTypes, vehicles, in
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] uppercase font-bold tracking-wider text-slate-500">Vehicle Type <span className="text-red-500">*</span></label>
+                    <label className={LABEL_CLASS}>Vehicle Type <span className="text-red-500">*</span></label>
                     <Input
                       value={vehicleType}
                       onChange={e => setVehicleType(e.target.value)}
@@ -263,7 +349,7 @@ export function ServiceFormCard({ customer, category, serviceTypes, vehicles, in
                 </div>
                 {!vehicleId && (
                   <div>
-                    <label className="text-[11px] uppercase font-bold tracking-wider text-slate-500">Vehicle Name <span className="text-slate-400 normal-case font-normal">(optional — will be saved to customer profile)</span></label>
+                    <label className={LABEL_CLASS}>Vehicle Name <span className="text-slate-400 normal-case font-normal">(optional — will be saved to customer profile)</span></label>
                     <Input
                       value={vehicleName}
                       onChange={e => setVehicleName(e.target.value)}
@@ -272,91 +358,106 @@ export function ServiceFormCard({ customer, category, serviceTypes, vehicles, in
                     />
                   </div>
                 )}
-              </>
+              </div>
             )}
 
-            {category === 'licence' && (
-              <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  <div>
-                    <label className="text-[11px] uppercase font-bold tracking-wider text-slate-500">Vehicle Class <span className="text-red-500">*</span></label>
-                    <select
-                      value={vehicleClass}
-                      onChange={e => setVehicleClass(e.target.value as VehicleClass)}
-                      className="flex h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-sm mt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200"
-                      required
-                    >
-                      {VEHICLE_CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[11px] uppercase font-bold tracking-wider text-slate-500">Licence Type <span className="text-red-500">*</span></label>
-                    <select
-                      value={vehicleTypeLicence}
-                      onChange={e => setVehicleTypeLicence(e.target.value as VehicleTypeLicence)}
-                      className="flex h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-sm mt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200"
-                      required
-                    >
-                      {VEHICLE_TYPE_LICENCE.map(t => <option key={t} value={t}>{t}</option>)}
-                    </select>
-                  </div>
+            {showTypeCard && typeCard}
+
+          </fieldset>
+
+          {/* Licence details stay editable on a renewal (class/type can legitimately change). */}
+          {category === 'licence' && showTypeCard && (
+            <div className="stack-in bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div>
+                  <label className={LABEL_CLASS}>Vehicle Class <span className="text-red-500">*</span></label>
+                  <select value={vehicleClass} onChange={e => setVehicleClass(e.target.value as VehicleClass)} className={`${SELECT_CLASS} h-11`} required>
+                    {VEHICLE_CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
                 </div>
                 <div>
-                  <label className="text-[11px] uppercase font-bold tracking-wider text-slate-500">MDL / Application Number</label>
-                  <Input value={mdlNumber} onChange={e => setMdlNumber(e.target.value)} placeholder="Enter MDL or application number" className="mt-2 h-11 bg-slate-50 rounded-lg focus-visible:ring-amber-200" />
+                  <label className={LABEL_CLASS}>Licence Type <span className="text-red-500">*</span></label>
+                  <select value={vehicleTypeLicence} onChange={e => setVehicleTypeLicence(e.target.value as VehicleTypeLicence)} className={`${SELECT_CLASS} h-11`} required>
+                    {VEHICLE_TYPE_LICENCE.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
                 </div>
-              </>
-            )}
-          </div>
-
-          {/* Common Fields */}
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-5">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <div>
-                <label className="text-[11px] uppercase font-bold tracking-wider text-slate-500">Issue Date <span className="text-red-500">*</span></label>
-                <DateTimePicker value={issueDate} onChange={setIssueDate} required className="mt-2" />
               </div>
               <div>
-                <label className="text-[11px] uppercase font-bold tracking-wider text-slate-500">
-                  {category === 'licence' ? 'Renewal / Expiry Date' : 'Expiry Date'}
-                </label>
-                <DateTimePicker value={expiryDate} onChange={setExpiryDate} className="mt-2" />
+                <label className={LABEL_CLASS}>MDL / Application Number</label>
+                <Input value={mdlNumber} onChange={e => setMdlNumber(e.target.value)} placeholder="Enter MDL or application number" className="mt-2 h-11 bg-slate-50 rounded-lg focus-visible:ring-amber-200" />
               </div>
             </div>
+          )}
 
-            {/* Text input with inputmode=numeric prevents browser spinners causing float drift */}
-            <div className="pt-2 border-t border-slate-100">
-              <label className="text-[11px] uppercase font-bold tracking-wider text-slate-500">Total Cost (₹) <span className="text-red-500">*</span></label>
-              <div className="relative mt-2">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-base">₹</span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  value={totalCost}
-                  onChange={e => {
-                    // Only allow digits and a single decimal point
-                    const val = e.target.value.replace(/[^0-9.]/g, '');
-                    const parts = val.split('.');
-                    if (parts.length <= 2) setTotalCost(parts.length === 2 ? parts[0] + '.' + parts[1].slice(0, 2) : val);
-                  }}
-                  placeholder="0"
-                  required
-                  className="h-12 w-full rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-4 text-lg font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-transparent tracking-wider"
-                />
+          {/* Vehicle: expired matches for this car + type. */}
+          {category === 'vehicle' && needsDecision && (
+            <ExpiredMatchCard ref={matchRef} matches={matches} onRenew={renew} onSkip={() => setDecision({ key, renew: null })} />
+          )}
+
+          {renewing && (
+            <div className="stack-in flex items-center justify-between gap-3 rounded-xl border border-emerald-100 bg-emerald-50/50 px-4 py-3">
+              <p className="flex min-w-0 items-center gap-2 text-sm text-slate-700">
+                <RefreshCw className="h-4 w-4 shrink-0 text-emerald-600" aria-hidden />
+                <span className="truncate">Renewing <b className="font-semibold text-slate-900">{renewing.service_name}</b> · expired {format(new Date(renewing.expiry_date!), 'dd MMM yyyy')}</span>
+              </p>
+              <button type="button" onClick={undoRenewal} className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition-[background-color,transform] duration-150 hover:bg-white active:scale-[0.97]">
+                Switch to new service
+              </button>
+            </div>
+          )}
+
+          {/* Dates, cost, notes — after the owner has dealt with any expired match. */}
+          {showDates && (
+            <div ref={datesRef} className="stack-in bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div>
+                  <label className={LABEL_CLASS}>Issue Date <span className="text-red-500">*</span></label>
+                  <DateTimePicker value={issueDate} onChange={setIssueDate} required className="mt-2" />
+                </div>
+                <div>
+                  <label className={LABEL_CLASS}>
+                    {category === 'licence' ? 'Renewal / Expiry Date' : 'Expiry Date'}
+                  </label>
+                  <DateTimePicker value={expiryDate} onChange={setExpiryDate} className="mt-2" />
+                </div>
+              </div>
+
+              {/* Text input with inputmode=numeric prevents browser spinners causing float drift */}
+              <div className="pt-2 border-t border-slate-100">
+                <label className={LABEL_CLASS}>Total Cost (₹) <span className="text-red-500">*</span></label>
+                <div className="relative mt-2">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-base">₹</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={totalCost}
+                    onChange={e => {
+                      // Only allow digits and a single decimal point
+                      const val = e.target.value.replace(/[^0-9.]/g, '');
+                      const parts = val.split('.');
+                      if (parts.length <= 2) setTotalCost(parts.length === 2 ? parts[0] + '.' + parts[1].slice(0, 2) : val);
+                    }}
+                    placeholder="0"
+                    required
+                    className="h-12 w-full rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-4 text-lg font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-transparent tracking-wider"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className={LABEL_CLASS}>Notes & Comments</label>
+                <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any additional notes for this service..." className="mt-2 h-11 bg-slate-50 rounded-lg focus-visible:ring-amber-200" />
               </div>
             </div>
-
-            <div>
-              <label className="text-[11px] uppercase font-bold tracking-wider text-slate-500">Notes & Comments</label>
-              <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any additional notes for this service..." className="mt-2 h-11 bg-slate-50 rounded-lg focus-visible:ring-amber-200" />
-            </div>
-          </div>
+          )}
 
           <div className="flex flex-wrap gap-3 pt-2">
-            <Button type="submit" className="flex-1 min-w-[180px] bg-gradient-to-r from-amber-400 to-amber-600 hover:from-amber-500 hover:to-amber-700 text-black rounded-xl h-11 text-base font-bold shadow-md tracking-wide transition-[transform,background-color] duration-150 active:scale-[0.98]" disabled={submitting}>
-              {submitting ? <><Loader2 className="h-5 w-5 animate-spin mr-2" /> Creating Record...</> : <><Check className="h-5 w-5 mr-2" /> Confirm & Create</>}
-            </Button>
+            {showDates && (
+              <Button type="submit" className="flex-1 min-w-[180px] bg-gradient-to-r from-amber-400 to-amber-600 hover:from-amber-500 hover:to-amber-700 text-black rounded-xl h-11 text-base font-bold shadow-md tracking-wide transition-[transform,background-color] duration-150 active:scale-[0.98]" disabled={submitting}>
+                {submitting ? <><Loader2 className="h-5 w-5 animate-spin mr-2" /> Creating Record...</> : <><Check className="h-5 w-5 mr-2" /> Confirm & Create</>}
+              </Button>
+            )}
             <Button type="button" variant="outline" disabled={submitting} className="h-11 px-5 rounded-xl font-semibold bg-white transition-transform duration-150 active:scale-[0.98]" onClick={onChangeCategory}>
               Change category
             </Button>

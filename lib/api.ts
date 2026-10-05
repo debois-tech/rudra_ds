@@ -608,13 +608,16 @@ export interface RenewableService {
     mdl_number?: string | null;
 }
 
+// A renewal starts today and lasts as long as the service it replaces.
+export function renewalDates(s: { issue_date: string; expiry_date: string | null }): { issueDate: string; expiryDate: string } {
+    const issueDate = new Date().toISOString().split('T')[0];
+    if (!s.expiry_date) return { issueDate, expiryDate: '' };
+    const durationMs = Math.max(new Date(s.expiry_date).getTime() - new Date(s.issue_date).getTime(), 0);
+    return { issueDate, expiryDate: new Date(Date.now() + durationMs).toISOString().split('T')[0] };
+}
+
 export function buildRenewUrl(s: RenewableService): string {
-    const todayStr = new Date().toISOString().split('T')[0];
-    let newExpiry = '';
-    if (s.expiry_date) {
-        const durationMs = Math.max(new Date(s.expiry_date).getTime() - new Date(s.issue_date).getTime(), 0);
-        newExpiry = new Date(Date.now() + durationMs).toISOString().split('T')[0];
-    }
+    const { issueDate: todayStr, expiryDate: newExpiry } = renewalDates(s);
 
     const params = new URLSearchParams({
         customer: s.customer_id,
