@@ -157,6 +157,22 @@
   animation: fadeIn 0.4s ease-out forwards;
 }
 
+/* New-service flow: each card that joins the stack eases up into place */
+@keyframes stackIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.stack-in {
+  animation: stackIn 240ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+@keyframes stackFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stack-in { animation: stackFade 150ms ease-out both; }
+}
+
 /* Success badge: circle settles in, then the tick draws itself */
 @keyframes checkPop {
   from { transform: scale(0.6); opacity: 0; }

@@ -2,37 +2,33 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { customerApi, vehicleApi, serviceTypeApi, serviceApi } from '@/lib/api';
-import type {
-  CustomerDashboardView, Vehicle, ServiceType,
-  VehicleClass, VehicleTypeLicence,
-} from '@/lib/types';
-import { Wrench, Loader2, Search, Check, ChevronDown, User, Car, FileText } from 'lucide-react';
+import { customerApi, vehicleApi, serviceTypeApi } from '@/lib/api';
+import type { CustomerDashboardView, Vehicle, ServiceType, VehicleClass, VehicleTypeLicence } from '@/lib/types';
+import { Loader2, Search, Check, User, Car, FileText, ArrowLeft } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { DateTimePicker } from '@/components/ui/date-time-picker';
+import { format } from 'date-fns';
 import { getErrorMessage, logClientError } from '@/lib/error-message';
+import { ServiceFormCard, type AddedService, type Category, type FormInitial } from './_components/service-form-card';
 
-const VEHICLE_CLASSES: VehicleClass[] = ['NT', 'Transport', 'Conductor'];
-const VEHICLE_TYPE_LICENCE: VehicleTypeLicence[] = [
-  '3W-TR', 'Others', 'MCWOG', 'MCWG', 'LMV', 'TRACTOR',
-  'FLIFT', 'LDRXCV', 'INVCGZ', 'TRANS', 'PSVBUS', 'CNEQP', 'LMV-TR', 'CONDUCTOR'
-];
+// Cards join the stack top-to-bottom; ease the new one into view (instantly for reduced-motion).
+function reveal(el: HTMLElement | null) {
+  if (!el) return;
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+}
 
 export default function NewServicePage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const preselectedCustomerId = searchParams.get('customer');
   const renewOf = searchParams.get('renewOf');
+  const paramString = searchParams.toString(); // value-stable dep for the renewal prefill effect
 
-  // State
-  const [step, setStep] = useState(1); // 1=customer, 2=category, 3=details
-
-  // Step 1: customer name / mobile / car number double as both the
-  // search-as-you-type query and the auto-create payload — one combined
-  // form instead of a separate "add customer" page + form.
+  // Customer card: name / mobile / car number double as both the
+  // search-as-you-type query and the auto-create payload.
   const [custName, setCustName] = useState('');
   const [custMobile, setCustMobile] = useState('');
   const [custCarNumber, setCustCarNumber] = useState('');
@@ -43,82 +39,68 @@ export default function NewServicePage() {
   const [creatingCustomer, setCreatingCustomer] = useState(false);
   const creatingCustomerLock = useRef(false);
 
+  // The stack: customer → category → [saved services…] → current form.
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerDashboardView | null>(null);
-  const [category, setCategory] = useState<'vehicle' | 'licence' | null>(null);
-  const [categoryLoading, setCategoryLoading] = useState(false);
+  const [category, setCategory] = useState<Category | null>(null);
+  const [loadingCategory, setLoadingCategory] = useState<Category | null>(null);
   const categoryLock = useRef(false);
-  const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([]);
-  const [customerVehicles, setCustomerVehicles] = useState<Vehicle[]>([]);
-  const [submitting, setSubmitting] = useState(false);
-  const submitLock = useRef(false);
+  // Fetched once and reused: service types per category, and the customer's vehicles.
+  const [typesByCategory, setTypesByCategory] = useState<Partial<Record<Category, ServiceType[]>>>({});
+  const [vehicles, setVehicles] = useState<Vehicle[] | null>(null);
+  const [added, setAdded] = useState<AddedService[]>([]);
+  const [formKey, setFormKey] = useState(0); // new key = fresh blank form
+  const [renewal, setRenewal] = useState<{ id: string; oldStatus: string | null; initial: FormInitial } | null>(null);
+  const formDirty = useRef(false);
+  const categoryRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLDivElement>(null);
 
-  // Form fields
-  const [serviceTypeId, setServiceTypeId] = useState<number | null>(null);
-  const [vehicleId, setVehicleId] = useState('');
-  const [vehicleType, setVehicleType] = useState('');
-  const [vehicleNumber, setVehicleNumber] = useState('');
-  const [vehicleName, setVehicleName] = useState(''); // new: capture vehicle name for auto-add
-  const [vehicleClass, setVehicleClass] = useState<VehicleClass>('NT');
-  const [vehicleTypeLicence, setVehicleTypeLicence] = useState<VehicleTypeLicence>('LMV');
-  const [mdlNumber, setMdlNumber] = useState('');
-  const [issueDate, setIssueDate] = useState(new Date().toISOString().split('T')[0]);
-  const [expiryDate, setExpiryDate] = useState('');
-  const [totalCost, setTotalCost] = useState('');
-  const [notes, setNotes] = useState('');
-
-  // Load preselected customer (skip if this is a renewal — that effect below
-  // does its own fetch plus prefill, no need to double it up).
+  // Preselected customer (skip for renewals — the effect below does its own fetch).
   useEffect(() => {
     if (!preselectedCustomerId || renewOf) return;
     const controller = new AbortController();
     customerApi.getByIdWithStats(preselectedCustomerId).then(c => {
-      if (!controller.signal.aborted && c) {
-        setSelectedCustomer(c);
-        setStep(2);
-      }
+      if (!controller.signal.aborted && c) setSelectedCustomer(c);
     }).catch(() => {});
     return () => controller.abort();
   }, [preselectedCustomerId, renewOf]);
 
-  // Renewal: prefill everything from buildRenewUrl()'s query params and
-  // jump straight to the details step — category/service type are already
-  // known from the service being renewed.
+  // Renewal: customer, service types and vehicles load in parallel, and the
+  // form opens prefilled from buildRenewUrl()'s query params.
   useEffect(() => {
     if (!renewOf || !preselectedCustomerId) return;
-    const cat = searchParams.get('category') as 'vehicle' | 'licence' | null;
+    const params = new URLSearchParams(paramString);
+    const cat = params.get('category') as Category | null;
     if (!cat) return;
     let cancelled = false;
     (async () => {
       try {
-        const customer = await customerApi.getByIdWithStats(preselectedCustomerId);
+        const [customer, types, vehs] = await Promise.all([
+          customerApi.getByIdWithStats(preselectedCustomerId),
+          serviceTypeApi.getByCategory(cat),
+          cat === 'vehicle' ? vehicleApi.getByOwner(preselectedCustomerId) : Promise.resolve(null),
+        ]);
         if (cancelled || !customer) return;
+        const stId = params.get('serviceTypeId');
         setSelectedCustomer(customer);
+        setTypesByCategory({ [cat]: types });
+        if (vehs) setVehicles(vehs);
+        setRenewal({
+          id: renewOf,
+          oldStatus: params.get('oldStatus'),
+          initial: {
+            serviceTypeId: stId ? Number(stId) : undefined,
+            vehicleId: params.get('vehicleId') || undefined,
+            vehicleNumber: params.get('vehicleNumber') || undefined,
+            vehicleType: params.get('vehicleType') || undefined,
+            vehicleClass: (params.get('vehicleClass') as VehicleClass) || undefined,
+            vehicleTypeLicence: (params.get('vehicleTypeLicence') as VehicleTypeLicence) || undefined,
+            mdlNumber: params.get('mdlNumber') || undefined,
+            issueDate: params.get('issueDate') || undefined,
+            expiryDate: params.get('expiryDate') || undefined,
+            totalCost: params.get('cost') || undefined,
+          },
+        });
         setCategory(cat);
-
-        const types = await serviceTypeApi.getByCategory(cat);
-        if (cancelled) return;
-        setServiceTypes(types);
-
-        const stId = searchParams.get('serviceTypeId');
-        if (stId) setServiceTypeId(Number(stId));
-
-        if (cat === 'vehicle') {
-          const vehs = await vehicleApi.getByOwner(customer.c_id);
-          if (cancelled) return;
-          setCustomerVehicles(vehs);
-          setVehicleId(searchParams.get('vehicleId') || '');
-          setVehicleNumber(searchParams.get('vehicleNumber') || '');
-          setVehicleType(searchParams.get('vehicleType') || '');
-        } else {
-          setVehicleClass((searchParams.get('vehicleClass') as VehicleClass) || 'NT');
-          setVehicleTypeLicence((searchParams.get('vehicleTypeLicence') as VehicleTypeLicence) || 'LMV');
-          setMdlNumber(searchParams.get('mdlNumber') || '');
-        }
-
-        setIssueDate(searchParams.get('issueDate') || new Date().toISOString().split('T')[0]);
-        setExpiryDate(searchParams.get('expiryDate') || '');
-        setTotalCost(searchParams.get('cost') || '');
-        setStep(3);
       } catch (error) {
         if (!cancelled) {
           console.error(error);
@@ -127,7 +109,11 @@ export default function NewServicePage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [renewOf, preselectedCustomerId, searchParams]);
+  }, [renewOf, preselectedCustomerId, paramString]);
+
+  // Scroll the newest card into view as the stack grows.
+  useEffect(() => { if (selectedCustomer) reveal(categoryRef.current); }, [selectedCustomer]);
+  useEffect(() => { if (category) reveal(formRef.current); }, [category, formKey]);
 
   // Search-as-you-type across whichever of the 3 fields the user is
   // actively editing — customerApi.search() already ORs name/mobile/
@@ -162,7 +148,6 @@ export default function NewServicePage() {
     setCustName(''); setCustMobile(''); setCustCarNumber('');
     setLastEdited(null);
     setFieldErrors({});
-    setStep(2);
   }
 
   // No match selected — validate and auto-create the customer (+ vehicle if
@@ -211,7 +196,6 @@ export default function NewServicePage() {
       // Freshly created — stats are known without a round-trip fetch.
       setSelectedCustomer({ ...customer, vehicle_count: plate && vehicleErrors.length === 0 ? 1 : 0, service_count: 0, total_revenue: 0 });
       setCustName(''); setCustMobile(''); setCustCarNumber('');
-      setStep(2);
     } catch (error: unknown) {
       logClientError('create-customer', error, { mobile: custMobile });
       toast.error(getErrorMessage(error, 'Could not create customer.'));
@@ -221,170 +205,101 @@ export default function NewServicePage() {
     }
   }
 
-  // Select category and load types + vehicles
-  async function selectCategory(cat: 'vehicle' | 'licence') {
-    if (categoryLock.current) return;
+  // Everything below the customer card is thrown away; services already
+  // saved stay in the database.
+  function changeCustomer() {
+    setSelectedCustomer(null);
+    setCategory(null);
+    setAdded([]);
+    setVehicles(null);
+    setRenewal(null);
+    formDirty.current = false;
+    setCustName(''); setCustMobile(''); setCustCarNumber('');
+    setFieldErrors({});
+  }
+
+  // Pick a category: types (cached per category) and vehicles (once per
+  // customer) load in parallel; the form card only appears once both are ready.
+  async function selectCategory(cat: Category) {
+    if (categoryLock.current || cat === category || !selectedCustomer) return;
     categoryLock.current = true;
-    setCategoryLoading(true);
-    setCategory(cat);
+    setLoadingCategory(cat);
     try {
-      const types = await serviceTypeApi.getByCategory(cat);
-      setServiceTypes(types);
-      if (cat === 'vehicle' && selectedCustomer) {
-        const vehs = await vehicleApi.getByOwner(selectedCustomer.c_id);
-        setCustomerVehicles(vehs);
-        // One car on file — pre-select it; "enter manually" stays in the dropdown.
-        if (vehs.length === 1) {
-          const vehicle = vehs[0];
-          setVehicleId(vehicle.v_id);
-          setVehicleNumber(vehicle.v_number);
-          setVehicleType(vehicle.v_type);
-          setVehicleName(vehicle.v_name || '');
-        }
-      }
+      const [types, vehs] = await Promise.all([
+        typesByCategory[cat] ?? serviceTypeApi.getByCategory(cat),
+        cat === 'vehicle' && vehicles === null ? vehicleApi.getByOwner(selectedCustomer.c_id) : Promise.resolve(null),
+      ]);
+      setTypesByCategory(prev => ({ ...prev, [cat]: types }));
+      if (vehs) setVehicles(vehs);
+      setRenewal(null); // a prefilled renewal only applies to its own category
+      formDirty.current = false;
+      setFormKey(k => k + 1);
+      setCategory(cat);
     } catch (error) {
       console.error(error);
-      toast.error('Failed to load service types');
+      toast.error('Failed to load service types — try again.');
     } finally {
-      setStep(3);
-      setCategoryLoading(false);
+      setLoadingCategory(null);
       categoryLock.current = false;
     }
   }
 
-  // Validate cost string is a clean integer or decimal
-  function parseCost(raw: string): number {
-    // Remove any non-numeric characters except decimal point
-    const cleaned = raw.replace(/[^0-9.]/g, '');
-    const parsed = parseFloat(cleaned);
-    return isNaN(parsed) ? 0 : Math.round(parsed * 100) / 100;
+  // "Change category": drop the current form, keep the saved-service rows.
+  function changeCategory() {
+    formDirty.current = false;
+    setRenewal(null);
+    setCategory(null);
+    reveal(categoryRef.current);
   }
 
-  // Submit
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (submitLock.current) return;
-    if (!selectedCustomer || !serviceTypeId) {
-      toast.error('Please fill all required fields');
-      return;
-    }
-    const cost = parseCost(totalCost);
-    if (cost <= 0) {
-      toast.error('Please enter a valid service cost');
-      return;
-    }
-    submitLock.current = true;
-    setSubmitting(true);
-    try {
-      if (category === 'vehicle') {
-        // Issue 1 Fix: If no existing vehicle was selected (manual entry) and vehicle number is provided,
-        // auto-create the vehicle record under this customer BEFORE creating the service.
-        let resolvedVehicleId = vehicleId || undefined;
-        if (!vehicleId && vehicleNumber.trim() && selectedCustomer) {
-          try {
-            const newVehicle = await vehicleApi.create({
-              owner_id: selectedCustomer.c_id,
-              v_number: vehicleNumber.trim().toUpperCase(),
-              v_name: vehicleName.trim() || undefined,
-              v_type: vehicleType.trim() || 'car',
-            });
-            resolvedVehicleId = newVehicle.v_id;
-          } catch (vErr) {
-            // If vehicle already exists (duplicate number), that's OK - proceed without vehicle_id
-            console.warn('Vehicle auto-add skipped:', vErr);
-          }
-        }
-
-        await serviceApi.createVehicleService({
-          customer_id: selectedCustomer.c_id,
-          service_type_id: serviceTypeId,
-          vehicle_id: resolvedVehicleId,
-          vehicle_type: vehicleType,
-          vehicle_number: vehicleNumber,
-          issue_date: issueDate,
-          expiry_date: expiryDate || undefined,
-          total_cost: cost,
-          notes: notes || undefined,
-        });
-      } else {
-        // Issue 2 Fix: renewal_date removed — expiry_date serves as the single renewal/expiry date
-        await serviceApi.createLicenceService({
-          customer_id: selectedCustomer.c_id,
-          service_type_id: serviceTypeId,
-          vehicle_class: vehicleClass,
-          vehicle_type_licence: vehicleTypeLicence,
-          mdl_number: mdlNumber || undefined,
-          issue_date: issueDate,
-          expiry_date: expiryDate || undefined,
-          total_cost: cost,
-          notes: notes || undefined,
-        });
-      }
-
-      // Renewal supersedes the old record — mark it completed if it was
-      // 'active' or 'expired' (a late renewal), so it drops off the
-      // "Expired" / active-status views. 'cancelled' stays as-is —
-      // that's an explicit void, not a lapse, and renewing doesn't undo it.
-      const oldStatus = searchParams.get('oldStatus');
-      if (renewOf && (oldStatus === 'active' || oldStatus === 'expired')) {
-        try { await serviceApi.updateStatus(renewOf, 'completed'); }
-        catch (error) { console.warn('Could not update renewed service status:', error); }
-      }
-
-      toast.success(renewOf ? 'Service renewed successfully!' : 'Service created successfully!');
-      // Land on the services table; it offers "add another service" for this
-      // customer. Button stays locked until navigation so a late click can't double-submit.
-      router.push(`/dashboard/services/overview?added=${selectedCustomer.c_id}`);
-    } catch (error: unknown) {
-      logClientError(category === 'vehicle' ? 'create-vehicle-service' : 'create-document-service', error, { customerId: selectedCustomer?.c_id, serviceTypeId, form: category });
-      toast.error(getErrorMessage(error, 'Could not create service.'));
-      setSubmitting(false);
-      submitLock.current = false;
-    }
+  // Saved: the form collapses into a ✓ row and a fresh one mounts below it.
+  function handleSaved(item: AddedService, newVehicle?: Vehicle) {
+    setAdded(prev => [...prev, item]);
+    if (newVehicle) setVehicles(prev => [newVehicle, ...(prev || [])]); // available to the next service
+    setRenewal(null); // the old service was marked completed on the first save only
+    formDirty.current = false;
+    setFormKey(k => k + 1);
   }
+
+  function exit() {
+    if (formDirty.current && !confirm('Discard the unsaved service?')) return;
+    router.push('/dashboard/services/overview');
+  }
+
+  const types = category ? typesByCategory[category] : undefined;
+
+  const CATEGORIES: { key: Category; label: string; hint: string; Icon: typeof Car; selected: string; icon: string }[] = [
+    { key: 'vehicle', label: 'Vehicle Service', hint: 'Fitness, Tax, PUC, Permit, etc.', Icon: Car, selected: 'border-amber-400 bg-amber-50/50', icon: 'bg-amber-50 border-amber-100 text-amber-600' },
+    { key: 'licence', label: 'Licence Service', hint: 'New DL, Learning, Renewal, etc.', Icon: FileText, selected: 'border-violet-400 bg-violet-50/50', icon: 'bg-violet-50 border-violet-100 text-violet-600' },
+  ];
 
   return (
-    <div className="max-w-3xl mx-auto space-y-8 pb-10">
-      <div className="border-b border-slate-200 pb-5">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">New Service</h1>
-        <p className="text-slate-500 mt-1 font-medium">Issue a new service to a customer</p>
-      </div>
-
-      {/* Step Indicator */}
-      <div className="flex items-center gap-2 max-w-full overflow-hidden">
-        {[
-          { n: 1, label: 'Customer' },
-          { n: 2, label: 'Category' },
-          { n: 3, label: 'Details' },
-        ].map(s => (
-          <div key={s.n} className="flex items-center gap-2">
-            <div className={`h-8 w-8 rounded-full flex items-center justify-center text-sm font-bold shadow-sm transition-colors ${
-              step > s.n ? 'bg-amber-500 text-black border border-amber-600' :
-              step === s.n ? 'bg-amber-400 text-black border border-amber-500' : 'bg-slate-100 text-slate-400 border border-slate-200'
-            }`}>
-              {step > s.n ? <Check className="h-4 w-4" /> : s.n}
-            </div>
-            <span className={`text-sm hidden sm:inline ${step >= s.n ? 'text-slate-900 font-bold' : 'text-slate-400 font-medium'}`}>
-              {s.label}
-            </span>
-            {s.n < 3 && <ChevronDown className="h-4 w-4 text-slate-300 rotate-[-90deg] mx-1" />}
-          </div>
-        ))}
+    <div className="max-w-3xl mx-auto space-y-5 pb-24">
+      <div className="flex items-center gap-4 border-b border-slate-200 pb-5">
+        <Button type="button" variant="outline" size="icon" aria-label="Back to services" onClick={exit} className="h-10 w-10 shrink-0 rounded-full border-slate-200 text-slate-500 hover:text-slate-900 shadow-sm transition-transform duration-150 active:scale-95">
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">New Service</h1>
+          <p className="text-slate-500 mt-0.5 font-medium">
+            {added.length > 0 ? `${added.length} service${added.length > 1 ? 's' : ''} added` : 'Issue a new service to a customer'}
+          </p>
+        </div>
       </div>
 
       {/* Selected customer banner */}
-      {selectedCustomer && step >= 2 && (
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-amber-50/50 rounded-2xl border border-amber-100">
-          <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-full bg-amber-100 flex items-center justify-center text-amber-700 font-bold border border-amber-200 shadow-sm">
+      {selectedCustomer && (
+        <div className="stack-in flex items-center justify-between gap-3 p-4 bg-white rounded-2xl border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-4 min-w-0">
+            <div className="h-12 w-12 shrink-0 rounded-full bg-slate-100 flex items-center justify-center text-slate-700 font-bold border border-slate-200">
               {selectedCustomer.c_name.charAt(0).toUpperCase()}
             </div>
-            <div>
-              <p className="font-bold text-slate-900">{selectedCustomer.c_name}</p>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{selectedCustomer.c_mobile} · {selectedCustomer.c_registration_id}</p>
+            <div className="min-w-0">
+              <p className="font-bold text-slate-900 truncate">{selectedCustomer.c_name}</p>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider truncate">{selectedCustomer.c_mobile} · {selectedCustomer.c_registration_id}</p>
             </div>
           </div>
-          <Button variant="ghost" size="sm" className="hidden sm:inline-flex text-amber-600 hover:text-amber-700 hover:bg-amber-100 rounded-lg" onClick={() => { setStep(1); setSelectedCustomer(null); setCategory(null); setCustName(''); setCustMobile(''); setCustCarNumber(''); setFieldErrors({}); }}>
+          <Button variant="ghost" size="sm" className="shrink-0 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg" onClick={changeCustomer}>
             Change Customer
           </Button>
         </div>
@@ -392,7 +307,7 @@ export default function NewServicePage() {
 
       {/* Step 1: Customer details — search-as-you-type on all 3 fields; pick a
           match to autofill, or keep typing and Next auto-creates the profile. */}
-      {step === 1 && (
+      {!selectedCustomer && (
         <Card className="rounded-2xl shadow-sm border-slate-200 overflow-hidden">
           <CardHeader className="bg-white border-b border-slate-100 pb-4 pt-5 px-6">
             <CardTitle className="text-lg flex items-center gap-2"><User className="h-5 w-5 text-amber-600" /> Customer Details</CardTitle>
@@ -485,241 +400,77 @@ export default function NewServicePage() {
         </Card>
       )}
 
-      {/* Step 2: Select Category */}
-      {step === 2 && (
-        <Card className="rounded-2xl shadow-sm border-slate-200 overflow-hidden">
-          <CardHeader className="bg-white border-b border-slate-100 pb-4 pt-5 px-6">
-            <CardTitle className="text-lg">Service Category</CardTitle>
-            <CardDescription>What type of service does the customer need?</CardDescription>
-          </CardHeader>
-          <CardContent className="p-6 bg-slate-50/30">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <button
-                type="button"
-                disabled={categoryLoading}
-                className="flex flex-col items-center justify-center gap-4 p-8 bg-white border-2 border-slate-200 rounded-2xl hover:border-amber-400 hover:shadow-md transition-all group disabled:opacity-50 disabled:pointer-events-none"
-                onClick={() => selectCategory('vehicle')}
-              >
-                {categoryLoading && category === 'vehicle' ? (
-                  <Loader2 className="h-8 w-8 text-amber-600 animate-spin" />
-                ) : (
-                  <div className="h-16 w-16 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center group-hover:bg-amber-100 group-hover:scale-110 transition-all">
-                    <Car className="h-8 w-8 text-amber-600" />
-                  </div>
-                )}
-                <div className="text-center">
-                  <p className="font-bold text-slate-900 text-lg">Vehicle Service</p>
-                  <p className="text-sm font-medium text-slate-500 mt-1">Fitness, Tax, PUC, Permit, etc.</p>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                disabled={categoryLoading}
-                className="flex flex-col items-center justify-center gap-4 p-8 bg-white border-2 border-slate-200 rounded-2xl hover:border-amber-400 hover:shadow-md transition-all group disabled:opacity-50 disabled:pointer-events-none"
-                onClick={() => selectCategory('licence')}
-              >
-                {categoryLoading && category === 'licence' ? (
-                  <Loader2 className="h-8 w-8 text-violet-600 animate-spin" />
-                ) : (
-                  <div className="h-16 w-16 rounded-full bg-violet-50 border border-violet-100 flex items-center justify-center group-hover:bg-violet-100 group-hover:scale-110 transition-all">
-                    <FileText className="h-8 w-8 text-violet-600" />
-                  </div>
-                )}
-                <div className="text-center">
-                  <p className="font-bold text-slate-900 text-lg">Licence Service</p>
-                  <p className="text-sm font-medium text-slate-500 mt-1">New DL, Learning, Renewal, etc.</p>
-                </div>
-              </button>
-            </div>
-
-            <div className="mt-6 flex justify-start">
-               <Button variant="outline" onClick={() => { setStep(1); setSelectedCustomer(null); }} className="rounded-xl font-medium">Back to Customer Search</Button>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Category — stays on screen with the choice highlighted */}
+      {selectedCustomer && (
+        <div ref={categoryRef} className="stack-in scroll-mt-4">
+          <Card className="rounded-2xl shadow-sm border-slate-200 overflow-hidden">
+            <CardHeader className="bg-white border-b border-slate-100 pb-4 pt-5 px-6">
+              <CardTitle className="text-lg">Service Category</CardTitle>
+              <CardDescription>What type of service does the customer need?</CardDescription>
+            </CardHeader>
+            <CardContent className="p-4 sm:p-6 bg-slate-50/30">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {CATEGORIES.map(c => (
+                  <button
+                    key={c.key}
+                    type="button"
+                    aria-pressed={category === c.key}
+                    disabled={loadingCategory !== null}
+                    onClick={() => selectCategory(c.key)}
+                    className={`flex items-center gap-4 p-4 text-left bg-white border-2 rounded-2xl transition-[border-color,background-color,box-shadow,transform] duration-150 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60 ${category === c.key ? c.selected : 'border-slate-200 hover:border-slate-300 hover:shadow-sm'}`}
+                  >
+                    <div className={`h-12 w-12 shrink-0 rounded-full border flex items-center justify-center ${c.icon}`}>
+                      {loadingCategory === c.key ? <Loader2 className="h-6 w-6 animate-spin" /> : <c.Icon className="h-6 w-6" />}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-slate-900">{c.label}</p>
+                      <p className="text-sm font-medium text-slate-500">{c.hint}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
-      {/* Step 3: Service Details */}
-      {step === 3 && (
-        <Card className="rounded-2xl shadow-sm border-slate-200 overflow-hidden">
-          <CardHeader className="bg-white border-b border-slate-100 pb-4 pt-5 px-6">
-            <CardTitle className="text-lg flex items-center gap-2">
-              {category === 'vehicle' ? <Car className="h-5 w-5 text-amber-600" /> : <FileText className="h-5 w-5 text-violet-600" />}
-              {category === 'vehicle' ? 'Vehicle Service Details' : 'Licence Service Details'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-6 bg-slate-50/30">
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Service Type */}
-              <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-                <label className="text-[11px] uppercase font-bold tracking-wider text-slate-500">Service Type <span className="text-red-500">*</span></label>
-                <select
-                  value={serviceTypeId || ''}
-                  onChange={e => setServiceTypeId(Number(e.target.value))}
-                  className="flex h-12 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-sm mt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 font-medium"
-                  required
-                >
-                  <option value="">Select a specific service...</option>
-                  {serviceTypes.map(t => (
-                    <option key={t.st_id} value={t.st_id}>{t.name}</option>
-                  ))}
-                </select>
+      {/* Services saved in this session */}
+      {added.length > 0 && (
+        <ol aria-label="Services added" className="space-y-2">
+          {added.map(a => (
+            <li key={a.id} className="stack-in flex items-center gap-3 rounded-xl border border-emerald-100 bg-emerald-50/40 px-4 py-3">
+              <div className="success-check flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-emerald-200 bg-emerald-100">
+                <Check className="h-4 w-4 text-emerald-700" strokeWidth={2.5} aria-hidden />
               </div>
-
-              <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-5">
-                {/* Vehicle Service Fields */}
-                {category === 'vehicle' && (
-                  <>
-                    {customerVehicles.length > 0 && (
-                      <div>
-                        <label className="text-[11px] uppercase font-bold tracking-wider text-slate-500">Select Customer&apos;s Existing Vehicle</label>
-                        <select
-                          value={vehicleId}
-                          onChange={e => {
-                            const v = customerVehicles.find(v => v.v_id === e.target.value);
-                            setVehicleId(e.target.value);
-                            if (v) { setVehicleNumber(v.v_number); setVehicleType(v.v_type); setVehicleName(v.v_name || ''); }
-                            else { setVehicleNumber(''); setVehicleType(''); setVehicleName(''); }
-                          }}
-                          className="flex h-11 w-full rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-1 text-sm mt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 font-medium"
-                        >
-                          <option value="">— Enter details manually (will be saved to customer) —</option>
-                          {customerVehicles.map(v => (
-                            <option key={v.v_id} value={v.v_id}>{v.v_number} ({v.v_name || v.v_type})</option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mt-2">
-                      <div>
-                        <label className="text-[11px] uppercase font-bold tracking-wider text-slate-500">Vehicle Number <span className="text-red-500">*</span></label>
-                        <Input 
-                          value={vehicleNumber} 
-                          onChange={e => setVehicleNumber(e.target.value.toUpperCase())} 
-                          placeholder="MH12AB1234" 
-                          required 
-                          readOnly={!!vehicleId}
-                          className={`mt-2 h-11 rounded-lg uppercase focus-visible:ring-amber-200 ${vehicleId ? 'bg-slate-100 text-slate-500' : 'bg-slate-50'}`} 
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[11px] uppercase font-bold tracking-wider text-slate-500">Vehicle Type <span className="text-red-500">*</span></label>
-                        <Input 
-                          value={vehicleType} 
-                          onChange={e => setVehicleType(e.target.value)} 
-                          placeholder="e.g. car, bike, truck" 
-                          required 
-                          readOnly={!!vehicleId}
-                          className={`mt-2 h-11 rounded-lg focus-visible:ring-amber-200 ${vehicleId ? 'bg-slate-100 text-slate-500' : 'bg-slate-50'}`}
-                        />
-                      </div>
-                    </div>
-                    {/* Only show vehicle name when entering manually */}
-                    {!vehicleId && (
-                      <div>
-                        <label className="text-[11px] uppercase font-bold tracking-wider text-slate-500">Vehicle Name <span className="text-slate-400 normal-case font-normal">(optional — will be saved to customer profile)</span></label>
-                        <Input
-                          value={vehicleName}
-                          onChange={e => setVehicleName(e.target.value)}
-                          placeholder="e.g. Swift, Pulsar, Activa"
-                          className="mt-2 h-11 bg-slate-50 rounded-lg focus-visible:ring-amber-200"
-                        />
-                      </div>
-                    )}
-                  </>
-                )}
-
-                {/* Licence Service Fields — Issue 2 Fix: Removed renewal_date, only expiry_date */}
-                {category === 'licence' && (
-                  <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                      <div>
-                        <label className="text-[11px] uppercase font-bold tracking-wider text-slate-500">Vehicle Class <span className="text-red-500">*</span></label>
-                        <select
-                          value={vehicleClass}
-                          onChange={e => setVehicleClass(e.target.value as VehicleClass)}
-                          className="flex h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-sm mt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200"
-                          required
-                        >
-                          {VEHICLE_CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-[11px] uppercase font-bold tracking-wider text-slate-500">Licence Type <span className="text-red-500">*</span></label>
-                        <select
-                          value={vehicleTypeLicence}
-                          onChange={e => setVehicleTypeLicence(e.target.value as VehicleTypeLicence)}
-                          className="flex h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-sm mt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200"
-                          required
-                        >
-                          {VEHICLE_TYPE_LICENCE.map(t => <option key={t} value={t}>{t}</option>)}
-                        </select>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-[11px] uppercase font-bold tracking-wider text-slate-500">MDL / Application Number</label>
-                      <Input value={mdlNumber} onChange={e => setMdlNumber(e.target.value)} placeholder="Enter MDL or application number" className="mt-2 h-11 bg-slate-50 rounded-lg focus-visible:ring-amber-200" />
-                    </div>
-                  </>
-                )}
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-slate-900">{a.name}{a.detail ? <span className="font-medium text-slate-500"> · {a.detail}</span> : null}</p>
+                <p className="truncate text-xs text-slate-500">
+                  {format(new Date(a.issueDate), 'dd MMM yy')}{a.expiryDate ? ` → ${format(new Date(a.expiryDate), 'dd MMM yy')}` : ''}
+                </p>
               </div>
+              <p className="shrink-0 text-sm font-bold tabular-nums text-slate-900">₹{a.cost.toLocaleString('en-IN')}</p>
+            </li>
+          ))}
+        </ol>
+      )}
 
-              {/* Common Fields */}
-              <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-5">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  <div>
-                    <label className="text-[11px] uppercase font-bold tracking-wider text-slate-500">Issue Date <span className="text-red-500">*</span></label>
-                    <DateTimePicker value={issueDate} onChange={setIssueDate} required className="mt-2" />
-                  </div>
-                  <div>
-                    <label className="text-[11px] uppercase font-bold tracking-wider text-slate-500">
-                      {category === 'licence' ? 'Renewal / Expiry Date' : 'Expiry Date'}
-                    </label>
-                    <DateTimePicker value={expiryDate} onChange={setExpiryDate} className="mt-2" />
-                  </div>
-                </div>
-                
-                {/* Issue 5 Fix: Use text input with inputmode=numeric to prevent browser spinners causing float drift */}
-                <div className="pt-2 border-t border-slate-100">
-                  <label className="text-[11px] uppercase font-bold tracking-wider text-slate-500">Total Cost (₹) <span className="text-red-500">*</span></label>
-                  <div className="relative mt-2">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-base">₹</span>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      value={totalCost}
-                      onChange={e => {
-                        // Only allow digits and a single decimal point
-                        const val = e.target.value.replace(/[^0-9.]/g, '');
-                        const parts = val.split('.');
-                        if (parts.length <= 2) setTotalCost(parts.length === 2 ? parts[0] + '.' + parts[1].slice(0, 2) : val);
-                      }}
-                      placeholder="0"
-                      required
-                      className="h-12 w-full rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-4 text-lg font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-transparent tracking-wider"
-                    />
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="text-[11px] uppercase font-bold tracking-wider text-slate-500">Notes & Comments</label>
-                  <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any additional notes for this service..." className="mt-2 h-11 bg-slate-50 rounded-lg focus-visible:ring-amber-200" />
-                </div>
-              </div>
-
-              <div className="flex gap-4 pt-4">
-                <Button type="submit" className="flex-1 bg-gradient-to-r from-amber-400 to-amber-600 hover:from-amber-500 hover:to-amber-700 text-black rounded-xl h-10 text-base font-bold shadow-md tracking-wide" disabled={submitting}>
-                  {submitting ? <><Loader2 className="h-5 w-5 animate-spin mr-2" /> Creating Record...</> : <><Check className="h-6 w-6 mr-2" /> Confirm & Create Service</>}
-                </Button>
-                <Button type="button" variant="outline" className="h-10 px-8 rounded-xl font-bold bg-white" onClick={() => { setStep(2); setCategory(null); }}>
-                  Back
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+      {/* Current service form — remounts (blank) after every save */}
+      {selectedCustomer && category && types && (
+        <div ref={formRef} className="stack-in scroll-mt-28">
+          <ServiceFormCard
+            key={formKey}
+            customer={selectedCustomer}
+            category={category}
+            serviceTypes={types}
+            vehicles={vehicles ?? []}
+            initial={renewal?.initial}
+            renewal={renewal ? { id: renewal.id, oldStatus: renewal.oldStatus } : undefined}
+            onSaved={handleSaved}
+            onChangeCategory={changeCategory}
+            onBack={exit}
+            onDirty={() => { formDirty.current = true; }}
+          />
+        </div>
       )}
     </div>
   );
