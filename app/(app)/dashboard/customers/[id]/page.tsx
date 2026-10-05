@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { customerApi, vehicleApi, serviceApi, buildRenewUrl } from '@/lib/api';
 import type { Customer, Vehicle, ServiceOverview } from '@/lib/types';
@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FILTER_TRIGGER_CLASS, FILTER_ITEM_CLASS } from '@/lib/ui-constants';
+import { smoothReveal } from '@/lib/utils';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -33,6 +34,15 @@ export default function CustomerDetailPage() {
 
   const [serviceSearchOpen, setServiceSearchOpen] = useState(false);
   const [serviceQuery, setServiceQuery] = useState('');
+  const historyRef = useRef<HTMLDivElement>(null);
+
+  // Picking a car: ease down to the (now filtered) Service History card.
+  // Deselecting (null) leaves the scroll alone.
+  useEffect(() => {
+    if (!selectedVehicleId) return;
+    smoothReveal(historyRef.current, 'center');
+  }, [selectedVehicleId]);
+
   const [vehicleSearchOpen, setVehicleSearchOpen] = useState(false);
   const [vehicleQuery, setVehicleQuery] = useState('');
 
@@ -283,6 +293,7 @@ export default function CustomerDetailPage() {
           </Card>
 
           {/* Services List */}
+          <div ref={historyRef}>
           <Card className="rounded-2xl shadow-sm border-slate-200 overflow-hidden">
             <CardHeader className="bg-white border-b border-slate-100 pb-3 pt-5 px-6 flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-lg"><Wrench className="h-5 w-5 text-amber-500" /> Service History <span className="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full">{visibleServices.length}{visibleServices.length !== services.length && ` / ${services.length}`}</span></CardTitle>
@@ -393,6 +404,7 @@ export default function CustomerDetailPage() {
               )}
             </CardContent>
           </Card>
+          </div>
         </div>
       </div>
     </div>

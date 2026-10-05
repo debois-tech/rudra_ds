@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useContext } from 'react';
+import { useCallback, useEffect, useState, useContext } from 'react';
 import { DashboardOrgContext } from '../../app-shell';
 import { dashboardApi } from '@/lib/api';
 import type {
@@ -9,21 +9,21 @@ import type {
 } from '@/lib/types';
 import {
     Users, Car, Wrench, Plus, ArrowUpRight, Shield,
-    AlertTriangle, FileText, ArrowUpDown, RefreshCw, Search, X,
+    AlertTriangle, FileText, ArrowUpDown, RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FILTER_TRIGGER_CLASS, FILTER_ITEM_CLASS } from '@/lib/ui-constants';
-import { buildRenewUrl, EXPIRED_LIMIT } from '@/lib/api';
+import { buildRenewUrl, type ExpiryFilter, type ExpirySort } from '@/lib/api';
 import Link from 'next/link';
 import { formatDistanceToNow, format } from 'date-fns';
-import { createPortal } from 'react-dom';
 
 import { StatCard, StatCardSkeleton } from './_components/stat-card';
 import { StatusBadge, UrgencyBadge } from './_components/badges';
 import { EmptyState } from './_components/empty-state';
+import { ExpiringDialog, expirySortOptions, expiryPresets } from './_components/expiring-dialog';
 
-type ExpiryMode = number | 'expired';
+const CARD_LIMIT = 10; // the card is a preview; the popup pages through everything
 
 // ═══════════════════════════════════════════
 // Types
@@ -61,25 +61,24 @@ export default function DashboardPage() {
     });
     const [activities, setActivities] = useState<ActivityItem[]>([]);
     const [expiringDocs, setExpiringDocs] = useState<ExpiringDocument[]>([]);
-    const [expiryMode, setExpiryMode] = useState<ExpiryMode>(30);
+    const [expiringTotal, setExpiringTotal] = useState(0);
+    const [expired, setExpired] = useState(false);
+    const [upDays, setUpDays] = useState(30);
+    const [expDays, setExpDays] = useState(90);
+    const [expirySort, setExpirySort] = useState<ExpirySort>('expiry-asc'); // shared by the card and the popup
     const [showCustomDays, setShowCustomDays] = useState(false);
     const [customDaysInput, setCustomDaysInput] = useState('');
     const [expiryOpen, setExpiryOpen] = useState(false);
-    const [expirySearch, setExpirySearch] = useState('');
-    const [expiryCategory, setExpiryCategory] = useState('all');
+    const closeExpiry = useCallback(() => setExpiryOpen(false), []);
     const [statsLoading, setStatsLoading] = useState(true);
     const [activityLoading, setActivityLoading] = useState(true);
-    const [loadedExpiryMode, setLoadedExpiryMode] = useState<ExpiryMode | null>(null);
-    const expiryLoading = loadedExpiryMode !== expiryMode; // true until the list for the current mode arrives
-
-    useEffect(() => {
-        if (!expiryOpen) return;
-        const previousOverflow = document.body.style.overflow;
-        const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setExpiryOpen(false); };
-        document.body.style.overflow = 'hidden';
-        document.addEventListener('keydown', closeOnEscape);
-        return () => { document.body.style.overflow = previousOverflow; document.removeEventListener('keydown', closeOnEscape); };
-    }, [expiryOpen]);
+    // One dropdown, two meanings: "due in next N days" or, in expired mode, "expired in last N days".
+    const days = expired ? expDays : upDays;
+    const setDays = expired ? setExpDays : setUpDays;
+    const presets = expiryPresets(expired);
+    const expiryKey = `${expired ? 'expired' : 'upcoming'}:${days}:${expirySort}`;
+    const [loadedExpiryKey, setLoadedExpiryKey] = useState<string | null>(null);
+    const expiryLoading = loadedExpiryKey !== expiryKey; // true until the list for the current window arrives
 
     // Each section loads and renders on its own — a slow stats RPC no longer
     // holds back the activity feed or the expiry list (and vice versa).
@@ -119,16 +118,18 @@ export default function DashboardPage() {
 
     useEffect(() => {
         let cancelled = false;
-        dashboardApi.getExpiringDocuments(expiryMode).then(docs => {
+        const filter: ExpiryFilter = { kind: expired ? 'expired' : 'upcoming', days };
+        dashboardApi.getExpiringDocuments(filter, { limit: CARD_LIMIT, sort: expirySort }).then(({ rows, total }) => {
             if (cancelled) return;
-            setExpiringDocs(docs);
-            setLoadedExpiryMode(expiryMode);
+            setExpiringDocs(rows);
+            setExpiringTotal(total);
+            setLoadedExpiryKey(expiryKey);
         }).catch(error => {
             console.error('Dashboard expiry error:', error);
-            if (!cancelled) { setExpiringDocs([]); setLoadedExpiryMode(expiryMode); } // don't spin forever on error
+            if (!cancelled) { setExpiringDocs([]); setExpiringTotal(0); setLoadedExpiryKey(expiryKey); } // don't spin forever on error
         });
         return () => { cancelled = true; };
-    }, [expiryMode]);
+    }, [expired, days, expirySort, expiryKey]);
 
     return (
         <div className="space-y-8 animate-fade-in max-w-7xl mx-auto">
@@ -205,32 +206,43 @@ export default function DashboardPage() {
                             <h2 className="text-[15px] font-semibold text-slate-900">Documents Expiring Soon</h2>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                         <Select
-                            value={expiryMode === 7 || expiryMode === 30 ? String(expiryMode) : 'custom'}
+                            value={presets.includes(days) ? String(days) : 'custom'}
                             onValueChange={(v) => {
                                 if (v === 'custom') { setShowCustomDays(true); return; }
                                 setShowCustomDays(false);
-                                setExpiryMode(Number(v));
+                                setDays(Number(v));
                             }}
                         >
-                            <SelectTrigger size="sm" aria-label="Expiry window" className={`${FILTER_TRIGGER_CLASS} ${expiryMode === 'expired' ? 'opacity-50' : ''}`}>
+                            <SelectTrigger size="sm" aria-label="Expiry window" className={FILTER_TRIGGER_CLASS}>
                                 <ArrowUpDown className="h-3.5 w-3.5 text-slate-400" />
-                                <SelectValue>{expiryMode === 'expired' ? 'Window' : `${expiryMode} days`}</SelectValue>
+                                <SelectValue>{expired ? `Last ${days} days` : `${days} days`}</SelectValue>
                             </SelectTrigger>
                             <SelectContent className="rounded-xl border-slate-200 shadow-lg">
-                                <SelectItem value="7" className={FILTER_ITEM_CLASS}>7 days</SelectItem>
-                                <SelectItem value="30" className={FILTER_ITEM_CLASS}>30 days</SelectItem>
+                                {presets.map(n => (
+                                    <SelectItem key={n} value={String(n)} className={FILTER_ITEM_CLASS}>{expired ? `Last ${n} days` : `${n} days`}</SelectItem>
+                                ))}
                                 <SelectItem value="custom" className={FILTER_ITEM_CLASS}>Custom…</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Select value={expirySort} onValueChange={v => setExpirySort(v as ExpirySort)}>
+                            <SelectTrigger size="sm" aria-label="Sort documents" className={FILTER_TRIGGER_CLASS}>
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-xl border-slate-200 shadow-lg">
+                                {expirySortOptions(expired).map(o => (
+                                    <SelectItem key={o.value} value={o.value} className={FILTER_ITEM_CLASS}>{o.label}</SelectItem>
+                                ))}
                             </SelectContent>
                         </Select>
                         <Button
                             type="button"
                             variant="outline"
                             size="sm"
-                            aria-pressed={expiryMode === 'expired'}
-                            onClick={() => { setShowCustomDays(false); setExpiryMode(expiryMode === 'expired' ? 30 : 'expired'); }}
-                            className={`h-9 rounded-lg text-xs font-semibold ${expiryMode === 'expired' ? 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                            aria-pressed={expired}
+                            onClick={() => { setShowCustomDays(false); setExpirySort('expiry-asc'); setExpired(e => !e); }}
+                            className={`h-9 rounded-lg text-xs font-semibold ${expired ? 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                         >
                             Show expired
                         </Button>
@@ -240,7 +252,7 @@ export default function DashboardPage() {
                                 onSubmit={e => {
                                     e.preventDefault();
                                     const n = parseInt(customDaysInput, 10);
-                                    if (n > 0) { setExpiryMode(n); setShowCustomDays(false); setCustomDaysInput(''); }
+                                    if (n > 0) { setDays(n); setShowCustomDays(false); setCustomDaysInput(''); }
                                 }}
                             >
                                 <input
@@ -281,7 +293,7 @@ export default function DashboardPage() {
                         </div>
                         <h3 className="text-[14px] font-semibold text-slate-900 mb-1">All clear!</h3>
                         <p className="text-sm text-slate-400">
-                            {expiryMode === 'expired' ? 'No overdue documents' : `No documents expiring in the next ${expiryMode} days`}
+                            {expired ? `No documents expired in the last ${days} days` : `No documents expiring in the next ${days} days`}
                         </p>
                     </div>
                 ) : (
@@ -322,17 +334,10 @@ export default function DashboardPage() {
                         ))}
                     </div>
                 )}
-                {expiryMode === 'expired' && expiringDocs.length >= EXPIRED_LIMIT && <p className="border-t border-slate-100 px-6 py-2 text-[11px] text-slate-400">Showing the {EXPIRED_LIMIT} most recently expired documents.</p>}
-                {expiringDocs.length > 5 && <button type="button" onClick={() => setExpiryOpen(true)} className="w-full border-t border-slate-100 px-6 py-3 text-left text-[12px] font-semibold text-amber-700 hover:bg-amber-50/40">View all expiring documents</button>}
+                {expiringTotal > 5 && <button type="button" onClick={() => setExpiryOpen(true)} className="w-full border-t border-slate-100 px-6 py-3 text-left text-[12px] font-semibold text-amber-700 hover:bg-amber-50/40">View all {expiringTotal.toLocaleString('en-IN')} {expired ? 'expired' : 'expiring'} documents</button>}
             </div>
 
-            {expiryOpen && createPortal(<div className="fixed inset-0 z-[70] flex items-center justify-center overflow-y-auto bg-slate-950/30 p-4" role="presentation" onClick={() => setExpiryOpen(false)}>
-                <div role="dialog" aria-modal="true" aria-labelledby="expiry-dialog-title" className="flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={e => e.stopPropagation()}>
-                    <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4"><div><h2 id="expiry-dialog-title" className="text-[15px] font-semibold text-slate-900">Expiring documents</h2><p className="text-xs text-slate-400">{expiringDocs.length} records in this window</p></div><button type="button" aria-label="Close expiring documents" onClick={() => setExpiryOpen(false)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"><X className="h-4 w-4" /></button></div>
-                    <div className="flex gap-2 border-b border-slate-100 p-4"><div className="relative flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={expirySearch} onChange={e => setExpirySearch(e.target.value)} placeholder="Search customer or service" className="h-9 w-full rounded-lg border border-slate-200 pl-9 pr-3 text-sm outline-none focus:border-amber-400" /></div><select value={expiryCategory} onChange={e => setExpiryCategory(e.target.value)} className="h-9 rounded-lg border border-slate-200 px-2 text-xs text-slate-600"><option value="all">All types</option><option value="vehicle">Vehicle</option><option value="licence">Document</option></select></div>
-                    <div className="max-h-[424px] flex-none overflow-y-auto">{expiringDocs.filter(doc => (expiryCategory === 'all' || doc.category === expiryCategory) && `${doc.customer_name} ${doc.service_name}`.toLowerCase().includes(expirySearch.toLowerCase())).map(doc => <div key={doc.s_id} className="flex items-center gap-3 border-b border-slate-50 px-6 py-3 hover:bg-amber-50/30"><Link href={`/dashboard/customers/${doc.customer_id}`} onClick={() => setExpiryOpen(false)} className="min-w-0 flex-1"><p className="truncate text-[13px] font-semibold text-slate-900">{doc.customer_name}</p><p className="truncate text-xs text-slate-400">{doc.service_name}</p></Link><UrgencyBadge days={doc.days_remaining} /><Link href={buildRenewUrl(doc)} title="Renew this service" onClick={() => setExpiryOpen(false)} className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700 shrink-0"><RefreshCw className="h-3.5 w-3.5" /></Link></div>)}{expiringDocs.filter(doc => (expiryCategory === 'all' || doc.category === expiryCategory) && `${doc.customer_name} ${doc.service_name}`.toLowerCase().includes(expirySearch.toLowerCase())).length === 0 && <p className="px-6 py-10 text-center text-sm text-slate-400">No matching documents.</p>}</div>
-                </div>
-            </div>, document.body)}
+            {expiryOpen && <ExpiringDialog filter={{ kind: expired ? 'expired' : 'upcoming', days }} sort={expirySort} onDaysChange={setDays} onSortChange={setExpirySort} onClose={closeExpiry} />}
 
             {/* ── Activity Feed ── */}
             <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
