@@ -676,7 +676,11 @@ SELECT
     c.c_mobile AS customer_mobile
 FROM public.service_records s
 JOIN public.service_types st ON st.st_id = s.service_type_id
-JOIN public.customers c ON c.c_id = s.customer_id;
+JOIN public.customers c ON c.c_id = s.customer_id
+-- Soft delete: status 'expired' for more than 90 days is hidden from every UI
+-- table. Counts/revenue read service_records (not this view), so hidden rows
+-- still count. To turn off: drop this WHERE line and re-run the view.
+WHERE NOT (s.status = 'expired' AND s.expiry_date < CURRENT_DATE - 90);
 
 DROP VIEW IF EXISTS public.v_ds_driving_logs;
 CREATE VIEW public.v_ds_driving_logs

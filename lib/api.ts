@@ -33,7 +33,6 @@ function getClient() {
     return createSupabaseBrowser();
 }
 
-export const EXPIRED_LIMIT = 500;
 
 // Escapes LIKE wildcards so user text is matched literally.
 const escapeLike = (term: string) => term.replace(/[\\%_]/g, m => '\\' + m);
@@ -42,6 +41,8 @@ const escapeLike = (term: string) => term.replace(/[\\%_]/g, m => '\\' + m);
 // comma/paren in the search text (e.g. "Sharma, Raj") breaks the whole filter.
 const orIlike = (term: string) => `"%${escapeLike(term).replace(/[\\"]/g, m => '\\' + m)}%"`;
 
+export type ExpiryFilter = { kind: 'upcoming' | 'expired'; days: number };
+export type ExpirySort = 'expiry-asc' | 'expiry-desc' | 'name' | 'cost'; // expiry-asc = soonest / most overdue first
 export type CustomerSort = 'name' | 'newest' | 'oldest' | 'vehicles' | 'services' | 'revenue';
 export type CustomerVehicleFilter = 'all' | 'with' | 'without';
 export type ServiceSort = 'newest' | 'oldest' | 'amount-high' | 'amount-low' | 'customer';
@@ -534,44 +535,54 @@ export const dashboardApi = {
     },
 
     /**
-     * Get services with expiry dates within the next N days.
-     * RLS scopes this to the logged-in user's org automatically.
+     * kind 'upcoming' = still-active services expiring in the next N days;
+     * kind 'expired' = lapsed within the last N days (active OR expired status —
+     * bulk-imported rows often never got relabeled; completed/cancelled are
+     * resolved and excluded). Paged: returns one page plus the exact total.
      */
-    /**
-     * `filter` is either "next N days" (upcoming, still active) or 'expired'
-     * (already past expiry, regardless of stored status — bulk-imported
-     * historical rows often still say 'active' even though they've lapsed).
-     */
-    async getExpiringDocuments(filter: number | 'expired' = 30): Promise<ExpiringDocument[]> {
+    async getExpiringDocuments(
+        filter: ExpiryFilter,
+        opts: { limit?: number; offset?: number; search?: string; category?: ServiceCategory | 'all'; sort?: ExpirySort } = {},
+    ): Promise<{ rows: ExpiringDocument[]; total: number }> {
         const supabase = getClient();
+        const { limit = 25, offset = 0, search = '', category = 'all', sort = 'expiry-asc' } = opts;
         const today = new Date();
-        const todayStr = today.toISOString().split('T')[0];
+        const dayStr = (shift: number) => {
+            const d = new Date();
+            d.setDate(today.getDate() + shift);
+            return d.toISOString().split('T')[0];
+        };
 
         let query = supabase
             .from('v_services_overview')
-            .select('s_id, customer_id, customer_name, service_name, category, expiry_date, vehicle_number, service_type_id, issue_date, total_cost, status, vehicle_id, vehicle_type, vehicle_class, vehicle_type_licence, mdl_number')
+            .select('s_id, customer_id, customer_name, service_name, category, expiry_date, vehicle_number, service_type_id, issue_date, total_cost, status, vehicle_id, vehicle_type, vehicle_class, vehicle_type_licence, mdl_number', { count: 'exact' })
             .not('expiry_date', 'is', null);
 
-        if (filter === 'expired') {
-            // Not status = 'active' only — some bulk-imported rows never got
-            // relabeled 'expired' even though the date has passed. But do
-            // exclude 'completed'/'cancelled' — those are resolved (e.g. a
-            // renewal already superseded them) and shouldn't linger here.
-            query = query.lt('expiry_date', todayStr).in('status', ['active', 'expired']).order('expiry_date', { ascending: false }).limit(EXPIRED_LIMIT);
-        } else {
-            const futureDate = new Date();
-            futureDate.setDate(today.getDate() + filter);
-            const futureStr = futureDate.toISOString().split('T')[0];
-            query = query.gte('expiry_date', todayStr).lte('expiry_date', futureStr).eq('status', 'active').order('expiry_date', { ascending: true });
+        query = filter.kind === 'expired'
+            ? query.lt('expiry_date', dayStr(0)).gte('expiry_date', dayStr(-filter.days)).in('status', ['active', 'expired'])
+            : query.gte('expiry_date', dayStr(0)).lte('expiry_date', dayStr(filter.days)).eq('status', 'active');
+
+        if (category !== 'all') query = query.eq('category', category);
+        const term = search.trim();
+        if (term) {
+            const pat = orIlike(term);
+            query = query.or(`customer_name.ilike.${pat},service_name.ilike.${pat},vehicle_number.ilike.${pat}`);
         }
 
-        const { data, error } = await query;
+        const [column, ascending] = ({
+            'expiry-asc': ['expiry_date', true],
+            'expiry-desc': ['expiry_date', false],
+            name: ['customer_name', true],
+            cost: ['total_cost', false],
+        } as Record<ExpirySort, [string, boolean]>)[sort];
+        const { data, error, count } = await query.order(column, { ascending }).order('s_id').range(offset, offset + limit - 1);
         if (error) throw error;
 
-        return (data || []).map((row: Omit<ExpiringDocument, 'days_remaining'>) => {
-            const daysRemaining = differenceInCalendarDays(new Date(row.expiry_date), today);
-            return { ...row, days_remaining: daysRemaining };
-        });
+        const rows = (data || []).map((row: Omit<ExpiringDocument, 'days_remaining'>) => ({
+            ...row,
+            days_remaining: differenceInCalendarDays(new Date(row.expiry_date), today),
+        }));
+        return { rows, total: count ?? rows.length };
     },
 };
 
