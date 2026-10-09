@@ -301,9 +301,9 @@ export default function DashboardPage() {
                         {expiringDocs.map((doc) => (
                             <div
                                 key={doc.s_id}
-                                className="flex items-center gap-3.5 px-6 py-3 hover:bg-amber-50/30 transition-colors group"
+                                className="flex items-center gap-3.5 px-6 py-3 hover:bg-amber-50/30 transition-colors group md:grid md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:gap-4"
                             >
-                                <Link href={`/dashboard/customers/${doc.customer_id}`} className="flex flex-1 min-w-0 items-center gap-3.5">
+                                <Link href={`/dashboard/customers/${doc.customer_id}`} className="flex flex-1 min-w-0 items-center gap-3.5 md:flex-none">
                                     <div className={`h-9 w-9 rounded-full flex items-center justify-center shrink-0 ${
                                         doc.category === 'vehicle' ? 'bg-amber-50 text-amber-600' : 'bg-violet-50 text-violet-600'
                                     }`}>
@@ -316,7 +316,10 @@ export default function DashboardPage() {
                                         </p>
                                     </div>
                                 </Link>
-                                <div className="flex items-center gap-3 shrink-0">
+                                <a href={`tel:${doc.customer_mobile}`} className="hidden md:block text-center whitespace-nowrap text-[13px] font-medium tabular-nums text-slate-600 hover:text-slate-900 hover:underline">
+                                    {doc.customer_mobile}
+                                </a>
+                                <div className="flex items-center gap-3 shrink-0 md:justify-self-end">
                                     <span className="text-[11px] text-slate-400 font-medium hidden sm:block">
                                         {format(new Date(doc.expiry_date), 'dd MMM yyyy')}
                                     </span>

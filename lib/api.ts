@@ -555,7 +555,7 @@ export const dashboardApi = {
 
         let query = supabase
             .from('v_services_overview')
-            .select('s_id, customer_id, customer_name, service_name, category, expiry_date, vehicle_number, service_type_id, issue_date, total_cost, status, vehicle_id, vehicle_type, vehicle_class, vehicle_type_licence, mdl_number', { count: 'exact' })
+            .select('s_id, customer_id, customer_name, customer_mobile, service_name, category, expiry_date, vehicle_number, service_type_id, issue_date, total_cost, status, vehicle_id, vehicle_type, vehicle_class, vehicle_type_licence, mdl_number', { count: 'exact' })
             .not('expiry_date', 'is', null);
 
         query = filter.kind === 'expired'
