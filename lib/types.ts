@@ -209,6 +209,7 @@ export interface DashboardStats {
 export interface ExpiringDocument {
   s_id: string;
   customer_name: string;
+  customer_mobile: string;
   customer_id: string;
   service_name: string;
   category: ServiceCategory;
