@@ -1008,6 +1008,9 @@ $$;
 -- Kept in sync by hand with that repo's sql/setup.sql (which is also safe to run on a live DB).
 -- ============================================
 
+COMMENT ON COLUMN public.organizations.reminders_enabled IS
+  'WhatsApp expiry-reminder automation: send reminders for this school when true (default false).';
+
 -- ---- 1. schema + send_log
 create schema if not exists reminders;
 
