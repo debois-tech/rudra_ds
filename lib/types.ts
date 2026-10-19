@@ -12,6 +12,7 @@ export interface Organization {
   email: string | null;
   address: string | null;
   logo_url: string | null;
+  org_num: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;

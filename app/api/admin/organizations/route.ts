@@ -38,6 +38,7 @@ export async function POST(request: NextRequest) {
                 phone: body.phone || null,
                 email: body.email || null,
                 address: body.address || null,
+                org_num: body.org_num || null,
             }])
             .select()
             .single()
@@ -58,8 +59,8 @@ export async function PATCH(request: NextRequest) {
 
     try {
         const body = await request.json()
-        const { id, name, slug, phone, email, address, is_active } = body
-        const updates = { name, slug, phone, email, address, is_active }
+        const { id, name, slug, phone, email, address, org_num, is_active } = body
+        const updates = { name, slug, phone, email, address, org_num, is_active }
         const { data, error } = await supabase
             .from('organizations')
             .update(updates)

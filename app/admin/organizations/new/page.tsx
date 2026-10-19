@@ -21,6 +21,7 @@ export default function NewOrganizationPage() {
     const [orgPhone, setOrgPhone] = useState('')
     const [orgEmail, setOrgEmail] = useState('')
     const [orgAddress, setOrgAddress] = useState('')
+    const [orgNum, setOrgNum] = useState('')
 
     // First user fields
     const [userName, setUserName] = useState('')
@@ -45,6 +46,7 @@ export default function NewOrganizationPage() {
                 phone: orgPhone,
                 email: orgEmail,
                 address: orgAddress,
+                org_num: orgNum,
             })
 
             // Step 2: Create the first user for this org
@@ -132,6 +134,16 @@ export default function NewOrganizationPage() {
                                     className="bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500"
                                 />
                             </div>
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="text-slate-300">Org WhatsApp Number</Label>
+                            <Input
+                                value={orgNum}
+                                onChange={(e) => setOrgNum(e.target.value)}
+                                placeholder="+91 98765 43210"
+                                className="bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500"
+                            />
+                            <p className="text-xs text-slate-500">Gets the notification report and is shown in customer messages</p>
                         </div>
                         <div className="space-y-2">
                             <Label className="text-slate-300">Address</Label>

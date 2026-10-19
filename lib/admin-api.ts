@@ -41,6 +41,7 @@ export const adminOrgApi = {
         phone?: string;
         email?: string;
         address?: string;
+        org_num?: string;
     }): Promise<Organization> {
         return adminFetch<Organization>('/api/admin/organizations', {
             method: 'POST',

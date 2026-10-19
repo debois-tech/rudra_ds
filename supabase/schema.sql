@@ -37,6 +37,10 @@ CREATE TABLE public.organizations (
     address     TEXT,
     logo_url    TEXT,
     is_active   BOOLEAN DEFAULT true,
+    -- WhatsApp expiry-reminder automation (see the REMINDERS section at the end). Off by default.
+    reminders_enabled BOOLEAN NOT NULL DEFAULT false,
+    -- WhatsApp number that receives the "who was notified" report and is shown in customer message templates
+    org_num     TEXT,
     created_at  TIMESTAMPTZ DEFAULT now(),
     updated_at  TIMESTAMPTZ DEFAULT now()
 );
@@ -993,3 +997,173 @@ BEGIN
     END IF;
 END;
 $$;
+
+
+-- ============================================
+-- REMINDERS (WhatsApp expiry reminders)
+-- Used by the separate repo motoadmin-whatsapp-automation (daily GitHub Actions job).
+-- The service logs in as the limited role `reminders_bot`: it can SELECT one view and
+-- INSERT/UPDATE reminders.send_log, nothing else. The schema is NOT exposed through the
+-- Supabase API. public.organizations.reminders_enabled (above) switches a school on/off.
+-- Kept in sync by hand with that repo's sql/setup.sql (which is also safe to run on a live DB).
+-- ============================================
+
+-- ---- 1. schema + send_log
+create schema if not exists reminders;
+
+create table if not exists reminders.send_log (
+    id               bigserial primary key,
+    message_type     text        not null default 'vehicle',   -- vehicle | licence | owner_report
+    org_id           uuid        not null,
+    -- customer reminders: the dedupe key is (service_id, expiry_date, reminder_window)
+    service_id       uuid,                    -- vehicle_services.s_id or document_services.s_id
+    expiry_date      date,
+    reminder_window  text        check (reminder_window in ('7d', '1d', 'catchup')),
+    -- owner reports: the dedupe key is (org_id, report_date, chunk_no)
+    report_date      date,
+    chunk_no         int,                     -- 1..n when one report is split over several messages
+    template_name    text        not null,
+    language         text        not null,
+    to_phone         text        not null,
+    -- sending          = claimed, in flight (stuck rows are NOT auto-retried: no double send)
+    -- failed           = transient error, retried on next run
+    -- failed_permanent = Meta rejected it, never retried
+    -- delivered/read   = written by the Phase 2 webhook
+    status           text        not null check (status in
+                       ('sending','sent','delivered','read','failed','failed_permanent')),
+    wamid            text,
+    error_code       text,
+    error_message    text,
+    attempts         int         not null default 1,   -- send attempts across all runs
+    created_at       timestamptz not null default now(),
+    updated_at       timestamptz not null default now(),
+    unique (service_id, expiry_date, reminder_window)
+);
+
+-- Upgrade path for an older send_log (no-ops on a fresh table).
+alter table reminders.send_log add column if not exists message_type text not null default 'vehicle';
+alter table reminders.send_log add column if not exists report_date  date;
+alter table reminders.send_log add column if not exists chunk_no      int;
+alter table reminders.send_log alter column service_id      drop not null;
+alter table reminders.send_log alter column expiry_date     drop not null;
+alter table reminders.send_log alter column reminder_window drop not null;
+alter table reminders.send_log drop constraint if exists send_log_message_type_check;
+alter table reminders.send_log add  constraint send_log_message_type_check
+    check (message_type in ('vehicle', 'licence', 'owner_report'));
+alter table reminders.send_log drop constraint if exists send_log_reminder_window_check;
+alter table reminders.send_log add  constraint send_log_reminder_window_check
+    check (reminder_window in ('7d', '1d', 'catchup'));   -- 'catchup' = one-off catch-up script
+
+create unique index if not exists send_log_owner_report_uq
+    on reminders.send_log (org_id, report_date, chunk_no) where message_type = 'owner_report';
+create index if not exists send_log_wamid_idx on reminders.send_log (wamid) where wamid is not null;
+
+-- ---- 2. the one view the bot reads
+-- One row per vehicle service (PUC, insurance, ...) and per licence (document_services).
+-- Date filtering is done by the app. Rows with a missing licence/car number are kept on purpose:
+-- the app decides (licence: sent as "Not available"; vehicle: skipped and reported).
+--
+-- Rules baked in:
+--  * status active/completed/expired, school is_active AND reminders_enabled, expiry_date present.
+--    (expired is included for the one-off catch-up script; the nightly job only looks at 7 / 1 days ahead.)
+--  * Renewal rule: a service is dropped if the same customer already has a LATER expiry for the
+--    same service type (same vehicle / same licence class). Renewals add a new row, so without
+--    this a customer who already renewed would still be reminded about the old row.
+--  * owner_name: the school's profile (profiles.org_id = organizations.id) is the owner, name from
+--    profiles.full_name. To stay safe it must be exactly ONE active 'user' profile with a name; if the
+--    school has 0 or 2+ such profiles it is NULL and the owner report is skipped. Adjust the `owners`
+--    CTE if schools can have several logins (e.g. pick the oldest).
+--
+-- NOT security_invoker on purpose: the bot must see every tenant. Safety = non-API schema +
+-- SELECT granted to reminders_bot only.
+drop view if exists reminders.reminders_expiring_services_v;
+create view reminders.reminders_expiring_services_v as
+with owners as (
+    select org_id, max(full_name) as owner_name
+    from public.profiles
+    where role = 'user' and is_active and btrim(coalesce(full_name, '')) <> ''
+    group by org_id
+    having count(*) = 1
+)
+select
+    'vehicle'::text                           as kind,
+    vs.s_id                                   as service_id,
+    vs.expiry_date,
+    o.id                                      as org_id,
+    o.name                                    as school_name,
+    o.phone                                   as school_phone,
+    ow.owner_name,
+    c.c_id                                    as customer_id,
+    c.c_name                                  as customer_name,
+    c.c_whatsapp                              as customer_phone,
+    st.name                                   as service_name,
+    coalesce(nullif(btrim(vs.vehicle_number), ''), v.v_number) as ref_no      -- car number
+from public.vehicle_services vs
+join public.organizations o  on o.id = vs.org_id and o.is_active and o.reminders_enabled
+join public.customers c      on c.c_id = vs.customer_id
+join public.service_types st on st.st_id = vs.service_type_id
+left join public.vehicles v  on v.v_id = vs.vehicle_id
+left join owners ow          on ow.org_id = o.id
+where vs.expiry_date is not null
+  and vs.status in ('active', 'completed', 'expired')
+  and not exists (
+      select 1 from public.vehicle_services n
+      where n.customer_id = vs.customer_id
+        and n.service_type_id = vs.service_type_id
+        and n.expiry_date > vs.expiry_date
+        and n.status in ('active', 'completed', 'expired')
+        and coalesce(n.vehicle_id::text, n.vehicle_number) = coalesce(vs.vehicle_id::text, vs.vehicle_number)
+  )
+union all
+select
+    'licence'::text,
+    ds.s_id,
+    ds.expiry_date,
+    o.id,
+    o.name,
+    o.phone,
+    ow.owner_name,
+    c.c_id,
+    c.c_name,
+    c.c_whatsapp,
+    st.name || coalesce(' (' || nullif(btrim(ds.vehicle_type_licence), '') || ')', ''),  -- "Driving Licence (LMV)"
+    nullif(btrim(ds.mdl_number), '')                                                       -- licence number
+from public.document_services ds
+join public.organizations o  on o.id = ds.org_id and o.is_active and o.reminders_enabled
+join public.customers c      on c.c_id = ds.customer_id
+join public.service_types st on st.st_id = ds.service_type_id
+left join owners ow          on ow.org_id = o.id
+where ds.expiry_date is not null
+  and ds.status in ('active', 'completed', 'expired')
+  and not exists (
+      select 1 from public.document_services n
+      where n.customer_id = ds.customer_id
+        and n.service_type_id = ds.service_type_id
+        and n.expiry_date > ds.expiry_date
+        and n.status in ('active', 'completed', 'expired')
+        and n.vehicle_type_licence is not distinct from ds.vehicle_type_licence
+  );
+
+-- ---- 3. lock out the public API
+revoke all on schema reminders from public, anon, authenticated;
+revoke all on all tables in schema reminders from public, anon, authenticated;
+
+-- ---- 4. bot role + grants
+-- The password is NOT stored here. After running this file, set it once:
+--   ALTER ROLE reminders_bot WITH PASSWORD '<long random string>';
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'reminders_bot') THEN
+    CREATE ROLE reminders_bot LOGIN NOINHERIT NOBYPASSRLS;
+  END IF;
+END $$;
+
+ALTER ROLE reminders_bot WITH LOGIN NOINHERIT NOBYPASSRLS;
+ALTER ROLE reminders_bot SET statement_timeout = '30s';
+
+GRANT USAGE ON SCHEMA reminders TO reminders_bot;
+GRANT SELECT ON reminders.reminders_expiring_services_v TO reminders_bot;
+GRANT SELECT, INSERT, UPDATE ON reminders.send_log TO reminders_bot;
+GRANT USAGE, SELECT ON SEQUENCE reminders.send_log_id_seq TO reminders_bot;
+REVOKE ALL ON ALL TABLES IN SCHEMA public FROM reminders_bot;
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM reminders_bot;
