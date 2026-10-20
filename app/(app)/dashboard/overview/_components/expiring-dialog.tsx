@@ -16,8 +16,8 @@ export const expiryPresets = (expired: boolean) => (expired ? [7, 30, 60, 90] : 
 // Same four sorts in both modes; only the wording of the date ones changes.
 export function expirySortOptions(expired: boolean): { value: ExpirySort; label: string }[] {
     return [
-        { value: 'expiry-asc', label: expired ? 'Most overdue first' : 'Soonest first' },
-        { value: 'expiry-desc', label: expired ? 'Least overdue first' : 'Latest first' },
+        { value: 'expiry-asc', label: expired ? 'Most overdue first' : 'Expiring soon' },
+        { value: 'expiry-desc', label: expired ? 'Least overdue first' : 'Up-to-Date' },
         { value: 'name', label: 'Customer A–Z' },
         { value: 'cost', label: 'Highest cost' },
     ];

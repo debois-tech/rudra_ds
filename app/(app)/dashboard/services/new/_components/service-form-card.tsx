@@ -1,38 +1,25 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { format } from 'date-fns';
-import { vehicleApi, serviceApi, renewalDates } from '@/lib/api';
-import type { CustomerDashboardView, Vehicle, ServiceType, ServiceOverview, VehicleClass, VehicleTypeLicence } from '@/lib/types';
-import { Loader2, Car, FileText, Check, RefreshCw } from 'lucide-react';
+import { format, formatDistanceToNow } from 'date-fns';
+import { vehicleApi, renewalDates } from '@/lib/api';
+import type { CustomerDashboardView, Vehicle, ServiceType, ServiceOverview, VehicleClass, VehicleTypeLicence, CartItem } from '@/lib/types';
+import { Loader2, Car, FileText, Check, RefreshCw, Plus, Lock, ChevronDown, ChevronUp, ShoppingBag } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DateTimePicker } from '@/components/ui/date-time-picker';
 import { toast } from 'sonner';
 import { getErrorMessage, logClientError } from '@/lib/error-message';
-import { smoothReveal } from '@/lib/utils';
-import { ExpiredMatchCard } from './expired-match-card';
 
 export type Category = 'vehicle' | 'licence';
 
-// What the page keeps after a save — enough to render the ✓ summary row.
-export interface AddedService {
-  id: string;
-  category: Category;
-  name: string;
-  detail: string;
-  issueDate: string;
-  expiryDate: string | null;
-  cost: number;
-}
-
-// Renewal prefill (from buildRenewUrl's query params).
 export interface FormInitial {
   serviceTypeId?: number;
   vehicleId?: string;
   vehicleNumber?: string;
   vehicleType?: string;
+  vehicleName?: string;
   vehicleClass?: VehicleClass;
   vehicleTypeLicence?: VehicleTypeLicence;
   mdlNumber?: string;
@@ -49,18 +36,11 @@ const VEHICLE_TYPE_LICENCE: VehicleTypeLicence[] = [
 
 const today = () => new Date().toISOString().split('T')[0];
 
-// Same rule as the dashboard Expired list: date passed, and not already
-// renewed (completed) or voided (cancelled).
-const isLapsed = (s: ServiceOverview) =>
-  !!s.expiry_date && s.expiry_date < today() && (s.status === 'active' || s.status === 'expired');
-
-// Validate cost string is a clean integer or decimal
 function parseCost(raw: string): number {
   const parsed = parseFloat(raw.replace(/[^0-9.]/g, ''));
   return isNaN(parsed) ? 0 : Math.round(parsed * 100) / 100;
 }
 
-const SELECT_CLASS = 'flex w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-sm mt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 disabled:cursor-not-allowed';
 const LABEL_CLASS = 'text-[11px] uppercase font-bold tracking-wider text-slate-500';
 
 interface Props {
@@ -68,404 +48,731 @@ interface Props {
   category: Category;
   serviceTypes: ServiceType[];
   vehicles: Vehicle[];
-  // The customer's existing services — source of the "this one expired, renew it?" match.
   services: ServiceOverview[];
   initial?: FormInitial;
-  // Set only for the first form of a URL renewal (Renew button elsewhere): the old service to mark completed.
   renewal?: { id: string; oldStatus: string | null };
-  onSaved: (added: AddedService, newVehicle?: Vehicle, renewedId?: string) => void;
+  cart: CartItem[];
+  onAddToCart: (item: CartItem) => void;
+  onVehicleAdded?: (newVehicle: Vehicle) => void;
   onChangeCategory: () => void;
   onBack: () => void;
   onDirty: () => void;
 }
 
-// One service form. The page remounts it (new key) after every save, so each
-// service starts from a clean slate without a pile of reset code.
-//
-// Vehicle: vehicle -> service type -> (expired match?) -> dates & cost.
-// Licence: (expired matches?) -> licence details -> dates & cost.
-// Cards appear as the previous one is filled in.
-export function ServiceFormCard({ customer, category, serviceTypes, vehicles, services, initial, renewal, onSaved, onChangeCategory, onBack, onDirty }: Props) {
-  // A single car on file is pre-selected; "enter manually" stays in the dropdown.
+export function ServiceFormCard({
+  customer,
+  category,
+  serviceTypes,
+  vehicles,
+  services,
+  initial,
+  renewal,
+  cart,
+  onAddToCart,
+  onVehicleAdded,
+  onChangeCategory,
+  onBack,
+  onDirty,
+}: Props) {
+  const [localVehicles, setLocalVehicles] = useState<Vehicle[]>(vehicles);
+  useEffect(() => { setLocalVehicles(vehicles); }, [vehicles]);
+  const [addingVehicle, setAddingVehicle] = useState(false);
+
+  // A single car on file is pre-selected
   const onlyVehicle = category === 'vehicle' && !initial?.vehicleNumber && vehicles.length === 1 ? vehicles[0] : null;
 
-  const [serviceTypeId, setServiceTypeId] = useState<number | null>(initial?.serviceTypeId ?? null);
   const [vehicleId, setVehicleId] = useState(initial?.vehicleId || onlyVehicle?.v_id || '');
   const [vehicleType, setVehicleType] = useState(initial?.vehicleType || onlyVehicle?.v_type || '');
   const [vehicleNumber, setVehicleNumber] = useState(initial?.vehicleNumber || onlyVehicle?.v_number || '');
-  const [vehicleName, setVehicleName] = useState(onlyVehicle?.v_name || '');
-  const [vehicleClass, setVehicleClass] = useState<VehicleClass>(initial?.vehicleClass || 'NT');
-  const [vehicleTypeLicence, setVehicleTypeLicence] = useState<VehicleTypeLicence>(initial?.vehicleTypeLicence || 'LMV');
-  const [mdlNumber, setMdlNumber] = useState(initial?.mdlNumber || '');
-  const [issueDate, setIssueDate] = useState(initial?.issueDate || today());
-  const [expiryDate, setExpiryDate] = useState(initial?.expiryDate || '');
-  const [totalCost, setTotalCost] = useState(initial?.totalCost || '');
-  const [notes, setNotes] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const submitLock = useRef(false);
-  const formRef = useRef<HTMLFormElement>(null);
-  const matchRef = useRef<HTMLDivElement>(null);
-  const datesRef = useRef<HTMLDivElement>(null);
+  const [vehicleName, setVehicleName] = useState(initial?.vehicleName || onlyVehicle?.v_name || '');
 
-  // ── Expired-match step ────────────────────────────────────────────────
-  // `decision` remembers what the owner chose for ONE vehicle+type (or the
-  // licence list): renew a specific old service, or skip it. Change the car or
-  // type and the key changes, so the question is asked again.
-  const plate = vehicleNumber.trim().toUpperCase();
-  const vehicleChosen = category === 'licence' || !!vehicleId || (!!plate && !!vehicleType.trim());
-  const key = category === 'licence' ? 'licence' : `${vehicleId || plate}|${serviceTypeId}`;
-  const [decision, setDecision] = useState<{ key: string; renew: ServiceOverview | null } | null>(null);
-  const decided = decision?.key === key;
-  const renewing = decided ? decision.renew : null;
+  // Active expanded service configuration
+  const [expandedServiceId, setExpandedServiceId] = useState<number | null>(null);
+  const [formIssueDate, setFormIssueDate] = useState<string>(today());
+  const [formExpiryDate, setFormExpiryDate] = useState<string>('');
+  const [formCost, setFormCost] = useState<string>('');
+  const [formNotes, setFormNotes] = useState<string>('');
+  const [formVehicleClass, setFormVehicleClass] = useState<VehicleClass>(initial?.vehicleClass || 'NT');
+  const [formLicenceType, setFormLicenceType] = useState<VehicleTypeLicence>(initial?.vehicleTypeLicence || 'LMV');
+  const [formMdlNumber, setFormMdlNumber] = useState<string>(initial?.mdlNumber || '');
 
-  const matches = (() => {
-    if (renewal || !vehicleChosen) return []; // URL renewal already knows what it renews
-    if (category === 'vehicle' && !serviceTypeId) return [];
-    return services
-      .filter(s => s.category === category && isLapsed(s) && (category === 'licence' || (
-        s.service_type_id === serviceTypeId && ((!!vehicleId && s.vehicle_id === vehicleId) || (!!plate && s.vehicle_number?.toUpperCase() === plate))
-      )))
-      .sort((a, b) => b.expiry_date!.localeCompare(a.expiry_date!)); // newest expiry first
-  })();
-  const needsDecision = matches.length > 0 && !decided;
-  const showTypeCard = category === 'licence' ? !needsDecision : vehicleChosen;
-  const showDates = showTypeCard && !!serviceTypeId && !needsDecision;
-  const activeRenewal = renewing ? { id: renewing.s_id, oldStatus: renewing.status } : renewal;
-
-  function renew(m: ServiceOverview) {
-    const d = renewalDates(m);
-    setDecision({ key, renew: m });
-    setServiceTypeId(m.service_type_id);
-    if (category === 'licence') {
-      setVehicleClass(m.vehicle_class || 'NT');
-      setVehicleTypeLicence(m.vehicle_type_licence || 'LMV');
-      setMdlNumber(m.mdl_number || '');
+  // Pre-expand if initial specified (e.g. renewal from overview)
+  useEffect(() => {
+    if (initial?.serviceTypeId) {
+      setExpandedServiceId(initial.serviceTypeId);
+      if (initial.issueDate) setFormIssueDate(initial.issueDate);
+      if (initial.expiryDate) setFormExpiryDate(initial.expiryDate);
+      if (initial.totalCost) setFormCost(initial.totalCost);
+      if (initial.vehicleClass) setFormVehicleClass(initial.vehicleClass);
+      if (initial.vehicleTypeLicence) setFormLicenceType(initial.vehicleTypeLicence);
+      if (initial.mdlNumber) setFormMdlNumber(initial.mdlNumber);
     }
-    setIssueDate(d.issueDate);
-    setExpiryDate(d.expiryDate);
-    setTotalCost(String(m.total_cost));
+  }, [initial]);
+
+  async function handleAddVehicle() {
+    const plate = vehicleNumber.trim().toUpperCase();
+    if (!plate) {
+      toast.error('Please enter a vehicle number');
+      return;
+    }
+    const type = vehicleType.trim() || 'car';
+    const name = vehicleName.trim() || undefined;
+
+    const existing = localVehicles.find(v => v.v_number.toUpperCase() === plate);
+    if (existing) {
+      setVehicleId(existing.v_id || '');
+      setVehicleNumber(existing.v_number);
+      setVehicleType(existing.v_type || 'car');
+      setVehicleName(existing.v_name || '');
+      toast.info(`Vehicle ${plate} is already registered — selected.`);
+      onDirty();
+      return;
+    }
+
+    setAddingVehicle(true);
+    try {
+      const created = await vehicleApi.create({
+        owner_id: customer.c_id,
+        v_number: plate,
+        v_type: type,
+        v_name: name,
+      });
+      toast.success(`Vehicle ${created.v_number} added!`);
+      const updated = [created, ...localVehicles];
+      setLocalVehicles(updated);
+      onVehicleAdded?.(created);
+      setVehicleId(created.v_id);
+      setVehicleNumber(created.v_number);
+      setVehicleType(created.v_type);
+      setVehicleName(created.v_name || '');
+      onDirty();
+    } catch (err: unknown) {
+      logClientError('add-vehicle-inline', err, { customerId: customer.c_id, plate });
+      toast.error(getErrorMessage(err, 'Failed to add vehicle.'));
+    } finally {
+      setAddingVehicle(false);
+    }
+  }
+
+  function handleToggleExpand(st: ServiceType, exists: boolean, existingRecord?: ServiceOverview, cartItem?: CartItem) {
+    if (expandedServiceId === st.st_id) {
+      setExpandedServiceId(null);
+      return;
+    }
+
+    if (cartItem) {
+      setFormIssueDate(cartItem.issueDate);
+      setFormExpiryDate(cartItem.expiryDate);
+      setFormCost(String(cartItem.totalCost));
+      setFormNotes(cartItem.notes || '');
+      if (category === 'licence') {
+        setFormVehicleClass(cartItem.vehicleClass || 'NT');
+        setFormLicenceType(cartItem.vehicleTypeLicence || 'LMV');
+        setFormMdlNumber(cartItem.mdlNumber || '');
+      }
+    } else if (exists && existingRecord) {
+      const d = renewalDates(existingRecord);
+      setFormIssueDate(today());
+      setFormExpiryDate(d.expiryDate || '');
+      setFormCost(String(existingRecord.total_cost));
+      setFormNotes('');
+      if (category === 'licence') {
+        setFormVehicleClass(existingRecord.vehicle_class || 'NT');
+        setFormLicenceType(existingRecord.vehicle_type_licence || 'LMV');
+        setFormMdlNumber(existingRecord.mdl_number || '');
+      }
+    } else {
+      setFormIssueDate(today());
+      setFormExpiryDate('');
+      setFormCost('');
+      setFormNotes('');
+      if (category === 'licence') {
+        setFormVehicleClass('NT');
+        setFormLicenceType('LMV');
+        setFormMdlNumber('');
+      }
+    }
+
+    setExpandedServiceId(st.st_id);
+  }
+
+  function handleAddToCart(st: ServiceType, exists: boolean, existingRecord?: ServiceOverview) {
+    const cost = parseCost(formCost);
+    if (cost <= 0) {
+      toast.error('Please enter a valid cost');
+      return;
+    }
+    if (!formIssueDate) {
+      toast.error('Please select an issue date');
+      return;
+    }
+
+    const isRenewal = exists && !!existingRecord;
+    const cartItemId = `st_${st.st_id}_${category === 'vehicle' ? (vehicleId || plate) : 'licence'}`;
+
+    const item: CartItem = {
+      id: cartItemId,
+      serviceTypeId: st.st_id,
+      serviceName: st.name,
+      category,
+      isRenewal,
+      renewOfId: isRenewal ? existingRecord.s_id : (renewal ? renewal.id : undefined),
+      renewOldStatus: isRenewal ? existingRecord.status : (renewal ? renewal.oldStatus : undefined),
+      issueDate: formIssueDate,
+      expiryDate: formExpiryDate,
+      totalCost: cost,
+      notes: formNotes.trim() || undefined,
+      vehicleId: category === 'vehicle' ? (vehicleId || undefined) : undefined,
+      vehicleNumber: category === 'vehicle' ? vehicleNumber : undefined,
+      vehicleType: category === 'vehicle' ? vehicleType : undefined,
+      vehicleName: category === 'vehicle' ? vehicleName : undefined,
+      vehicleClass: category === 'licence' ? formVehicleClass : undefined,
+      vehicleTypeLicence: category === 'licence' ? formLicenceType : undefined,
+      mdlNumber: category === 'licence' ? formMdlNumber.trim() || undefined : undefined,
+    };
+
+    onAddToCart(item);
+    setExpandedServiceId(null);
     onDirty();
   }
 
-  // "Switch to new service": drop the prefill and unlock.
-  function undoRenewal() {
-    setDecision({ key, renew: null });
-    setVehicleClass('NT');
-    setVehicleTypeLicence('LMV');
-    setMdlNumber('');
-    setIssueDate(today());
-    setExpiryDate('');
-    setTotalCost('');
-  }
-
-  // Cursor on the first field without letting focus() yank the scroll
-  // (the page is already easing this card into view).
-  useEffect(() => { formRef.current?.querySelector<HTMLElement>('select, input')?.focus({ preventScroll: true }); }, []);
-
-  // Ease newly revealed cards into view (not on first mount).
-  const shown = useRef({ match: needsDecision, dates: showDates });
-  useEffect(() => {
-    if (needsDecision && !shown.current.match) smoothReveal(matchRef.current, 'nearest');
-    if (showDates && !shown.current.dates) smoothReveal(datesRef.current, 'nearest');
-    shown.current = { match: needsDecision, dates: showDates };
-  }, [needsDecision, showDates]);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (submitLock.current) return;
-    if (!serviceTypeId) {
-      toast.error('Please fill all required fields');
-      return;
-    }
-    const cost = parseCost(totalCost);
-    if (cost <= 0) {
-      toast.error('Please enter a valid service cost');
-      return;
-    }
-    submitLock.current = true;
-    setSubmitting(true);
-    try {
-      let newVehicle: Vehicle | undefined;
-      let created: { s_id: string };
-      if (category === 'vehicle') {
-        // No vehicle picked but a plate typed (or an unlinked old service being
-        // renewed): link to the customer's existing vehicle with that plate
-        // instead of inserting a duplicate. A renewal never creates a vehicle —
-        // the plate stays on the service row; a manual add saves the new vehicle
-        // BEFORE the service so it shows up in the dropdown for the next one.
-        let resolvedVehicleId = vehicleId || undefined;
-        const existing = !vehicleId && plate ? vehicles.find(v => v.v_number.toUpperCase() === plate) : undefined;
-        if (existing) {
-          resolvedVehicleId = existing.v_id;
-        } else if (!vehicleId && plate && !activeRenewal) {
-          try {
-            newVehicle = await vehicleApi.create({
-              owner_id: customer.c_id,
-              v_number: plate,
-              v_name: vehicleName.trim() || undefined,
-              v_type: vehicleType.trim() || 'car',
-            });
-            resolvedVehicleId = newVehicle.v_id;
-          } catch (vErr) {
-            // Duplicate plate is fine — proceed without a vehicle_id.
-            console.warn('Vehicle auto-add skipped:', vErr);
-          }
-        }
-        created = await serviceApi.createVehicleService({
-          customer_id: customer.c_id,
-          service_type_id: serviceTypeId,
-          vehicle_id: resolvedVehicleId,
-          vehicle_type: vehicleType,
-          vehicle_number: vehicleNumber,
-          issue_date: issueDate,
-          expiry_date: expiryDate || undefined,
-          total_cost: cost,
-          notes: notes || undefined,
-        });
-      } else {
-        created = await serviceApi.createLicenceService({
-          customer_id: customer.c_id,
-          service_type_id: serviceTypeId,
-          vehicle_class: vehicleClass,
-          vehicle_type_licence: vehicleTypeLicence,
-          mdl_number: mdlNumber || undefined,
-          issue_date: issueDate,
-          expiry_date: expiryDate || undefined,
-          total_cost: cost,
-          notes: notes || undefined,
-        });
-      }
-
-      // A renewal supersedes the old record — mark it completed if it was
-      // 'active' or 'expired'. 'cancelled' stays: that's an explicit void.
-      let renewedId: string | undefined;
-      if (activeRenewal && (activeRenewal.oldStatus === 'active' || activeRenewal.oldStatus === 'expired')) {
-        try { await serviceApi.updateStatus(activeRenewal.id, 'completed'); renewedId = activeRenewal.id; }
-        catch (error) { console.warn('Could not update renewed service status:', error); }
-      }
-
-      const name = serviceTypes.find(t => t.st_id === serviceTypeId)?.name || 'Service';
-      toast.success(activeRenewal ? 'Service renewed successfully!' : `${name} added`);
-      onSaved({
-        id: created.s_id,
-        category,
-        name,
-        detail: category === 'vehicle'
-          ? vehicleNumber
-          : [vehicleClass, vehicleTypeLicence, mdlNumber].filter(Boolean).join(' · '),
-        issueDate,
-        expiryDate: expiryDate || null,
-        cost,
-      }, newVehicle, renewedId);
-    } catch (error: unknown) {
-      logClientError(category === 'vehicle' ? 'create-vehicle-service' : 'create-document-service', error, { customerId: customer.c_id, serviceTypeId, form: category });
-      toast.error(getErrorMessage(error, 'Could not create service.'));
-      setSubmitting(false);
-      submitLock.current = false;
-    }
-  }
-
-  const typeCard = (
-    <div className="stack-in bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-      <label className={LABEL_CLASS}>Service Type <span className="text-red-500">*</span></label>
-      <select
-        value={serviceTypeId || ''}
-        onChange={e => setServiceTypeId(Number(e.target.value))}
-        disabled={!!renewing}
-        className={`${SELECT_CLASS} h-12 font-medium`}
-        required
-      >
-        <option value="">Select a specific service...</option>
-        {serviceTypes.map(t => (
-          <option key={t.st_id} value={t.st_id}>{t.name}</option>
-        ))}
-      </select>
-    </div>
-  );
+  const plate = vehicleNumber.trim().toUpperCase();
+  const vehicleChosen = category === 'licence' || !!vehicleId;
 
   return (
     <Card className="rounded-2xl shadow-sm border-slate-200 overflow-hidden">
       <CardHeader className="bg-white border-b border-slate-100 pb-4 pt-5 px-6">
         <CardTitle className="text-lg flex items-center gap-2">
           {category === 'vehicle' ? <Car className="h-5 w-5 text-amber-600" /> : <FileText className="h-5 w-5 text-violet-600" />}
-          {category === 'vehicle' ? 'Vehicle Service Details' : 'Licence Service Details'}
+          {category === 'vehicle' ? 'Vehicle & Services' : 'Licence Services'}
         </CardTitle>
       </CardHeader>
-      <CardContent className="p-6 bg-slate-50/30">
-        {/* React's onChange bubbles from every input/select, so one handler marks the form dirty. */}
-        <form ref={formRef} onSubmit={handleSubmit} onChange={onDirty} className="space-y-6">
-          {/* Licence: expired services come first. */}
-          {category === 'licence' && needsDecision && (
-            <ExpiredMatchCard ref={matchRef} matches={matches} onRenew={renew} onSkip={() => setDecision({ key, renew: null })} />
-          )}
-
-          {/* Vehicle first, then service type. Both lock once a renewal is picked. */}
-          <fieldset disabled={!!renewing} className="m-0 min-w-0 space-y-6 border-0 p-0">
-            {category === 'vehicle' && (
-              <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-5">
-                {vehicles.length > 0 && (
-                  <div>
-                    <label className={LABEL_CLASS}>Select Customer&apos;s Existing Vehicle</label>
-                    <select
-                      value={vehicleId}
-                      onChange={e => {
-                        const v = vehicles.find(v => v.v_id === e.target.value);
-                        setVehicleId(e.target.value);
-                        if (v) { setVehicleNumber(v.v_number); setVehicleType(v.v_type); setVehicleName(v.v_name || ''); }
-                        else { setVehicleNumber(''); setVehicleType(''); setVehicleName(''); }
-                      }}
-                      className={`${SELECT_CLASS} h-11 font-medium`}
-                    >
-                      <option value="">— Enter details manually (will be saved to customer) —</option>
-                      {vehicles.map(v => (
-                        <option key={v.v_id} value={v.v_id}>{v.v_number} ({v.v_name || v.v_type})</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  <div>
-                    <label className={LABEL_CLASS}>Vehicle Number <span className="text-red-500">*</span></label>
-                    <Input
-                      value={vehicleNumber}
-                      onChange={e => setVehicleNumber(e.target.value.toUpperCase())}
-                      placeholder="MH12AB1234"
-                      required
-                      readOnly={!!vehicleId}
-                      className={`mt-2 h-11 rounded-lg uppercase focus-visible:ring-amber-200 ${vehicleId ? 'bg-slate-100 text-slate-500' : 'bg-slate-50'}`}
-                    />
+      <CardContent className="p-6 bg-slate-50/30 space-y-6">
+        {/* Vehicle Selection & Add Section (When category === 'vehicle') */}
+        {category === 'vehicle' && (
+          <div className="space-y-4">
+            {/* 1. Customer's Existing Vehicles */}
+            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="h-7 w-7 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
+                    <Car className="h-4 w-4" />
                   </div>
                   <div>
-                    <label className={LABEL_CLASS}>Vehicle Type <span className="text-red-500">*</span></label>
-                    <Input
-                      value={vehicleType}
-                      onChange={e => setVehicleType(e.target.value)}
-                      placeholder="e.g. car, bike, truck"
-                      required
-                      readOnly={!!vehicleId}
-                      className={`mt-2 h-11 rounded-lg focus-visible:ring-amber-200 ${vehicleId ? 'bg-slate-100 text-slate-500' : 'bg-slate-50'}`}
-                    />
+                    <h3 className="text-sm font-bold text-slate-900 tracking-tight">Customer&apos;s Vehicles</h3>
+                    <p className="text-xs text-slate-400">Select an existing vehicle or add a new one below</p>
                   </div>
                 </div>
-                {!vehicleId && (
-                  <div>
-                    <label className={LABEL_CLASS}>Vehicle Name <span className="text-slate-400 normal-case font-normal">(optional — will be saved to customer profile)</span></label>
-                    <Input
-                      value={vehicleName}
-                      onChange={e => setVehicleName(e.target.value)}
-                      placeholder="e.g. Swift, Pulsar, Activa"
-                      className="mt-2 h-11 bg-slate-50 rounded-lg focus-visible:ring-amber-200"
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-
-            {showTypeCard && typeCard}
-
-          </fieldset>
-
-          {/* Licence details stay editable on a renewal (class/type can legitimately change). */}
-          {category === 'licence' && showTypeCard && (
-            <div className="stack-in bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-5">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <div>
-                  <label className={LABEL_CLASS}>Vehicle Class <span className="text-red-500">*</span></label>
-                  <select value={vehicleClass} onChange={e => setVehicleClass(e.target.value as VehicleClass)} className={`${SELECT_CLASS} h-11`} required>
-                    {VEHICLE_CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className={LABEL_CLASS}>Licence Type <span className="text-red-500">*</span></label>
-                  <select value={vehicleTypeLicence} onChange={e => setVehicleTypeLicence(e.target.value as VehicleTypeLicence)} className={`${SELECT_CLASS} h-11`} required>
-                    {VEHICLE_TYPE_LICENCE.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className={LABEL_CLASS}>MDL / Application Number</label>
-                <Input value={mdlNumber} onChange={e => setMdlNumber(e.target.value)} placeholder="Enter MDL or application number" className="mt-2 h-11 bg-slate-50 rounded-lg focus-visible:ring-amber-200" />
-              </div>
-            </div>
-          )}
-
-          {/* Vehicle: expired matches for this car + type. */}
-          {category === 'vehicle' && needsDecision && (
-            <ExpiredMatchCard ref={matchRef} matches={matches} onRenew={renew} onSkip={() => setDecision({ key, renew: null })} />
-          )}
-
-          {renewing && (
-            <div className="stack-in flex items-center justify-between gap-3 rounded-xl border border-emerald-100 bg-emerald-50/50 px-4 py-3">
-              <p className="flex min-w-0 items-center gap-2 text-sm text-slate-700">
-                <RefreshCw className="h-4 w-4 shrink-0 text-emerald-600" aria-hidden />
-                <span className="truncate">Renewing <b className="font-semibold text-slate-900">{renewing.service_name}</b> · expired {format(new Date(renewing.expiry_date!), 'dd MMM yyyy')}</span>
-              </p>
-              <button type="button" onClick={undoRenewal} className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition-[background-color,transform] duration-150 hover:bg-white active:scale-[0.97]">
-                Switch to new service
-              </button>
-            </div>
-          )}
-
-          {/* Dates, cost, notes — after the owner has dealt with any expired match. */}
-          {showDates && (
-            <div ref={datesRef} className="stack-in bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-5">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <div>
-                  <label className={LABEL_CLASS}>Issue Date <span className="text-red-500">*</span></label>
-                  <DateTimePicker value={issueDate} onChange={setIssueDate} required className="mt-2" />
-                </div>
-                <div>
-                  <label className={LABEL_CLASS}>
-                    {category === 'licence' ? 'Renewal / Expiry Date' : 'Expiry Date'}
-                  </label>
-                  <DateTimePicker value={expiryDate} onChange={setExpiryDate} className="mt-2" />
-                </div>
-              </div>
-
-              {/* Text input with inputmode=numeric prevents browser spinners causing float drift */}
-              <div className="pt-2 border-t border-slate-100">
-                <label className={LABEL_CLASS}>Total Cost (₹) <span className="text-red-500">*</span></label>
-                <div className="relative mt-2">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-base">₹</span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    value={totalCost}
-                    onChange={e => {
-                      // Only allow digits and a single decimal point
-                      const val = e.target.value.replace(/[^0-9.]/g, '');
-                      const parts = val.split('.');
-                      if (parts.length <= 2) setTotalCost(parts.length === 2 ? parts[0] + '.' + parts[1].slice(0, 2) : val);
+                {localVehicles.length > 0 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setVehicleId('');
+                      setVehicleNumber('');
+                      setVehicleType('');
+                      setVehicleName('');
+                      onDirty();
                     }}
-                    placeholder="0"
+                    className={`h-8 rounded-lg text-xs font-semibold ${
+                      !vehicleId
+                        ? 'border-amber-400 bg-amber-50 text-amber-800'
+                        : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1" />
+                    New Vehicle
+                  </Button>
+                )}
+              </div>
+
+              {localVehicles.length > 0 ? (
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {localVehicles.map((v, idx) => {
+                    const isSelected = vehicleId === v.v_id || (!vehicleId && vehicleNumber.trim() && v.v_number.toUpperCase() === vehicleNumber.trim().toUpperCase());
+                    const displayName = v.v_name || v.v_type || 'Vehicle';
+                    return (
+                      <button
+                        key={v.v_id || `${v.v_number}-${idx}`}
+                        type="button"
+                        onClick={() => {
+                          if (isSelected) {
+                            setVehicleId('');
+                            setVehicleNumber('');
+                            setVehicleType('');
+                            setVehicleName('');
+                          } else {
+                            setVehicleId(v.v_id || '');
+                            setVehicleNumber(v.v_number);
+                            setVehicleType(v.v_type || 'car');
+                            setVehicleName(v.v_name || '');
+                          }
+                          onDirty();
+                        }}
+                        className={`group inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all border ${
+                          isSelected
+                            ? 'bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/25 ring-2 ring-amber-400/40'
+                            : 'bg-white text-slate-700 border-slate-200 hover:border-amber-300 hover:bg-amber-50/50'
+                        }`}
+                      >
+                        <Car className={`h-4 w-4 ${isSelected ? 'text-white' : 'text-slate-400 group-hover:text-amber-600'}`} />
+                        <span className="font-mono font-bold tracking-tight text-sm">{v.v_number}</span>
+                        <span className={isSelected ? 'text-amber-100 font-normal' : 'text-slate-500 font-normal'}>
+                          ({displayName})
+                        </span>
+                        {isSelected && <Check className="h-4 w-4 ml-0.5 text-white stroke-[2.5]" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 p-4 text-center">
+                  <p className="text-xs text-slate-500 font-medium">No saved vehicles found for this customer. Enter details below and click Add Vehicle.</p>
+                </div>
+              )}
+            </div>
+
+            {/* 2. Adding / Selected Vehicle Section */}
+            <div className={`p-5 rounded-xl border shadow-sm space-y-4 transition-colors ${
+              vehicleId ? 'bg-amber-50/30 border-amber-200' : 'bg-white border-slate-200'
+            }`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-slate-900">
+                    {vehicleId ? 'Selected Vehicle Details' : 'Add New Vehicle'}
+                  </span>
+                  {vehicleId ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800 border border-amber-300">
+                      <Check className="h-3 w-3 stroke-[2.5]" /> Selected Vehicle
+                    </span>
+                  ) : (
+                    <span className="text-xs text-slate-400">Enter details below</span>
+                  )}
+                </div>
+                {vehicleId && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setVehicleId('');
+                      setVehicleNumber('');
+                      setVehicleType('');
+                      setVehicleName('');
+                      onDirty();
+                    }}
+                    className="h-7 text-xs font-semibold text-amber-700 hover:text-amber-900 hover:bg-amber-100/60"
+                  >
+                    Change / Add New Vehicle
+                  </Button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <label className={LABEL_CLASS}>Vehicle Number <span className="text-red-500">*</span></label>
+                    {vehicleId && (
+                      <span className="text-[10px] text-amber-700 font-semibold flex items-center gap-0.5">
+                        <Lock className="h-2.5 w-2.5" /> Locked
+                      </span>
+                    )}
+                  </div>
+                  <Input
+                    value={vehicleNumber}
+                    onChange={e => {
+                      if (vehicleId) return;
+                      setVehicleNumber(e.target.value.toUpperCase());
+                    }}
+                    placeholder="e.g. MH12AB1234"
                     required
-                    className="h-12 w-full rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-4 text-lg font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-transparent tracking-wider"
+                    readOnly={!!vehicleId}
+                    className={`mt-2 h-11 rounded-lg uppercase font-semibold transition-colors ${
+                      vehicleId
+                        ? 'bg-amber-100/50 border-amber-200 text-amber-950 cursor-not-allowed select-none shadow-none ring-0 focus-visible:ring-0'
+                        : 'bg-slate-50 border-slate-200 focus-visible:ring-amber-200'
+                    }`}
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between">
+                    <label className={LABEL_CLASS}>Vehicle Type <span className="text-red-500">*</span></label>
+                    {vehicleId && (
+                      <span className="text-[10px] text-amber-700 font-semibold flex items-center gap-0.5">
+                        <Lock className="h-2.5 w-2.5" /> Locked
+                      </span>
+                    )}
+                  </div>
+                  <Input
+                    value={vehicleType}
+                    onChange={e => {
+                      if (vehicleId) return;
+                      setVehicleType(e.target.value);
+                    }}
+                    placeholder="e.g. Car, Bike, Truck"
+                    required
+                    readOnly={!!vehicleId}
+                    className={`mt-2 h-11 rounded-lg font-semibold transition-colors ${
+                      vehicleId
+                        ? 'bg-amber-100/50 border-amber-200 text-amber-950 cursor-not-allowed select-none shadow-none ring-0 focus-visible:ring-0'
+                        : 'bg-slate-50 border-slate-200 focus-visible:ring-amber-200'
+                    }`}
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between">
+                    <label className={LABEL_CLASS}>Vehicle Name <span className="text-slate-400 normal-case font-normal">(optional)</span></label>
+                    {vehicleId && (
+                      <span className="text-[10px] text-amber-700 font-semibold flex items-center gap-0.5">
+                        <Lock className="h-2.5 w-2.5" /> Locked
+                      </span>
+                    )}
+                  </div>
+                  <Input
+                    value={vehicleName}
+                    onChange={e => {
+                      if (vehicleId) return;
+                      setVehicleName(e.target.value);
+                    }}
+                    placeholder="e.g. Swift, Pulsar, Activa"
+                    readOnly={!!vehicleId}
+                    className={`mt-2 h-11 rounded-lg font-semibold transition-colors ${
+                      vehicleId
+                        ? 'bg-amber-100/50 border-amber-200 text-amber-950 cursor-not-allowed select-none shadow-none ring-0 focus-visible:ring-0'
+                        : 'bg-slate-50 border-slate-200 focus-visible:ring-amber-200'
+                    }`}
                   />
                 </div>
               </div>
 
-              <div>
-                <label className={LABEL_CLASS}>Notes & Comments</label>
-                <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any additional notes for this service..." className="mt-2 h-11 bg-slate-50 rounded-lg focus-visible:ring-amber-200" />
-              </div>
+              {!vehicleId && (
+                <div className="flex items-center justify-end pt-2">
+                  <Button
+                    type="button"
+                    disabled={addingVehicle || !vehicleNumber.trim()}
+                    onClick={handleAddVehicle}
+                    className="h-11 px-5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-semibold flex items-center gap-2 shadow-sm transition-all"
+                  >
+                    {addingVehicle ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4 stroke-[2.5]" />}
+                    <span>Add Vehicle</span>
+                  </Button>
+                </div>
+              )}
             </div>
-          )}
-
-          <div className="flex flex-wrap gap-3 pt-2">
-            {showDates && (
-              <Button type="submit" className="flex-1 min-w-[180px] bg-gradient-to-r from-amber-400 to-amber-600 hover:from-amber-500 hover:to-amber-700 text-black rounded-xl h-11 text-base font-bold shadow-md tracking-wide transition-[transform,background-color] duration-150 active:scale-[0.98]" disabled={submitting}>
-                {submitting ? <><Loader2 className="h-5 w-5 animate-spin mr-2" /> Creating Record...</> : <><Check className="h-5 w-5 mr-2" /> Confirm & Create</>}
-              </Button>
-            )}
-            <Button type="button" variant="outline" disabled={submitting} className="h-11 px-5 rounded-xl font-semibold bg-white transition-transform duration-150 active:scale-[0.98]" onClick={onChangeCategory}>
-              Change category
-            </Button>
-            <Button type="button" variant="ghost" disabled={submitting} className="h-11 px-5 rounded-xl font-semibold text-slate-600 transition-transform duration-150 active:scale-[0.98]" onClick={onBack}>
-              Back
-            </Button>
           </div>
-        </form>
+        )}
+
+        {/* 3. Available Services List (Shown once vehicle chosen or licence category) */}
+        {vehicleChosen && (
+          <div className="space-y-4 pt-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 tracking-tight">Available Services</h3>
+                <p className="text-xs text-slate-400">Click New or Renew to configure and add to cart</p>
+              </div>
+              <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg">
+                {serviceTypes.length} {serviceTypes.length === 1 ? 'service' : 'services'} available
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              {serviceTypes.map(st => {
+                const existingRecord = services.find(s =>
+                  s.service_type_id === st.st_id &&
+                  (category === 'licence' || (
+                    (vehicleId && s.vehicle_id === vehicleId) ||
+                    (plate && s.vehicle_number?.toUpperCase() === plate)
+                  ))
+                );
+                const cartItem = cart.find(c => c.serviceTypeId === st.st_id);
+                const inCart = !!cartItem;
+                const isExpanded = expandedServiceId === st.st_id;
+                const exists = !!existingRecord;
+
+                return (
+                  <div
+                    key={st.st_id}
+                    className={`rounded-2xl border bg-white overflow-hidden shadow-sm transition-all duration-150 ${
+                      inCart
+                        ? 'border-amber-300 ring-2 ring-amber-400/30'
+                        : 'border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    {/* Main Row */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 gap-3.5">
+                      {/* Left: Service Type Info */}
+                      <div className="flex items-center gap-3 min-w-[200px]">
+                        <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${
+                          category === 'vehicle' ? 'bg-amber-50 text-amber-600' : 'bg-violet-50 text-violet-600'
+                        }`}>
+                          {category === 'vehicle' ? <Car className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <h4 className="font-bold text-slate-900 text-sm tracking-tight">{st.name}</h4>
+                            {inCart && (
+                              <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                                <Check className="h-2.5 w-2.5 stroke-[2.5]" /> In Cart
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-400 font-medium">
+                            {category === 'vehicle' ? 'Vehicle Service' : 'Document Service'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Middle: Existing Service Info */}
+                      <div className="flex-1 min-w-0 flex items-center text-xs">
+                        {exists && existingRecord ? (
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 bg-slate-50 border border-slate-100 px-3.5 py-2 rounded-xl text-slate-600 w-full sm:w-auto">
+                            <div>
+                              <span className="text-[10px] uppercase font-bold text-slate-400 block">Issue Date</span>
+                              <span className="font-semibold text-slate-800">
+                                {format(new Date(existingRecord.issue_date), 'dd MMM yyyy')}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] uppercase font-bold text-slate-400 block">Expiry Date</span>
+                              <span className="font-semibold text-slate-800">
+                                {existingRecord.expiry_date ? format(new Date(existingRecord.expiry_date), 'dd MMM yyyy') : 'No expiry'}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] uppercase font-bold text-slate-400 block">Cost</span>
+                              <span className="font-bold text-slate-900">₹{existingRecord.total_cost.toLocaleString('en-IN')}</span>
+                            </div>
+                            <div className="sm:ml-auto">
+                              {existingRecord.expiry_date && existingRecord.expiry_date < today() ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">
+                                  Overdue ({formatDistanceToNow(new Date(existingRecord.expiry_date))} ago)
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  Active
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 text-xs italic font-medium">
+                            No existing record
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Right: Actions (Expand or collapse details) */}
+                      <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                        {inCart ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleToggleExpand(st, exists, existingRecord, cartItem)}
+                            className="h-9 px-4 rounded-xl border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 text-xs font-bold shadow-sm cursor-pointer"
+                          >
+                            In Cart
+                          </Button>
+                        ) : exists ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => handleToggleExpand(st, true, existingRecord)}
+                            className="h-9 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-sm flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <RefreshCw className="h-3.5 w-3.5" />
+                            <span>Renew</span>
+                          </Button>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleToggleExpand(st, false)}
+                            className="h-9 px-4 rounded-xl border-slate-300 text-slate-700 hover:border-amber-400 hover:bg-amber-50 hover:text-amber-900 text-xs font-bold shadow-sm flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                            <span>New</span>
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Bottom Expand / Collapse Toggle Bar across the entire service card */}
+                    <button
+                      type="button"
+                      onClick={() => handleToggleExpand(st, exists, existingRecord, cartItem)}
+                      aria-expanded={isExpanded}
+                      aria-label={isExpanded ? "Collapse service details" : "Expand service details"}
+                      className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 bg-slate-50/60 hover:bg-amber-50/70 border-t border-slate-100 text-slate-400 hover:text-amber-700 text-[11px] font-semibold transition-colors cursor-pointer select-none"
+                    >
+                      <span>{isExpanded ? 'Hide details' : 'Details'}</span>
+                      {isExpanded ? (
+                        <ChevronUp className="h-3.5 w-3.5 text-slate-400 hover:text-amber-700" />
+                      ) : (
+                        <ChevronDown className="h-3.5 w-3.5 text-slate-400 hover:text-amber-700" />
+                      )}
+                    </button>
+
+                    {/* Expanding Detail Filling Card */}
+                    {isExpanded && (
+                      <div className="border-t border-slate-100 bg-slate-50/70 p-4.5 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                            {inCart ? 'Edit Service Details' : exists ? 'Configure Renewal' : 'Configure New Service'}
+                          </span>
+                          <span className="text-[11px] text-slate-400">Fill details and click Add to Cart</span>
+                        </div>
+
+                        {/* Licence specific fields */}
+                        {category === 'licence' && (
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div>
+                              <label className="text-[10px] uppercase font-bold tracking-wider text-slate-500 block mb-1">
+                                Vehicle Class <span className="text-red-500">*</span>
+                              </label>
+                              <select
+                                value={formVehicleClass}
+                                onChange={e => setFormVehicleClass(e.target.value as VehicleClass)}
+                                className="flex h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs"
+                              >
+                                {VEHICLE_CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="text-[10px] uppercase font-bold tracking-wider text-slate-500 block mb-1">
+                                Licence Type <span className="text-red-500">*</span>
+                              </label>
+                              <select
+                                value={formLicenceType}
+                                onChange={e => setFormLicenceType(e.target.value as VehicleTypeLicence)}
+                                className="flex h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs"
+                              >
+                                {VEHICLE_TYPE_LICENCE.map(t => <option key={t} value={t}>{t}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="text-[10px] uppercase font-bold tracking-wider text-slate-500 block mb-1">
+                                MDL / App No.
+                              </label>
+                              <Input
+                                value={formMdlNumber}
+                                onChange={e => setFormMdlNumber(e.target.value)}
+                                placeholder="e.g. DL-123456"
+                                className="h-10 text-xs bg-white"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Dates and Cost */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                          <div>
+                            <label className="text-[10px] uppercase font-bold tracking-wider text-slate-500 block mb-1">
+                              Issue Date <span className="text-red-500">*</span>
+                            </label>
+                            <DateTimePicker
+                              value={formIssueDate}
+                              onChange={d => {
+                                setFormIssueDate(d);
+                                if (formExpiryDate && formExpiryDate < d) {
+                                  setFormExpiryDate(d);
+                                }
+                              }}
+                              className="h-10 text-xs bg-white"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] uppercase font-bold tracking-wider text-slate-500 block mb-1">
+                              Expiry Date
+                            </label>
+                            <DateTimePicker
+                              value={formExpiryDate}
+                              onChange={setFormExpiryDate}
+                              minDate={formIssueDate}
+                              className="h-10 text-xs bg-white"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] uppercase font-bold tracking-wider text-slate-500 block mb-1">
+                              Cost (₹) <span className="text-red-500">*</span>
+                            </label>
+                            <Input
+                              type="number"
+                              min={0}
+                              value={formCost}
+                              onChange={e => setFormCost(e.target.value)}
+                              placeholder="e.g. 500"
+                              className="h-10 text-xs font-bold bg-white focus-visible:ring-amber-200"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Notes */}
+                        <div>
+                          <label className="text-[10px] uppercase font-bold tracking-wider text-slate-500 block mb-1">
+                            Notes <span className="text-slate-400 font-normal">(optional)</span>
+                          </label>
+                          <Input
+                            value={formNotes}
+                            onChange={e => setFormNotes(e.target.value)}
+                            placeholder="Add notes or comments..."
+                            className="h-9 text-xs bg-white focus-visible:ring-amber-200"
+                          />
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center justify-between pt-2">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setExpandedServiceId(null)}
+                            className="h-9 text-xs text-slate-500 hover:text-slate-700"
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => handleAddToCart(st, exists, existingRecord)}
+                            className="h-10 px-5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs flex items-center gap-2 shadow-sm shadow-amber-500/20"
+                          >
+                            <ShoppingBag className="h-4 w-4" />
+                            <span>{inCart ? 'Update in Cart' : 'Add to Cart'}</span>
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Category change & back buttons */}
+        <div className="flex flex-wrap gap-3 pt-3 border-t border-slate-100">
+          <Button
+            type="button"
+            variant="outline"
+            className="h-10 px-5 rounded-xl font-semibold bg-white border-slate-200 hover:bg-slate-50 text-xs"
+            onClick={onChangeCategory}
+          >
+            Change category
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-10 px-5 rounded-xl font-semibold text-slate-500 hover:text-slate-700 text-xs"
+            onClick={onBack}
+          >
+            Back
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

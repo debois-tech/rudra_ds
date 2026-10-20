@@ -74,6 +74,11 @@ export interface CustomerDashboardView {
   total_revenue: number;
 }
 
+export interface CustomerSearchResult extends CustomerDashboardView {
+  vehicles?: Vehicle[];
+  vehicle_numbers?: string[];
+}
+
 // =============================================
 // VEHICLE TYPES
 // =============================================
@@ -131,6 +136,27 @@ export interface ServiceType {
   org_id: string | null;
   is_active: boolean;
   created_at: string;
+}
+
+export interface CartItem {
+  id: string;
+  serviceTypeId: number;
+  serviceName: string;
+  category: ServiceCategory;
+  isRenewal: boolean;
+  renewOfId?: string;
+  renewOldStatus?: string | null;
+  issueDate: string;
+  expiryDate: string;
+  totalCost: number;
+  notes?: string;
+  vehicleId?: string;
+  vehicleNumber?: string;
+  vehicleType?: string;
+  vehicleName?: string;
+  vehicleClass?: VehicleClass;
+  vehicleTypeLicence?: VehicleTypeLicence;
+  mdlNumber?: string;
 }
 
 export interface Service {

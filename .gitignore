@@ -22,3 +22,6 @@ CLAUDE.md
 #extra
 service_data.xlsx
 atrifacts_and_guides
+
+# Local runner scripts
+run.bat

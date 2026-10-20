@@ -148,15 +148,6 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex gap-2.5">
                     <Link href="/dashboard/services/new">
-                        <Button
-                            variant="outline"
-                            className="rounded-xl h-9 px-4 text-[13px] font-medium border-slate-200 hover:bg-slate-50 shadow-sm cursor-pointer"
-                        >
-                            <Plus className="h-3.5 w-3.5 mr-1.5" />
-                            Customer
-                        </Button>
-                    </Link>
-                    <Link href="/dashboard/services/new">
                         <Button className="rounded-xl h-9 px-4 text-[13px] font-medium bg-amber-500 hover:bg-amber-600 text-black shadow-sm shadow-amber-400/20 cursor-pointer">
                             <Plus className="h-3.5 w-3.5 mr-1.5" />
                             Service
@@ -304,9 +295,8 @@ export default function DashboardPage() {
                                 className="flex items-center gap-3.5 px-6 py-3 hover:bg-amber-50/30 transition-colors group md:grid md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:gap-4"
                             >
                                 <Link href={`/dashboard/customers/${doc.customer_id}`} className="flex flex-1 min-w-0 items-center gap-3.5 md:flex-none">
-                                    <div className={`h-9 w-9 rounded-full flex items-center justify-center shrink-0 ${
-                                        doc.category === 'vehicle' ? 'bg-amber-50 text-amber-600' : 'bg-violet-50 text-violet-600'
-                                    }`}>
+                                    <div className={`h-9 w-9 rounded-full flex items-center justify-center shrink-0 ${doc.category === 'vehicle' ? 'bg-amber-50 text-amber-600' : 'bg-violet-50 text-violet-600'
+                                        }`}>
                                         {doc.category === 'vehicle' ? <Car className="h-3.5 w-3.5" /> : <FileText className="h-3.5 w-3.5" />}
                                     </div>
                                     <div className="flex-1 min-w-0">
@@ -383,11 +373,10 @@ export default function DashboardPage() {
                                 className="flex items-center gap-3.5 px-6 py-3.5 hover:bg-slate-50/60 transition-colors group"
                             >
                                 {/* Avatar */}
-                                <div className={`h-9 w-9 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${
-                                    item.type === 'customer'
+                                <div className={`h-9 w-9 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${item.type === 'customer'
                                         ? 'bg-slate-100 text-slate-600'
                                         : 'bg-amber-50 text-amber-600'
-                                }`}>
+                                    }`}>
                                     {item.type === 'customer' ? (
                                         item.title?.charAt(0)?.toUpperCase() || 'C'
                                     ) : (
