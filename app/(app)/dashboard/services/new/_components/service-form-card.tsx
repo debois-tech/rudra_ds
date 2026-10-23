@@ -240,243 +240,230 @@ export function ServiceFormCard({
   const vehicleChosen = category === 'licence' || !!vehicleId;
 
   return (
-    <Card className="rounded-2xl shadow-sm border-slate-200 overflow-hidden">
-      <CardHeader className="bg-white border-b border-slate-100 pb-4 pt-5 px-6">
-        <CardTitle className="text-lg flex items-center gap-2">
-          {category === 'vehicle' ? <Car className="h-5 w-5 text-amber-600" /> : <FileText className="h-5 w-5 text-violet-600" />}
-          {category === 'vehicle' ? 'Vehicle & Services' : 'Licence Services'}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="p-6 bg-slate-50/30 space-y-6">
-        {/* Vehicle Selection & Add Section (When category === 'vehicle') */}
-        {category === 'vehicle' && (
-          <div className="space-y-4">
-            {/* 1. Customer's Existing Vehicles */}
-            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="h-7 w-7 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
-                    <Car className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900 tracking-tight">Customer&apos;s Vehicles</h3>
-                    <p className="text-xs text-slate-400">Select an existing vehicle or add a new one below</p>
-                  </div>
-                </div>
-                {localVehicles.length > 0 && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setVehicleId('');
-                      setVehicleNumber('');
-                      setVehicleType('');
-                      setVehicleName('');
-                      onDirty();
-                    }}
-                    className={`h-8 rounded-lg text-xs font-semibold ${
-                      !vehicleId
-                        ? 'border-amber-400 bg-amber-50 text-amber-800'
-                        : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    <Plus className="h-3.5 w-3.5 mr-1" />
-                    New Vehicle
-                  </Button>
-                )}
-              </div>
-
-              {localVehicles.length > 0 ? (
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {localVehicles.map((v, idx) => {
-                    const isSelected = vehicleId === v.v_id || (!vehicleId && vehicleNumber.trim() && v.v_number.toUpperCase() === vehicleNumber.trim().toUpperCase());
-                    const displayName = v.v_name || v.v_type || 'Vehicle';
-                    return (
-                      <button
-                        key={v.v_id || `${v.v_number}-${idx}`}
-                        type="button"
-                        onClick={() => {
-                          if (isSelected) {
-                            setVehicleId('');
-                            setVehicleNumber('');
-                            setVehicleType('');
-                            setVehicleName('');
-                          } else {
-                            setVehicleId(v.v_id || '');
-                            setVehicleNumber(v.v_number);
-                            setVehicleType(v.v_type || 'car');
-                            setVehicleName(v.v_name || '');
-                          }
-                          onDirty();
-                        }}
-                        className={`group inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all border ${
-                          isSelected
-                            ? 'bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/25 ring-2 ring-amber-400/40'
-                            : 'bg-white text-slate-700 border-slate-200 hover:border-amber-300 hover:bg-amber-50/50'
-                        }`}
-                      >
-                        <Car className={`h-4 w-4 ${isSelected ? 'text-white' : 'text-slate-400 group-hover:text-amber-600'}`} />
-                        <span className="font-mono font-bold tracking-tight text-sm">{v.v_number}</span>
-                        <span className={isSelected ? 'text-amber-100 font-normal' : 'text-slate-500 font-normal'}>
-                          ({displayName})
-                        </span>
-                        {isSelected && <Check className="h-4 w-4 ml-0.5 text-white stroke-[2.5]" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 p-4 text-center">
-                  <p className="text-xs text-slate-500 font-medium">No saved vehicles found for this customer. Enter details below and click Add Vehicle.</p>
-                </div>
-              )}
-            </div>
-
-            {/* 2. Adding / Selected Vehicle Section */}
-            <div className={`p-5 rounded-xl border shadow-sm space-y-4 transition-colors ${
-              vehicleId ? 'bg-amber-50/30 border-amber-200' : 'bg-white border-slate-200'
-            }`}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-slate-900">
-                    {vehicleId ? 'Selected Vehicle Details' : 'Add New Vehicle'}
-                  </span>
-                  {vehicleId ? (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800 border border-amber-300">
-                      <Check className="h-3 w-3 stroke-[2.5]" /> Selected Vehicle
+    <div className="space-y-4">
+      {/* ── CARD 1: Vehicles Card (or Licence info) ── */}
+      <Card className="rounded-2xl shadow-sm border-slate-200 overflow-hidden">
+        <CardHeader className="bg-white border-b border-slate-100 py-3.5 px-5">
+          <CardTitle className="text-base flex items-center gap-2">
+            {category === 'vehicle' ? <Car className="h-4.5 w-4.5 text-slate-700" /> : <FileText className="h-4.5 w-4.5 text-slate-700" />}
+            <span>{category === 'vehicle' ? 'Vehicles' : 'Licence Details'}</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-4 sm:p-5 bg-slate-50/30 space-y-4">
+          {category === 'vehicle' && (
+            <>
+              {/* 1. Add New Vehicle / Selected Vehicle Section (Moved Above) */}
+              <div className={`p-4 rounded-xl border shadow-xs space-y-3 transition-colors ${
+                vehicleId ? 'bg-slate-100/60 border-slate-300' : 'bg-white border-slate-200'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs sm:text-sm font-bold text-slate-900">
+                      {vehicleId ? 'Selected Vehicle' : 'Add New Vehicle'}
                     </span>
-                  ) : (
-                    <span className="text-xs text-slate-400">Enter details below</span>
+                    {vehicleId ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-200/80 text-slate-800 border border-slate-300">
+                        <Check className="h-3 w-3 text-slate-700 stroke-[2.5]" /> Selected
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-slate-400">Enter plate, type, and name below</span>
+                    )}
+                  </div>
+                  {vehicleId && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setVehicleId('');
+                        setVehicleNumber('');
+                        setVehicleType('');
+                        setVehicleName('');
+                        onDirty();
+                      }}
+                      className="h-7 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
+                    >
+                      Change Vehicle
+                    </Button>
                   )}
                 </div>
-                {vehicleId && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setVehicleId('');
-                      setVehicleNumber('');
-                      setVehicleType('');
-                      setVehicleName('');
-                      onDirty();
-                    }}
-                    className="h-7 text-xs font-semibold text-amber-700 hover:text-amber-900 hover:bg-amber-100/60"
-                  >
-                    Change / Add New Vehicle
-                  </Button>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <label className={LABEL_CLASS}>Vehicle Number <span className="text-red-500">*</span></label>
+                      {vehicleId && (
+                        <span className="text-[10px] text-slate-500 font-semibold flex items-center gap-0.5">
+                          <Lock className="h-2.5 w-2.5" /> Locked
+                        </span>
+                      )}
+                    </div>
+                    <Input
+                      value={vehicleNumber}
+                      onChange={e => {
+                        if (vehicleId) return;
+                        setVehicleNumber(e.target.value.toUpperCase());
+                      }}
+                      placeholder="e.g. MH12AB1234"
+                      required
+                      readOnly={!!vehicleId}
+                      className={`mt-1.5 h-10 rounded-lg uppercase font-semibold text-xs transition-colors ${
+                        vehicleId
+                          ? 'bg-slate-200/60 border-slate-300 text-slate-800 cursor-not-allowed select-none shadow-none ring-0 focus-visible:ring-0'
+                          : 'bg-white border-slate-200 focus-visible:ring-slate-400'
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <label className={LABEL_CLASS}>Vehicle Type <span className="text-red-500">*</span></label>
+                      {vehicleId && (
+                        <span className="text-[10px] text-slate-500 font-semibold flex items-center gap-0.5">
+                          <Lock className="h-2.5 w-2.5" /> Locked
+                        </span>
+                      )}
+                    </div>
+                    <Input
+                      value={vehicleType}
+                      onChange={e => {
+                        if (vehicleId) return;
+                        setVehicleType(e.target.value);
+                      }}
+                      placeholder="e.g. Car, Bike, Truck"
+                      required
+                      readOnly={!!vehicleId}
+                      className={`mt-1.5 h-10 rounded-lg font-semibold text-xs transition-colors ${
+                        vehicleId
+                          ? 'bg-slate-200/60 border-slate-300 text-slate-800 cursor-not-allowed select-none shadow-none ring-0 focus-visible:ring-0'
+                          : 'bg-white border-slate-200 focus-visible:ring-slate-400'
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <label className={LABEL_CLASS}>Vehicle Name <span className="text-slate-400 normal-case font-normal">(optional)</span></label>
+                      {vehicleId && (
+                        <span className="text-[10px] text-slate-500 font-semibold flex items-center gap-0.5">
+                          <Lock className="h-2.5 w-2.5" /> Locked
+                        </span>
+                      )}
+                    </div>
+                    <Input
+                      value={vehicleName}
+                      onChange={e => {
+                        if (vehicleId) return;
+                        setVehicleName(e.target.value);
+                      }}
+                      placeholder="e.g. Swift, Pulsar, Activa"
+                      readOnly={!!vehicleId}
+                      className={`mt-1.5 h-10 rounded-lg font-semibold text-xs transition-colors ${
+                        vehicleId
+                          ? 'bg-slate-200/60 border-slate-300 text-slate-800 cursor-not-allowed select-none shadow-none ring-0 focus-visible:ring-0'
+                          : 'bg-white border-slate-200 focus-visible:ring-slate-400'
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                {!vehicleId && (
+                  <div className="flex items-center justify-end pt-1">
+                    <Button
+                      type="button"
+                      disabled={addingVehicle || !vehicleNumber.trim()}
+                      onClick={handleAddVehicle}
+                      className="h-8 px-3.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 font-semibold text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                    >
+                      {addingVehicle ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5 stroke-[2.5]" />}
+                      <span>Add Vehicle</span>
+                    </Button>
+                  </div>
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <div className="flex items-center justify-between">
-                    <label className={LABEL_CLASS}>Vehicle Number <span className="text-red-500">*</span></label>
-                    {vehicleId && (
-                      <span className="text-[10px] text-amber-700 font-semibold flex items-center gap-0.5">
-                        <Lock className="h-2.5 w-2.5" /> Locked
-                      </span>
-                    )}
-                  </div>
-                  <Input
-                    value={vehicleNumber}
-                    onChange={e => {
-                      if (vehicleId) return;
-                      setVehicleNumber(e.target.value.toUpperCase());
-                    }}
-                    placeholder="e.g. MH12AB1234"
-                    required
-                    readOnly={!!vehicleId}
-                    className={`mt-2 h-11 rounded-lg uppercase font-semibold transition-colors ${
-                      vehicleId
-                        ? 'bg-amber-100/50 border-amber-200 text-amber-950 cursor-not-allowed select-none shadow-none ring-0 focus-visible:ring-0'
-                        : 'bg-slate-50 border-slate-200 focus-visible:ring-amber-200'
-                    }`}
-                  />
+              {/* 2. Customer's Existing Vehicles (Positioned below Add/Selected vehicle) */}
+              <div className="space-y-2 pt-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-700">
+                    Customer&apos;s Registered Vehicles:
+                  </span>
+                  {localVehicles.length > 0 && !vehicleId && (
+                    <span className="text-[11px] text-slate-400 font-medium">Click a vehicle to select</span>
+                  )}
                 </div>
-                <div>
-                  <div className="flex items-center justify-between">
-                    <label className={LABEL_CLASS}>Vehicle Type <span className="text-red-500">*</span></label>
-                    {vehicleId && (
-                      <span className="text-[10px] text-amber-700 font-semibold flex items-center gap-0.5">
-                        <Lock className="h-2.5 w-2.5" /> Locked
-                      </span>
-                    )}
+
+                {localVehicles.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {localVehicles.map((v, idx) => {
+                      const isSelected = vehicleId === v.v_id || (!vehicleId && vehicleNumber.trim() && v.v_number.toUpperCase() === vehicleNumber.trim().toUpperCase());
+                      const displayName = v.v_name || v.v_type || 'Vehicle';
+                      return (
+                        <button
+                          key={v.v_id || `${v.v_number}-${idx}`}
+                          type="button"
+                          onClick={() => {
+                            if (isSelected) {
+                              setVehicleId('');
+                              setVehicleNumber('');
+                              setVehicleType('');
+                              setVehicleName('');
+                            } else {
+                              setVehicleId(v.v_id || '');
+                              setVehicleNumber(v.v_number);
+                              setVehicleType(v.v_type || 'car');
+                              setVehicleName(v.v_name || '');
+                            }
+                            onDirty();
+                          }}
+                          className={`group inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border cursor-pointer ${
+                            isSelected
+                              ? 'bg-slate-200/90 text-slate-900 border-slate-400 shadow-xs ring-1 ring-slate-300'
+                              : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-100/70'
+                          }`}
+                        >
+                          <Car className={`h-3.5 w-3.5 ${isSelected ? 'text-slate-800' : 'text-slate-400 group-hover:text-slate-600'}`} />
+                          <span className="font-mono font-bold tracking-tight">{v.v_number}</span>
+                          <span className={isSelected ? 'text-slate-600 font-normal' : 'text-slate-400 font-normal'}>
+                            ({displayName})
+                          </span>
+                          {isSelected && <Check className="h-3.5 w-3.5 ml-0.5 text-slate-800 stroke-[2.5]" />}
+                        </button>
+                      );
+                    })}
                   </div>
-                  <Input
-                    value={vehicleType}
-                    onChange={e => {
-                      if (vehicleId) return;
-                      setVehicleType(e.target.value);
-                    }}
-                    placeholder="e.g. Car, Bike, Truck"
-                    required
-                    readOnly={!!vehicleId}
-                    className={`mt-2 h-11 rounded-lg font-semibold transition-colors ${
-                      vehicleId
-                        ? 'bg-amber-100/50 border-amber-200 text-amber-950 cursor-not-allowed select-none shadow-none ring-0 focus-visible:ring-0'
-                        : 'bg-slate-50 border-slate-200 focus-visible:ring-amber-200'
-                    }`}
-                  />
-                </div>
-                <div>
-                  <div className="flex items-center justify-between">
-                    <label className={LABEL_CLASS}>Vehicle Name <span className="text-slate-400 normal-case font-normal">(optional)</span></label>
-                    {vehicleId && (
-                      <span className="text-[10px] text-amber-700 font-semibold flex items-center gap-0.5">
-                        <Lock className="h-2.5 w-2.5" /> Locked
-                      </span>
-                    )}
-                  </div>
-                  <Input
-                    value={vehicleName}
-                    onChange={e => {
-                      if (vehicleId) return;
-                      setVehicleName(e.target.value);
-                    }}
-                    placeholder="e.g. Swift, Pulsar, Activa"
-                    readOnly={!!vehicleId}
-                    className={`mt-2 h-11 rounded-lg font-semibold transition-colors ${
-                      vehicleId
-                        ? 'bg-amber-100/50 border-amber-200 text-amber-950 cursor-not-allowed select-none shadow-none ring-0 focus-visible:ring-0'
-                        : 'bg-slate-50 border-slate-200 focus-visible:ring-amber-200'
-                    }`}
-                  />
-                </div>
+                ) : (
+                  <p className="text-xs text-slate-400 italic">No registered vehicles on record for this customer.</p>
+                )}
               </div>
+            </>
+          )}
 
-              {!vehicleId && (
-                <div className="flex items-center justify-end pt-2">
-                  <Button
-                    type="button"
-                    disabled={addingVehicle || !vehicleNumber.trim()}
-                    onClick={handleAddVehicle}
-                    className="h-11 px-5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-semibold flex items-center gap-2 shadow-sm transition-all"
-                  >
-                    {addingVehicle ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4 stroke-[2.5]" />}
-                    <span>Add Vehicle</span>
-                  </Button>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+          {category === 'licence' && (
+            <p className="text-xs text-slate-500 font-medium">Select a service below to configure licence service details.</p>
+          )}
+        </CardContent>
+      </Card>
 
-        {/* 3. Available Services List (Shown once vehicle chosen or licence category) */}
-        {vehicleChosen && (
-          <div className="space-y-4 pt-2">
+      {/* ── CARD 2: Services Card (Fitting on screen without extra scrolling, 2-column grid, tap to expand) ── */}
+      {vehicleChosen && (
+        <Card className="rounded-2xl shadow-sm border-slate-200 overflow-hidden">
+          <CardHeader className="bg-white border-b border-slate-100 py-3.5 px-5">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-bold text-slate-900 tracking-tight">Available Services</h3>
-                <p className="text-xs text-slate-400">Click New or Renew to configure and add to cart</p>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <FileText className="h-4.5 w-4.5 text-slate-700" />
+                  <span>Services</span>
+                </CardTitle>
+                <p className="text-[11px] text-slate-400 mt-0.5">Tap any service to view or configure details</p>
               </div>
-              <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg">
-                {serviceTypes.length} {serviceTypes.length === 1 ? 'service' : 'services'} available
+              <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-md border border-slate-200">
+                {serviceTypes.length} {serviceTypes.length === 1 ? 'service' : 'services'}
               </span>
             </div>
+          </CardHeader>
 
-            <div className="space-y-3">
+          <CardContent className="p-4 bg-slate-50/30 space-y-3.5">
+            {/* 2-Column Grid of Services */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
               {serviceTypes.map(st => {
                 const existingRecord = services.find(s =>
                   s.service_type_id === st.st_id &&
@@ -493,141 +480,92 @@ export function ServiceFormCard({
                 return (
                   <div
                     key={st.st_id}
-                    className={`rounded-2xl border bg-white overflow-hidden shadow-sm transition-all duration-150 ${
+                    onClick={() => handleToggleExpand(st, exists, existingRecord, cartItem)}
+                    className={`rounded-xl border bg-white overflow-hidden shadow-2xs transition-all duration-150 cursor-pointer ${
+                      isExpanded ? 'col-span-1 md:col-span-2 ring-1 ring-slate-300 border-slate-300' : ''
+                    } ${
                       inCart
-                        ? 'border-amber-300 ring-2 ring-amber-400/30'
-                        : 'border-slate-200 hover:border-slate-300'
+                        ? 'border-slate-300 bg-slate-50/50'
+                        : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50/40'
                     }`}
                   >
-                    {/* Main Row */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 gap-3.5">
-                      {/* Left: Service Type Info */}
-                      <div className="flex items-center gap-3 min-w-[200px]">
-                        <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${
-                          category === 'vehicle' ? 'bg-amber-50 text-amber-600' : 'bg-violet-50 text-violet-600'
+                    {/* Main Service Row (Tapping anywhere expands or collapses) */}
+                    <div className="flex items-center justify-between p-3 gap-2.5">
+                      {/* Left: Icon & Name */}
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${
+                          category === 'vehicle' ? 'bg-slate-100 text-slate-700' : 'bg-slate-100 text-slate-700'
                         }`}>
-                          {category === 'vehicle' ? <Car className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
+                          {category === 'vehicle' ? <Car className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
                         </div>
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <h4 className="font-bold text-slate-900 text-sm tracking-tight">{st.name}</h4>
+                            <h4 className="font-bold text-slate-900 text-xs sm:text-sm tracking-tight truncate">
+                              {st.name}
+                            </h4>
                             {inCart && (
-                              <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-bold bg-slate-100 text-slate-800 border border-slate-300">
                                 <Check className="h-2.5 w-2.5 stroke-[2.5]" /> In Cart
                               </span>
                             )}
                           </div>
-                          <p className="text-[11px] text-slate-400 font-medium">
-                            {category === 'vehicle' ? 'Vehicle Service' : 'Document Service'}
-                          </p>
+                          {/* Previous Record Details */}
+                          {exists && existingRecord ? (
+                            <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
+                              Exp: {existingRecord.expiry_date ? format(new Date(existingRecord.expiry_date), 'dd MMM yy') : 'None'} · ₹{existingRecord.total_cost}
+                              {existingRecord.expiry_date && existingRecord.expiry_date < today() ? (
+                                <span className="text-red-600 font-bold ml-1">· Overdue</span>
+                              ) : (
+                                <span className="text-emerald-700 font-semibold ml-1">· Active</span>
+                              )}
+                            </p>
+                          ) : (
+                            <p className="text-[11px] text-slate-400 italic mt-0.5">No previous record</p>
+                          )}
                         </div>
                       </div>
 
-                      {/* Middle: Existing Service Info */}
-                      <div className="flex-1 min-w-0 flex items-center text-xs">
-                        {exists && existingRecord ? (
-                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 bg-slate-50 border border-slate-100 px-3.5 py-2 rounded-xl text-slate-600 w-full sm:w-auto">
-                            <div>
-                              <span className="text-[10px] uppercase font-bold text-slate-400 block">Issue Date</span>
-                              <span className="font-semibold text-slate-800">
-                                {format(new Date(existingRecord.issue_date), 'dd MMM yyyy')}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-[10px] uppercase font-bold text-slate-400 block">Expiry Date</span>
-                              <span className="font-semibold text-slate-800">
-                                {existingRecord.expiry_date ? format(new Date(existingRecord.expiry_date), 'dd MMM yyyy') : 'No expiry'}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-[10px] uppercase font-bold text-slate-400 block">Cost</span>
-                              <span className="font-bold text-slate-900">₹{existingRecord.total_cost.toLocaleString('en-IN')}</span>
-                            </div>
-                            <div className="sm:ml-auto">
-                              {existingRecord.expiry_date && existingRecord.expiry_date < today() ? (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">
-                                  Overdue ({formatDistanceToNow(new Date(existingRecord.expiry_date))} ago)
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                  Active
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-slate-400 text-xs italic font-medium">
-                            No existing record
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Right: Actions (Expand or collapse details) */}
-                      <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                      {/* Right: Action Button */}
+                      <div className="shrink-0 flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
                         {inCart ? (
-                          <Button
+                          <button
                             type="button"
-                            variant="outline"
-                            size="sm"
                             onClick={() => handleToggleExpand(st, exists, existingRecord, cartItem)}
-                            className="h-9 px-4 rounded-xl border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 text-xs font-bold shadow-sm cursor-pointer"
+                            className="h-8 px-3 rounded-lg border border-slate-300 bg-slate-100 text-slate-800 hover:bg-slate-200 text-xs font-bold shadow-2xs transition-colors cursor-pointer"
                           >
                             In Cart
-                          </Button>
+                          </button>
                         ) : exists ? (
-                          <Button
+                          <button
                             type="button"
-                            size="sm"
                             onClick={() => handleToggleExpand(st, true, existingRecord)}
-                            className="h-9 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-sm flex items-center gap-1.5 cursor-pointer"
+                            className="h-8 px-3 rounded-lg border border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold shadow-2xs flex items-center gap-1 transition-colors cursor-pointer"
                           >
-                            <RefreshCw className="h-3.5 w-3.5" />
+                            <RefreshCw className="h-3 w-3" />
                             <span>Renew</span>
-                          </Button>
+                          </button>
                         ) : (
-                          <Button
+                          <button
                             type="button"
-                            variant="outline"
-                            size="sm"
                             onClick={() => handleToggleExpand(st, false)}
-                            className="h-9 px-4 rounded-xl border-slate-300 text-slate-700 hover:border-amber-400 hover:bg-amber-50 hover:text-amber-900 text-xs font-bold shadow-sm flex items-center gap-1.5 cursor-pointer"
+                            className="h-8 px-3 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold shadow-2xs flex items-center gap-1 transition-colors cursor-pointer"
                           >
-                            <Plus className="h-3.5 w-3.5" />
+                            <Plus className="h-3 w-3" />
                             <span>New</span>
-                          </Button>
+                          </button>
                         )}
                       </div>
                     </div>
 
-                    {/* Bottom Expand / Collapse Toggle Bar across the entire service card */}
-                    <button
-                      type="button"
-                      onClick={() => handleToggleExpand(st, exists, existingRecord, cartItem)}
-                      aria-expanded={isExpanded}
-                      aria-label={isExpanded ? "Collapse service details" : "Expand service details"}
-                      className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 bg-slate-50/60 hover:bg-amber-50/70 border-t border-slate-100 text-slate-400 hover:text-amber-700 text-[11px] font-semibold transition-colors cursor-pointer select-none"
-                    >
-                      <span>{isExpanded ? 'Hide details' : 'Details'}</span>
-                      {isExpanded ? (
-                        <ChevronUp className="h-3.5 w-3.5 text-slate-400 hover:text-amber-700" />
-                      ) : (
-                        <ChevronDown className="h-3.5 w-3.5 text-slate-400 hover:text-amber-700" />
-                      )}
-                    </button>
-
-                    {/* Expanding Detail Filling Card */}
+                    {/* Expanding Detail Filling Card (Minimized top gap & padding) */}
                     {isExpanded && (
-                      <div className="border-t border-slate-100 bg-slate-50/70 p-4.5 space-y-4">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                            {inCart ? 'Edit Service Details' : exists ? 'Configure Renewal' : 'Configure New Service'}
-                          </span>
-                          <span className="text-[11px] text-slate-400">Fill details and click Add to Cart</span>
-                        </div>
-
+                      <div
+                        onClick={e => e.stopPropagation()}
+                        className="border-t border-slate-200 bg-slate-50/70 p-3 space-y-2.5 cursor-default"
+                      >
                         {/* Licence specific fields */}
                         {category === 'licence' && (
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                             <div>
                               <label className="text-[10px] uppercase font-bold tracking-wider text-slate-500 block mb-1">
                                 Vehicle Class <span className="text-red-500">*</span>
@@ -635,7 +573,7 @@ export function ServiceFormCard({
                               <select
                                 value={formVehicleClass}
                                 onChange={e => setFormVehicleClass(e.target.value as VehicleClass)}
-                                className="flex h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs"
+                                className="flex h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs outline-none"
                               >
                                 {VEHICLE_CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
                               </select>
@@ -647,7 +585,7 @@ export function ServiceFormCard({
                               <select
                                 value={formLicenceType}
                                 onChange={e => setFormLicenceType(e.target.value as VehicleTypeLicence)}
-                                className="flex h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs"
+                                className="flex h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs outline-none"
                               >
                                 {VEHICLE_TYPE_LICENCE.map(t => <option key={t} value={t}>{t}</option>)}
                               </select>
@@ -660,14 +598,14 @@ export function ServiceFormCard({
                                 value={formMdlNumber}
                                 onChange={e => setFormMdlNumber(e.target.value)}
                                 placeholder="e.g. DL-123456"
-                                className="h-10 text-xs bg-white"
+                                className="h-9 text-xs bg-white"
                               />
                             </div>
                           </div>
                         )}
 
                         {/* Dates and Cost */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                           <div>
                             <label className="text-[10px] uppercase font-bold tracking-wider text-slate-500 block mb-1">
                               Issue Date <span className="text-red-500">*</span>
@@ -680,7 +618,7 @@ export function ServiceFormCard({
                                   setFormExpiryDate(d);
                                 }
                               }}
-                              className="h-10 text-xs bg-white"
+                              className="h-9 text-xs bg-white"
                             />
                           </div>
 
@@ -692,7 +630,7 @@ export function ServiceFormCard({
                               value={formExpiryDate}
                               onChange={setFormExpiryDate}
                               minDate={formIssueDate}
-                              className="h-10 text-xs bg-white"
+                              className="h-9 text-xs bg-white"
                             />
                           </div>
 
@@ -706,7 +644,7 @@ export function ServiceFormCard({
                               value={formCost}
                               onChange={e => setFormCost(e.target.value)}
                               placeholder="e.g. 500"
-                              className="h-10 text-xs font-bold bg-white focus-visible:ring-amber-200"
+                              className="h-9 text-xs font-bold bg-white focus-visible:ring-slate-400"
                             />
                           </div>
                         </div>
@@ -720,18 +658,18 @@ export function ServiceFormCard({
                             value={formNotes}
                             onChange={e => setFormNotes(e.target.value)}
                             placeholder="Add notes or comments..."
-                            className="h-9 text-xs bg-white focus-visible:ring-amber-200"
+                            className="h-8 text-xs bg-white focus-visible:ring-slate-400"
                           />
                         </div>
 
                         {/* Actions */}
-                        <div className="flex items-center justify-between pt-2">
+                        <div className="flex items-center justify-between pt-1">
                           <Button
                             type="button"
                             variant="ghost"
                             size="sm"
                             onClick={() => setExpandedServiceId(null)}
-                            className="h-9 text-xs text-slate-500 hover:text-slate-700"
+                            className="h-8 text-xs text-slate-500 hover:text-slate-700"
                           >
                             Cancel
                           </Button>
@@ -739,9 +677,9 @@ export function ServiceFormCard({
                             type="button"
                             size="sm"
                             onClick={() => handleAddToCart(st, exists, existingRecord)}
-                            className="h-10 px-5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs flex items-center gap-2 shadow-sm shadow-amber-500/20"
+                            className="h-8 px-3.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-900 border border-slate-300 font-bold text-xs flex items-center gap-1.5 shadow-2xs cursor-pointer transition-colors"
                           >
-                            <ShoppingBag className="h-4 w-4" />
+                            <ShoppingBag className="h-3.5 w-3.5 text-slate-700" />
                             <span>{inCart ? 'Update in Cart' : 'Add to Cart'}</span>
                           </Button>
                         </div>
@@ -751,29 +689,31 @@ export function ServiceFormCard({
                 );
               })}
             </div>
-          </div>
-        )}
 
-        {/* Category change & back buttons */}
-        <div className="flex flex-wrap gap-3 pt-3 border-t border-slate-100">
-          <Button
-            type="button"
-            variant="outline"
-            className="h-10 px-5 rounded-xl font-semibold bg-white border-slate-200 hover:bg-slate-50 text-xs"
-            onClick={onChangeCategory}
-          >
-            Change category
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            className="h-10 px-5 rounded-xl font-semibold text-slate-500 hover:text-slate-700 text-xs"
-            onClick={onBack}
-          >
-            Back
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+            {/* Category change & back buttons */}
+            <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 px-3.5 rounded-lg font-semibold bg-white border-slate-200 hover:bg-slate-50 text-xs"
+                onClick={onChangeCategory}
+              >
+                Change category
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 px-3.5 rounded-lg font-semibold text-slate-500 hover:text-slate-700 text-xs"
+                onClick={onBack}
+              >
+                Back
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
   );
 }

@@ -154,6 +154,13 @@ export function ExpiringDialog({ filter, sort, onDaysChange, onSortChange, onClo
                                 <p className="truncate text-[13px] font-semibold text-slate-900">{doc.customer_name}</p>
                                 <p className="truncate text-xs text-slate-400">{doc.service_name}{doc.vehicle_number ? ` · ${doc.vehicle_number}` : ''}</p>
                             </Link>
+                            {doc.customer_mobile && (
+                                <div className="shrink-0 text-center">
+                                    <span className="font-mono text-xs font-semibold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200 tracking-wide">
+                                        {doc.customer_mobile}
+                                    </span>
+                                </div>
+                            )}
                             <UrgencyBadge days={doc.days_remaining} />
                             <Link href={buildRenewUrl(doc)} title="Renew this service" onClick={onClose} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900">
                                 <RefreshCw className="h-3.5 w-3.5" />

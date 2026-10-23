@@ -82,7 +82,7 @@ export default function NewServicePage() {
         });
         if (vehs) setVehicles(vehs);
       }
-    }).catch(() => {});
+    }).catch(() => { });
     return () => controller.abort();
   }, [preselectedCustomerId, renewOf]);
 
@@ -248,7 +248,7 @@ export default function NewServicePage() {
       if (initialVehs.length > 0) {
         vehicleApi.getByOwner(customer.c_id).then(vehs => {
           setVehicles(vehs);
-        }).catch(() => {});
+        }).catch(() => { });
       }
       setCustName(''); setCustMobile(''); setCustCarNumber('');
     } catch (error: unknown) {
@@ -486,7 +486,7 @@ export default function NewServicePage() {
             <Card className="rounded-2xl shadow-sm border-slate-200 overflow-hidden">
               <CardHeader className="bg-white border-b border-slate-100 pb-4 pt-5 px-6">
                 <CardTitle className="text-lg flex items-center gap-2"><User className="h-5 w-5 text-amber-600" /> Customer Details</CardTitle>
-                <CardDescription>Matches show up as you type — pick one, or keep going to add a new customer</CardDescription>
+
               </CardHeader>
               <CardContent className="p-6 bg-slate-50/30 space-y-5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">

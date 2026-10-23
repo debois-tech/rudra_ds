@@ -615,7 +615,7 @@ export const dashboardApi = {
         const term = search.trim();
         if (term) {
             const pat = orIlike(term);
-            query = query.or(`customer_name.ilike.${pat},service_name.ilike.${pat},vehicle_number.ilike.${pat}`);
+            query = query.or(`customer_name.ilike.${pat},customer_mobile.ilike.${pat},service_name.ilike.${pat},vehicle_number.ilike.${pat}`);
         }
 
         const [column, ascending] = ({
