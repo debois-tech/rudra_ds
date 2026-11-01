@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { customerApi, vehicleApi, serviceTypeApi, serviceApi } from '@/lib/api';
 import type {
@@ -26,6 +26,23 @@ import { ServiceFormCard, type Category, type FormInitial } from './_components/
 import { ServicesCart } from './_components/services-cart';
 
 export default function NewServicePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="flex flex-col items-center gap-3">
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-amber-500 border-t-transparent" />
+            <p className="text-sm text-slate-400">Loading service form...</p>
+          </div>
+        </div>
+      }
+    >
+      <NewServicePageContent />
+    </Suspense>
+  );
+}
+
+function NewServicePageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const preselectedCustomerId = searchParams.get('customer');

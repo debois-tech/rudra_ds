@@ -24,4 +24,7 @@ service_data.xlsx
 atrifacts_and_guides
 
 # Local runner scripts
-run.bat
+run.bat
+
+# TypeScript build info
+*.tsbuildinfo

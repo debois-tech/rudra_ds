@@ -78,11 +78,10 @@ export function ServicesCart({
                       {item.serviceName}
                     </h4>
                     <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
-                        item.isRenewal
+                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${item.isRenewal
                           ? 'bg-slate-100 text-slate-700 border border-slate-300'
                           : 'bg-blue-50 text-blue-700 border border-blue-200/70'
-                      }`}
+                        }`}
                     >
                       {item.isRenewal ? 'Renewal' : 'New'}
                     </span>
@@ -188,7 +187,7 @@ export function ServicesCart({
           ) : (
             <>
               <CheckCircle2 className="h-4 w-4 stroke-[2.5] text-slate-700" />
-              <span>Confirm &amp; Create Services</span>
+              <span>Create Services</span>
             </>
           )}
         </Button>

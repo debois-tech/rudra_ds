@@ -139,7 +139,7 @@ export default function DashboardPage() {
                     {orgName && (
                         <p className="text-[13px] font-semibold text-amber-600 mb-1">{orgName}</p>
                     )}
-                    <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+                    <h1 suppressHydrationWarning className="text-2xl font-bold text-slate-900 tracking-tight">
                         {getGreeting()} 👋
                     </h1>
                     <p className="text-[14px] text-slate-400 mt-1">

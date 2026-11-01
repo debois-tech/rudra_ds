@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
 import { ArrowLeft, GraduationCap, Phone, Mail, MapPin, Calendar, IndianRupee, Plus, UserCircle, Car, Clock, Pencil, CheckCircle2, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -13,6 +13,16 @@ import { EditStudentSheet } from './_components/edit-student-sheet'
 import { toast } from 'sonner'
 
 export default function StudentProfilePage() {
+    return (
+        <Suspense fallback={
+            <div className="text-center py-12 text-slate-400 text-sm">Loading student profile...</div>
+        }>
+            <StudentProfileContent />
+        </Suspense>
+    )
+}
+
+function StudentProfileContent() {
     const params = useParams()
     const searchParams = useSearchParams()
     const router = useRouter()
