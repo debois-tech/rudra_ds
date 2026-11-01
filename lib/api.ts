@@ -9,6 +9,7 @@ import type {
     Customer,
     CustomerFormData,
     CustomerDashboardView,
+    CustomerSearchResult,
     Vehicle,
     VehicleWithOwner,
     VehicleFormData,
@@ -42,7 +43,7 @@ const escapeLike = (term: string) => term.replace(/[\\%_]/g, m => '\\' + m);
 const orIlike = (term: string) => `"%${escapeLike(term).replace(/[\\"]/g, m => '\\' + m)}%"`;
 
 export type ExpiryFilter = { kind: 'upcoming' | 'expired'; days: number };
-export type ExpirySort = 'expiry-asc' | 'expiry-desc' | 'name' | 'cost'; // expiry-asc = soonest / most overdue first
+export type ExpirySort = 'expiry-asc' | 'expiry-desc' | 'name' | 'cost'; // expiry-asc = expiring soon / oldest expired; expiry-desc = up-to-date / recently expired
 export type CustomerSort = 'name' | 'newest' | 'oldest' | 'vehicles' | 'services' | 'revenue';
 export type CustomerVehicleFilter = 'all' | 'with' | 'without';
 export type ServiceSort = 'newest' | 'oldest' | 'amount-high' | 'amount-low' | 'customer';
@@ -188,9 +189,9 @@ export const customerApi = {
 
     // Matches name/mobile/registration directly, plus vehicle plate via a
     // second query (v_customer_dashboard has no plate column). Top 5 total —
-    // this backs the add-customer search-as-you-type dropdown, so callers
-    // don't need to re-add customers that already exist.
-    async search(query: string): Promise<CustomerDashboardView[]> {
+    // also fetches and attaches all vehicle numbers owned by each customer
+    // so callers can immediately view vehicle plates.
+    async search(query: string): Promise<CustomerSearchResult[]> {
         const supabase = getClient();
         const pat = orIlike(query);
         const [direct, byPlate] = await Promise.all([
@@ -224,7 +225,55 @@ export const customerApi = {
             plateResults = data || [];
         }
 
-        return [...directResults, ...plateResults].slice(0, 5);
+        const combined = [...directResults, ...plateResults].slice(0, 5);
+        if (combined.length === 0) return [];
+
+        const customerIds = combined.map(c => c.c_id);
+        const [vehiclesRes, servicesRes] = await Promise.all([
+            supabase
+                .from('vehicles')
+                .select('*')
+                .in('owner_id', customerIds)
+                .order('created_at', { ascending: false }),
+            supabase
+                .from('service_records')
+                .select('customer_id, vehicle_number')
+                .in('customer_id', customerIds)
+                .not('vehicle_number', 'is', null),
+        ]);
+
+        const vehiclesByOwner = new Map<string, Vehicle[]>();
+        const numbersByOwner = new Map<string, Set<string>>();
+
+        for (const v of (vehiclesRes.data || []) as Vehicle[]) {
+            const list = vehiclesByOwner.get(v.owner_id) || [];
+            list.push(v);
+            vehiclesByOwner.set(v.owner_id, list);
+
+            if (v.v_number) {
+                const numSet = numbersByOwner.get(v.owner_id) || new Set<string>();
+                numSet.add(v.v_number.trim().toUpperCase());
+                numbersByOwner.set(v.owner_id, numSet);
+            }
+        }
+
+        for (const s of (servicesRes.data || []) as { customer_id: string; vehicle_number: string | null }[]) {
+            if (s.customer_id && s.vehicle_number) {
+                const numSet = numbersByOwner.get(s.customer_id) || new Set<string>();
+                numSet.add(s.vehicle_number.trim().toUpperCase());
+                numbersByOwner.set(s.customer_id, numSet);
+            }
+        }
+
+        return combined.map(c => {
+            const ownerVehicles = vehiclesByOwner.get(c.c_id) || [];
+            const uniqueNumbers = Array.from(numbersByOwner.get(c.c_id) || []);
+            return {
+                ...c,
+                vehicles: ownerVehicles,
+                vehicle_numbers: uniqueNumbers,
+            };
+        });
     },
 };
 
@@ -566,7 +615,7 @@ export const dashboardApi = {
         const term = search.trim();
         if (term) {
             const pat = orIlike(term);
-            query = query.or(`customer_name.ilike.${pat},service_name.ilike.${pat},vehicle_number.ilike.${pat}`);
+            query = query.or(`customer_name.ilike.${pat},customer_mobile.ilike.${pat},service_name.ilike.${pat},vehicle_number.ilike.${pat}`);
         }
 
         const [column, ascending] = ({
