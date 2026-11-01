@@ -43,7 +43,7 @@ const escapeLike = (term: string) => term.replace(/[\\%_]/g, m => '\\' + m);
 const orIlike = (term: string) => `"%${escapeLike(term).replace(/[\\"]/g, m => '\\' + m)}%"`;
 
 export type ExpiryFilter = { kind: 'upcoming' | 'expired'; days: number };
-export type ExpirySort = 'expiry-asc' | 'expiry-desc' | 'name' | 'cost'; // expiry-asc = soonest / most overdue first
+export type ExpirySort = 'expiry-asc' | 'expiry-desc' | 'name' | 'cost'; // expiry-asc = expiring soon / oldest expired; expiry-desc = up-to-date / recently expired
 export type CustomerSort = 'name' | 'newest' | 'oldest' | 'vehicles' | 'services' | 'revenue';
 export type CustomerVehicleFilter = 'all' | 'with' | 'without';
 export type ServiceSort = 'newest' | 'oldest' | 'amount-high' | 'amount-low' | 'customer';
