@@ -1098,7 +1098,7 @@ select
     ow.owner_name,
     c.c_id                                    as customer_id,
     c.c_name                                  as customer_name,
-    c.c_whatsapp                              as customer_phone,
+    coalesce(nullif(btrim(c.c_whatsapp), ''), c.c_mobile)  as customer_phone,   -- WhatsApp number, else the mobile number
     st.name                                   as service_name,
     coalesce(nullif(btrim(vs.vehicle_number), ''), v.v_number) as ref_no      -- car number
 from public.vehicle_services vs
@@ -1128,7 +1128,7 @@ select
     ow.owner_name,
     c.c_id,
     c.c_name,
-    c.c_whatsapp,
+    coalesce(nullif(btrim(c.c_whatsapp), ''), c.c_mobile),
     st.name || coalesce(' (' || nullif(btrim(ds.vehicle_type_licence), '') || ')', ''),  -- "Driving Licence (LMV)"
     nullif(btrim(ds.mdl_number), '')                                                       -- licence number
 from public.document_services ds
