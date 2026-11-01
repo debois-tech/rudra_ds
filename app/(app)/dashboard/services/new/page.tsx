@@ -4,7 +4,6 @@ import { Suspense, useEffect, useRef, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { customerApi, vehicleApi, serviceTypeApi, serviceApi } from '@/lib/api';
 import type {
-  CustomerDashboardView,
   CustomerSearchResult,
   Vehicle,
   ServiceType,
@@ -15,7 +14,7 @@ import type {
   VehicleServiceFormData,
   LicenceServiceFormData,
 } from '@/lib/types';
-import { Loader2, Search, Check, User, Car, FileText, ArrowLeft } from 'lucide-react';
+import { Loader2, Search, User, Car, FileText, ArrowLeft } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,6 +23,12 @@ import { getErrorMessage, logClientError } from '@/lib/error-message';
 import { smoothReveal as reveal } from '@/lib/utils';
 import { ServiceFormCard, type Category, type FormInitial } from './_components/service-form-card';
 import { ServicesCart } from './_components/services-cart';
+
+const withVehicles = <T extends object>(c: T, vehicles: Vehicle[]) => ({
+  ...c,
+  vehicles,
+  vehicle_numbers: vehicles.map(v => v.v_number),
+});
 
 export default function NewServicePage() {
   return (
@@ -55,7 +60,7 @@ function NewServicePageContent() {
   const [custMobile, setCustMobile] = useState('');
   const [custCarNumber, setCustCarNumber] = useState('');
   const [lastEdited, setLastEdited] = useState<'name' | 'mobile' | 'car' | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<{ name?: string; mobile?: string; carNumber?: string }>({});
+  const [fieldErrors, setFieldErrors] = useState<{ name?: string; mobile?: string }>({});
   const [searchResults, setSearchResults] = useState<CustomerSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [creatingCustomer, setCreatingCustomer] = useState(false);
@@ -78,7 +83,7 @@ function NewServicePageContent() {
   const [submittingCart, setSubmittingCart] = useState(false);
 
   const [formKey, setFormKey] = useState(0); // new key = fresh blank form
-  const [renewal, setRenewal] = useState<{ id: string; oldStatus: string | null; initial: FormInitial } | null>(null);
+  const [renewal, setRenewal] = useState<{ id: string; initial: FormInitial } | null>(null);
   const formDirty = useRef(false);
   const categoryRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLDivElement>(null);
@@ -92,11 +97,7 @@ function NewServicePageContent() {
       vehicleApi.getByOwner(preselectedCustomerId),
     ]).then(([c, vehs]) => {
       if (!controller.signal.aborted && c) {
-        setSelectedCustomer({
-          ...c,
-          vehicles: vehs,
-          vehicle_numbers: vehs.map(v => v.v_number),
-        });
+        setSelectedCustomer(withVehicles(c, vehs));
         if (vehs) setVehicles(vehs);
       }
     }).catch(() => { });
@@ -120,16 +121,11 @@ function NewServicePageContent() {
         ]);
         if (cancelled || !customer) return;
         const stId = params.get('serviceTypeId');
-        setSelectedCustomer({
-          ...customer,
-          vehicles: vehs || [],
-          vehicle_numbers: (vehs || []).map(v => v.v_number),
-        });
+        setSelectedCustomer(withVehicles(customer, vehs || []));
         setTypesByCategory({ [cat]: types });
         if (vehs) setVehicles(vehs);
         setRenewal({
           id: renewOf,
-          oldStatus: params.get('oldStatus'),
           initial: {
             serviceTypeId: stId ? Number(stId) : undefined,
             vehicleId: params.get('vehicleId') || undefined,
@@ -190,11 +186,7 @@ function NewServicePageContent() {
     if (!customer.vehicle_numbers) {
       try {
         const vehs = await vehicleApi.getByOwner(customer.c_id);
-        customerWithVehicles = {
-          ...customer,
-          vehicles: vehs,
-          vehicle_numbers: vehs.map(v => v.v_number),
-        };
+        customerWithVehicles = withVehicles(customer, vehs);
         setVehicles(vehs);
       } catch (e) {
         console.error(e);
@@ -255,12 +247,10 @@ function NewServicePageContent() {
       // Freshly created — stats are known without a round-trip fetch.
       const initialVehs = plate && vehicleErrors.length === 0 ? [{ v_number: plate } as Vehicle] : [];
       setSelectedCustomer({
-        ...customer,
+        ...withVehicles(customer, initialVehs),
         vehicle_count: initialVehs.length,
         service_count: 0,
         total_revenue: 0,
-        vehicles: initialVehs,
-        vehicle_numbers: initialVehs.map(v => v.v_number),
       });
       if (initialVehs.length > 0) {
         vehicleApi.getByOwner(customer.c_id).then(vehs => {
@@ -362,7 +352,6 @@ function NewServicePageContent() {
 
     setSubmittingCart(true);
     try {
-      let createdCount = 0;
       for (const item of cart) {
         if (item.category === 'vehicle') {
           const payload: VehicleServiceFormData = {
@@ -377,7 +366,6 @@ function NewServicePageContent() {
             notes: item.notes,
           };
           await serviceApi.createVehicleService(payload);
-          createdCount++;
         } else {
           const payload: LicenceServiceFormData = {
             customer_id: selectedCustomer.c_id,
@@ -391,7 +379,6 @@ function NewServicePageContent() {
             notes: item.notes,
           };
           await serviceApi.createLicenceService(payload);
-          createdCount++;
         }
 
         // If this service was a renewal of an existing service, mark the previous record completed
@@ -404,7 +391,7 @@ function NewServicePageContent() {
         }
       }
 
-      toast.success(`Successfully created ${createdCount} service${createdCount > 1 ? 's' : ''}!`);
+      toast.success(`Successfully created ${cart.length} service${cart.length > 1 ? 's' : ''}!`);
       setCart([]);
       formDirty.current = false;
       router.push('/dashboard/services/overview');
@@ -548,7 +535,6 @@ function NewServicePageContent() {
                       className="pl-11 h-12 rounded-xl border-slate-200 focus-visible:ring-amber-200 text-base uppercase"
                     />
                   </div>
-                  {fieldErrors.carNumber && <p className="text-xs font-medium text-red-600 mt-1.5">{fieldErrors.carNumber}</p>}
                 </div>
 
                 {searching && <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-amber-600" /></div>}
@@ -656,7 +642,7 @@ function NewServicePageContent() {
                 vehicles={vehicles ?? []}
                 services={customerServices ?? []}
                 initial={renewal?.initial}
-                renewal={renewal ? { id: renewal.id, oldStatus: renewal.oldStatus } : undefined}
+                renewal={renewal ? { id: renewal.id } : undefined}
                 cart={cart}
                 onAddToCart={handleAddToCart}
                 onVehicleAdded={(newV) => setVehicles(prev => [newV, ...(prev || [])])}

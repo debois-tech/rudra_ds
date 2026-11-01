@@ -59,12 +59,8 @@ export function DateTimePicker({ value = '', onChange, mode = 'date', required, 
     const text = manualText.trim()
     if (!text) { onChange(''); return }
     const parsed = parseManualDate(text)
-    if (parsed) {
-      const formatted = format(parsed, 'yyyy-MM-dd')
-      if (minDate && formatted < minDate) {
-        setManualText(value ? formatManualDate(parse(value, 'yyyy-MM-dd', new Date())) : '')
-        return
-      }
+    const formatted = parsed ? format(parsed, 'yyyy-MM-dd') : ''
+    if (parsed && !(minDate && formatted < minDate)) {
       onChange(formatted)
       setMonth(startOfMonth(parsed))
     } else {

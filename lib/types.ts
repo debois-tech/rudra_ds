@@ -145,7 +145,6 @@ export interface CartItem {
   category: ServiceCategory;
   isRenewal: boolean;
   renewOfId?: string;
-  renewOldStatus?: string | null;
   issueDate: string;
   expiryDate: string;
   totalCost: number;

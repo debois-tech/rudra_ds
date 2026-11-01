@@ -1,11 +1,9 @@
 'use client';
 
-import { ShoppingBag, Trash2, CheckCircle2, Loader2, Calendar, FileText, ArrowRight, ShieldCheck, Car } from 'lucide-react';
+import { ShoppingBag, Trash2, CheckCircle2, Loader2, Car } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { DateTimePicker } from '@/components/ui/date-time-picker';
 import type { CartItem, CustomerDashboardView } from '@/lib/types';
-import { format } from 'date-fns';
 
 interface ServicesCartProps {
   cart: CartItem[];

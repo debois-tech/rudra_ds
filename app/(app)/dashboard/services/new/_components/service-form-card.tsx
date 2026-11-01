@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { format, formatDistanceToNow } from 'date-fns';
+import { useEffect, useState } from 'react';
+import { format } from 'date-fns';
 import { vehicleApi, renewalDates } from '@/lib/api';
 import type { CustomerDashboardView, Vehicle, ServiceType, ServiceOverview, VehicleClass, VehicleTypeLicence, CartItem } from '@/lib/types';
-import { Loader2, Car, FileText, Check, RefreshCw, Plus, Lock, ChevronDown, ChevronUp, ShoppingBag } from 'lucide-react';
+import { Loader2, Car, FileText, Check, RefreshCw, Plus, Lock, ShoppingBag } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -50,7 +50,7 @@ interface Props {
   vehicles: Vehicle[];
   services: ServiceOverview[];
   initial?: FormInitial;
-  renewal?: { id: string; oldStatus: string | null };
+  renewal?: { id: string };
   cart: CartItem[];
   onAddToCart: (item: CartItem) => void;
   onVehicleAdded?: (newVehicle: Vehicle) => void;
@@ -109,6 +109,14 @@ export function ServiceFormCard({
     }
   }, [initial]);
 
+  // No argument clears the selection.
+  function pickVehicle(v?: Vehicle) {
+    setVehicleId(v?.v_id || '');
+    setVehicleNumber(v?.v_number || '');
+    setVehicleType(v ? v.v_type || 'car' : '');
+    setVehicleName(v?.v_name || '');
+  }
+
   async function handleAddVehicle() {
     const plate = vehicleNumber.trim().toUpperCase();
     if (!plate) {
@@ -120,10 +128,7 @@ export function ServiceFormCard({
 
     const existing = localVehicles.find(v => v.v_number.toUpperCase() === plate);
     if (existing) {
-      setVehicleId(existing.v_id || '');
-      setVehicleNumber(existing.v_number);
-      setVehicleType(existing.v_type || 'car');
-      setVehicleName(existing.v_name || '');
+      pickVehicle(existing);
       toast.info(`Vehicle ${plate} is already registered — selected.`);
       onDirty();
       return;
@@ -141,10 +146,7 @@ export function ServiceFormCard({
       const updated = [created, ...localVehicles];
       setLocalVehicles(updated);
       onVehicleAdded?.(created);
-      setVehicleId(created.v_id);
-      setVehicleNumber(created.v_number);
-      setVehicleType(created.v_type);
-      setVehicleName(created.v_name || '');
+      pickVehicle(created);
       onDirty();
     } catch (err: unknown) {
       logClientError('add-vehicle-inline', err, { customerId: customer.c_id, plate });
@@ -161,39 +163,30 @@ export function ServiceFormCard({
     }
 
     if (cartItem) {
-      setFormIssueDate(cartItem.issueDate);
-      setFormExpiryDate(cartItem.expiryDate);
-      setFormCost(String(cartItem.totalCost));
-      setFormNotes(cartItem.notes || '');
-      if (category === 'licence') {
-        setFormVehicleClass(cartItem.vehicleClass || 'NT');
-        setFormLicenceType(cartItem.vehicleTypeLicence || 'LMV');
-        setFormMdlNumber(cartItem.mdlNumber || '');
-      }
+      fillForm(cartItem.issueDate, cartItem.expiryDate, String(cartItem.totalCost), cartItem.notes || '',
+        cartItem.vehicleClass, cartItem.vehicleTypeLicence, cartItem.mdlNumber);
     } else if (exists && existingRecord) {
-      const d = renewalDates(existingRecord);
-      setFormIssueDate(today());
-      setFormExpiryDate(d.expiryDate || '');
-      setFormCost(String(existingRecord.total_cost));
-      setFormNotes('');
-      if (category === 'licence') {
-        setFormVehicleClass(existingRecord.vehicle_class || 'NT');
-        setFormLicenceType(existingRecord.vehicle_type_licence || 'LMV');
-        setFormMdlNumber(existingRecord.mdl_number || '');
-      }
+      fillForm(today(), renewalDates(existingRecord).expiryDate || '', String(existingRecord.total_cost), '',
+        existingRecord.vehicle_class, existingRecord.vehicle_type_licence, existingRecord.mdl_number);
     } else {
-      setFormIssueDate(today());
-      setFormExpiryDate('');
-      setFormCost('');
-      setFormNotes('');
-      if (category === 'licence') {
-        setFormVehicleClass('NT');
-        setFormLicenceType('LMV');
-        setFormMdlNumber('');
-      }
+      fillForm(today(), '', '', '');
     }
 
     setExpandedServiceId(st.st_id);
+  }
+
+  // Licence fields only apply to the licence category; missing ones fall back to defaults.
+  function fillForm(issue: string, expiry: string, cost: string, notes: string,
+    vClass?: VehicleClass | null, licType?: VehicleTypeLicence | null, mdl?: string | null) {
+    setFormIssueDate(issue);
+    setFormExpiryDate(expiry);
+    setFormCost(cost);
+    setFormNotes(notes);
+    if (category === 'licence') {
+      setFormVehicleClass(vClass || 'NT');
+      setFormLicenceType(licType || 'LMV');
+      setFormMdlNumber(mdl || '');
+    }
   }
 
   function handleAddToCart(st: ServiceType, exists: boolean, existingRecord?: ServiceOverview) {
@@ -217,7 +210,6 @@ export function ServiceFormCard({
       category,
       isRenewal,
       renewOfId: isRenewal ? existingRecord.s_id : (renewal ? renewal.id : undefined),
-      renewOldStatus: isRenewal ? existingRecord.status : (renewal ? renewal.oldStatus : undefined),
       issueDate: formIssueDate,
       expiryDate: formExpiryDate,
       totalCost: cost,
@@ -235,6 +227,12 @@ export function ServiceFormCard({
     setExpandedServiceId(null);
     onDirty();
   }
+
+  const vehicleFields = [
+    { label: <>Vehicle Number <span className="text-red-500">*</span></>, value: vehicleNumber, set: (s: string) => setVehicleNumber(s.toUpperCase()), placeholder: 'e.g. MH12AB1234', required: true, upper: true },
+    { label: <>Vehicle Type <span className="text-red-500">*</span></>, value: vehicleType, set: setVehicleType, placeholder: 'e.g. Car, Bike, Truck', required: true, upper: false },
+    { label: <>Vehicle Name <span className="text-slate-400 normal-case font-normal">(optional)</span></>, value: vehicleName, set: setVehicleName, placeholder: 'e.g. Swift, Pulsar, Activa', required: false, upper: false },
+  ];
 
   const plate = vehicleNumber.trim().toUpperCase();
   const vehicleChosen = category === 'licence' || !!vehicleId;
@@ -275,10 +273,7 @@ export function ServiceFormCard({
                       variant="ghost"
                       size="sm"
                       onClick={() => {
-                        setVehicleId('');
-                        setVehicleNumber('');
-                        setVehicleType('');
-                        setVehicleName('');
+                        pickVehicle();
                         onDirty();
                       }}
                       className="h-7 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
@@ -289,80 +284,33 @@ export function ServiceFormCard({
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <label className={LABEL_CLASS}>Vehicle Number <span className="text-red-500">*</span></label>
-                      {vehicleId && (
-                        <span className="text-[10px] text-slate-500 font-semibold flex items-center gap-0.5">
-                          <Lock className="h-2.5 w-2.5" /> Locked
-                        </span>
-                      )}
+                  {vehicleFields.map(f => (
+                    <div key={f.placeholder}>
+                      <div className="flex items-center justify-between">
+                        <label className={LABEL_CLASS}>{f.label}</label>
+                        {vehicleId && (
+                          <span className="text-[10px] text-slate-500 font-semibold flex items-center gap-0.5">
+                            <Lock className="h-2.5 w-2.5" /> Locked
+                          </span>
+                        )}
+                      </div>
+                      <Input
+                        value={f.value}
+                        onChange={e => {
+                          if (vehicleId) return;
+                          f.set(e.target.value);
+                        }}
+                        placeholder={f.placeholder}
+                        required={f.required}
+                        readOnly={!!vehicleId}
+                        className={`mt-1.5 h-10 rounded-lg ${f.upper ? 'uppercase ' : ''}font-semibold text-xs transition-colors ${
+                          vehicleId
+                            ? 'bg-slate-200/60 border-slate-300 text-slate-800 cursor-not-allowed select-none shadow-none ring-0 focus-visible:ring-0'
+                            : 'bg-white border-slate-200 focus-visible:ring-slate-400'
+                        }`}
+                      />
                     </div>
-                    <Input
-                      value={vehicleNumber}
-                      onChange={e => {
-                        if (vehicleId) return;
-                        setVehicleNumber(e.target.value.toUpperCase());
-                      }}
-                      placeholder="e.g. MH12AB1234"
-                      required
-                      readOnly={!!vehicleId}
-                      className={`mt-1.5 h-10 rounded-lg uppercase font-semibold text-xs transition-colors ${
-                        vehicleId
-                          ? 'bg-slate-200/60 border-slate-300 text-slate-800 cursor-not-allowed select-none shadow-none ring-0 focus-visible:ring-0'
-                          : 'bg-white border-slate-200 focus-visible:ring-slate-400'
-                      }`}
-                    />
-                  </div>
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <label className={LABEL_CLASS}>Vehicle Type <span className="text-red-500">*</span></label>
-                      {vehicleId && (
-                        <span className="text-[10px] text-slate-500 font-semibold flex items-center gap-0.5">
-                          <Lock className="h-2.5 w-2.5" /> Locked
-                        </span>
-                      )}
-                    </div>
-                    <Input
-                      value={vehicleType}
-                      onChange={e => {
-                        if (vehicleId) return;
-                        setVehicleType(e.target.value);
-                      }}
-                      placeholder="e.g. Car, Bike, Truck"
-                      required
-                      readOnly={!!vehicleId}
-                      className={`mt-1.5 h-10 rounded-lg font-semibold text-xs transition-colors ${
-                        vehicleId
-                          ? 'bg-slate-200/60 border-slate-300 text-slate-800 cursor-not-allowed select-none shadow-none ring-0 focus-visible:ring-0'
-                          : 'bg-white border-slate-200 focus-visible:ring-slate-400'
-                      }`}
-                    />
-                  </div>
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <label className={LABEL_CLASS}>Vehicle Name <span className="text-slate-400 normal-case font-normal">(optional)</span></label>
-                      {vehicleId && (
-                        <span className="text-[10px] text-slate-500 font-semibold flex items-center gap-0.5">
-                          <Lock className="h-2.5 w-2.5" /> Locked
-                        </span>
-                      )}
-                    </div>
-                    <Input
-                      value={vehicleName}
-                      onChange={e => {
-                        if (vehicleId) return;
-                        setVehicleName(e.target.value);
-                      }}
-                      placeholder="e.g. Swift, Pulsar, Activa"
-                      readOnly={!!vehicleId}
-                      className={`mt-1.5 h-10 rounded-lg font-semibold text-xs transition-colors ${
-                        vehicleId
-                          ? 'bg-slate-200/60 border-slate-300 text-slate-800 cursor-not-allowed select-none shadow-none ring-0 focus-visible:ring-0'
-                          : 'bg-white border-slate-200 focus-visible:ring-slate-400'
-                      }`}
-                    />
-                  </div>
+                  ))}
                 </div>
 
                 {!vehicleId && (
@@ -401,17 +349,7 @@ export function ServiceFormCard({
                           key={v.v_id || `${v.v_number}-${idx}`}
                           type="button"
                           onClick={() => {
-                            if (isSelected) {
-                              setVehicleId('');
-                              setVehicleNumber('');
-                              setVehicleType('');
-                              setVehicleName('');
-                            } else {
-                              setVehicleId(v.v_id || '');
-                              setVehicleNumber(v.v_number);
-                              setVehicleType(v.v_type || 'car');
-                              setVehicleName(v.v_name || '');
-                            }
+                            pickVehicle(isSelected ? undefined : v);
                             onDirty();
                           }}
                           className={`group inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border cursor-pointer ${
@@ -493,9 +431,7 @@ export function ServiceFormCard({
                     <div className="flex items-center justify-between p-3 gap-2.5">
                       {/* Left: Icon & Name */}
                       <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                        <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${
-                          category === 'vehicle' ? 'bg-slate-100 text-slate-700' : 'bg-slate-100 text-slate-700'
-                        }`}>
+                        <div className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0 bg-slate-100 text-slate-700">
                           {category === 'vehicle' ? <Car className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
                         </div>
                         <div className="min-w-0 flex-1">
