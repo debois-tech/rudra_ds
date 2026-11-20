@@ -2,8 +2,9 @@
 // RLS handles tenant scoping automatically on SELECT/UPDATE/DELETE.
 // For INSERT, we must include org_id in the payload.
 
-import { differenceInCalendarDays } from 'date-fns';
+import { differenceInCalendarDays, subDays } from 'date-fns';
 import { createSupabaseBrowser } from './supabase';
+import { isoDay } from './utils';
 import { getCurrentProfile, getOrgId } from './auth';
 import type {
     Customer,
@@ -48,6 +49,19 @@ export type CustomerSort = 'name' | 'newest' | 'oldest' | 'vehicles' | 'services
 export type CustomerVehicleFilter = 'all' | 'with' | 'without';
 export type ServiceSort = 'newest' | 'oldest' | 'amount-high' | 'amount-low' | 'customer';
 export const PAGE_SIZE = 100;
+// "Live" services are the only ones listed in the UI; completed/cancelled rows
+// still count in totals and revenue (those read service_records directly).
+export const LIVE_STATUSES: ServiceStatus[] = ['active', 'expired'];
+// A service expired more than 90 days ago drops out of every list (same cutoff
+// as v_services_overview's soft delete, which only covered stored-'expired' rows).
+const notLongExpired = () => `expiry_date.is.null,expiry_date.gte.${isoDay(subDays(new Date(), 90))}`;
+// Plates compare ignoring case and spaces ("MH 12 AB 1234" === "mh12ab1234").
+export const normPlate = (p?: string | null) => (p || '').replace(/\s+/g, '').toUpperCase();
+// Every new service needs an expiry that is not before its issue date.
+function assertExpiry(issue: string, expiry?: string) {
+    if (!expiry) throw new Error('Expiry date is required.');
+    if (expiry < issue) throw new Error('Expiry date cannot be before the issue date.');
+}
 
 // =============================================
 // CUSTOMER OPERATIONS
@@ -397,7 +411,7 @@ export const serviceApi = {
     async list(opts: { search?: string; sort?: ServiceSort; category?: ServiceCategory | 'all'; status?: ServiceStatus | 'all'; offset?: number }): Promise<{ rows: ServiceOverview[]; hasMore: boolean }> {
         const supabase = getClient();
         const { search = '', sort = 'newest', category = 'all', status = 'all', offset = 0 } = opts;
-        let query = supabase.from('v_services_overview').select('*');
+        let query = supabase.from('v_services_overview').select('*').in('status', LIVE_STATUSES).or(notLongExpired());
 
         const term = search.trim();
         if (term) {
@@ -405,7 +419,10 @@ export const serviceApi = {
             query = query.or(`customer_name.ilike.${pat},service_name.ilike.${pat},vehicle_number.ilike.${pat},customer_mobile.ilike.${pat}`);
         }
         if (category !== 'all') query = query.eq('category', category);
-        if (status !== 'all') query = query.eq('status', status);
+        // Status is derived from the date (see effectiveStatus): a lapsed 'active' row counts as expired.
+        const today = isoDay(new Date());
+        if (status === 'active') query = query.eq('status', 'active').or(`expiry_date.is.null,expiry_date.gte.${today}`);
+        else if (status === 'expired') query = query.or(`status.eq.expired,and(status.eq.active,expiry_date.lt.${today})`);
 
         const [column, ascending] = ({
             newest: ['issue_date', false],
@@ -437,6 +454,8 @@ export const serviceApi = {
             .from('v_services_overview')
             .select('*')
             .eq('customer_id', customerId)
+            .in('status', LIVE_STATUSES)
+            .or(notLongExpired())
             .order('created_at', { ascending: false });
         if (error) throw error;
         return data || [];
@@ -453,7 +472,13 @@ export const serviceApi = {
         return data;
     },
 
-    async createVehicleService(formData: VehicleServiceFormData): Promise<Service> {
+    // One live (active/expired) row per vehicle + service type: after inserting the
+    // new row, every older live row for that vehicle and type is marked completed.
+    // Old imported rows with no vehicle_id are matched by plate. The insert comes
+    // first, so a failure here can never lose the new service.
+    async createVehicleService(formData: VehicleServiceFormData): Promise<Service & { supersedeFailed?: boolean }> {
+        if (!formData.vehicle_id) throw new Error('Select a vehicle before adding a vehicle service.');
+        assertExpiry(formData.issue_date, formData.expiry_date);
         const supabase = getClient();
         const orgId = await getOrgId();
         const { data, error } = await supabase
@@ -461,7 +486,7 @@ export const serviceApi = {
             .insert([{
                 customer_id: formData.customer_id,
                 service_type_id: formData.service_type_id,
-                vehicle_id: formData.vehicle_id || null,
+                vehicle_id: formData.vehicle_id,
                 vehicle_type: formData.vehicle_type,
                 vehicle_number: formData.vehicle_number,
                 issue_date: formData.issue_date,
@@ -473,10 +498,32 @@ export const serviceApi = {
             .select()
             .single();
         if (error) throw error;
+
+        // Candidates: live rows of this type for this vehicle or this customer. Legacy rows
+        // with no vehicle_id count as the same vehicle when the plate matches.
+        const { data: live, error: liveError } = await supabase
+            .from('vehicle_services')
+            .select('s_id, vehicle_id, vehicle_number')
+            .eq('service_type_id', formData.service_type_id)
+            .in('status', LIVE_STATUSES)
+            .neq('s_id', data.s_id)
+            .or(`vehicle_id.eq.${formData.vehicle_id},customer_id.eq.${formData.customer_id}`);
+        const plate = normPlate(formData.vehicle_number);
+        const stale = ((live || []) as { s_id: string; vehicle_id: string | null; vehicle_number: string | null }[])
+            .filter(r => r.vehicle_id === formData.vehicle_id || (!r.vehicle_id && plate && normPlate(r.vehicle_number) === plate))
+            .map(r => r.s_id);
+        const { error: supersedeError } = liveError || stale.length === 0
+            ? { error: liveError }
+            : await supabase.from('vehicle_services').update({ status: 'completed' }).in('s_id', stale);
+        if (supersedeError) {
+            console.error('Failed to complete previous live services', supersedeError);
+            return { ...data, supersedeFailed: true };
+        }
         return data;
     },
 
     async createLicenceService(formData: LicenceServiceFormData): Promise<Service> {
+        assertExpiry(formData.issue_date, formData.expiry_date);
         const supabase = getClient();
         const orgId = await getOrgId();
         const { data, error } = await supabase
@@ -561,10 +608,13 @@ export const dashboardApi = {
         };
     },
 
-    async getRecentCustomers(limit: number = 5): Promise<CustomerDashboardView[]> {
+    // Reads the customers table directly: v_customer_dashboard counts vehicles and services
+    // for EVERY customer before the LIMIT applies (~6.6s on a 5k-customer org, which times
+    // out under RLS). The dashboard only needs name, contact and created_at.
+    async getRecentCustomers(limit: number = 5): Promise<Customer[]> {
         const supabase = getClient();
         const { data, error } = await supabase
-            .from('v_customer_dashboard')
+            .from('customers')
             .select('*')
             .order('created_at', { ascending: false })
             .limit(limit);
@@ -577,6 +627,8 @@ export const dashboardApi = {
         const { data, error } = await supabase
             .from('v_services_overview')
             .select('*')
+            .in('status', LIVE_STATUSES)
+            .or(notLongExpired())
             .order('created_at', { ascending: false })
             .limit(limit);
         if (error) throw error;

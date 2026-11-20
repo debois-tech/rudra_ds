@@ -8,7 +8,7 @@ import type { CartItem, CustomerDashboardView } from '@/lib/types';
 interface ServicesCartProps {
   cart: CartItem[];
   customer: CustomerDashboardView;
-  vehicleNumber?: string;
+  subtitle?: string;
   onUpdateItem: (id: string, updates: Partial<CartItem>) => void;
   onRemoveItem: (id: string) => void;
   onConfirmAndCreate: () => void;
@@ -18,7 +18,7 @@ interface ServicesCartProps {
 export function ServicesCart({
   cart,
   customer,
-  vehicleNumber,
+  subtitle,
   onUpdateItem,
   onRemoveItem,
   onConfirmAndCreate,
@@ -43,7 +43,7 @@ export function ServicesCart({
                 </span>
               </div>
               <p className="text-[12px] text-slate-400 font-medium truncate max-w-[240px]">
-                {vehicleNumber ? `Vehicle: ${vehicleNumber}` : customer.c_name}
+                {subtitle ?? customer.c_name}
               </p>
             </div>
           </div>
@@ -122,7 +122,7 @@ export function ServicesCart({
                       onChange={(d) => {
                         const updates: Partial<CartItem> = { issueDate: d };
                         if (item.expiryDate && item.expiryDate < d) {
-                          updates.expiryDate = d;
+                          updates.expiryDate = '';
                         }
                         onUpdateItem(item.id, updates);
                       }}
@@ -137,6 +137,8 @@ export function ServicesCart({
                       value={item.expiryDate}
                       onChange={(d) => onUpdateItem(item.id, { expiryDate: d })}
                       minDate={item.issueDate}
+                      required
+                      invalid={!item.expiryDate}
                       className="h-8 text-xs bg-white border-slate-200"
                     />
                   </div>
@@ -175,16 +177,16 @@ export function ServicesCart({
           type="button"
           disabled={submitting || cart.length === 0}
           onClick={onConfirmAndCreate}
-          className="w-full h-11 rounded-xl bg-slate-200 hover:bg-slate-300 active:scale-[0.99] text-slate-900 font-bold text-xs border border-slate-300/90 shadow-xs flex items-center justify-center gap-2 transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+          className="w-full h-11 rounded-xl bg-gradient-to-r from-amber-400 to-amber-600 hover:from-amber-500 hover:to-amber-700 active:scale-[0.99] text-black font-bold text-sm shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
         >
           {submitting ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin text-slate-600" />
+              <Loader2 className="h-4 w-4 animate-spin" />
               <span>Creating Services...</span>
             </>
           ) : (
             <>
-              <CheckCircle2 className="h-4 w-4 stroke-[2.5] text-slate-700" />
+              <CheckCircle2 className="h-4 w-4 stroke-[2.5]" />
               <span>Create Services</span>
             </>
           )}

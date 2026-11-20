@@ -17,9 +17,10 @@ type Props = {
   required?: boolean
   className?: string
   minDate?: string
+  invalid?: boolean
 }
 
-export function DateTimePicker({ value = '', onChange, mode = 'date', required, className, minDate }: Props) {
+export function DateTimePicker({ value = '', onChange, mode = 'date', required, className, minDate, invalid }: Props) {
   const [open, setOpen] = useState(false)
   const [view, setView] = useState<'days' | 'months' | 'years'>('days')
   const buttonRef = useRef<HTMLButtonElement>(null)
@@ -121,7 +122,7 @@ export function DateTimePicker({ value = '', onChange, mode = 'date', required, 
 
   return (
     <div ref={rootRef} className="relative min-w-0 w-full">
-      <div ref={dateFieldRef} className={cn('flex h-11 w-full min-w-0 items-center overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:border-amber-300 focus-within:border-amber-400 focus-within:ring-2 focus-within:ring-amber-100', className)}>
+      <div ref={dateFieldRef} className={cn('flex h-11 w-full min-w-0 items-center overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:border-amber-300 focus-within:border-amber-400 focus-within:ring-2 focus-within:ring-amber-100', className, invalid && 'border-red-500 hover:border-red-500 focus-within:border-red-500 focus-within:ring-red-100')} aria-invalid={invalid || undefined}>
         <input
           type="text"
           inputMode="numeric"

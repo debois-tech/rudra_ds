@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { customerApi, vehicleApi, serviceTypeApi, serviceApi } from '@/lib/api';
+import { customerApi, vehicleApi, serviceTypeApi, serviceApi, normPlate } from '@/lib/api';
 import type {
   CustomerSearchResult,
   Vehicle,
@@ -114,28 +114,35 @@ function NewServicePageContent() {
     let cancelled = false;
     (async () => {
       try {
-        const [customer, types, vehs] = await Promise.all([
+        // Live services load too, so the form knows what this renewal replaces.
+        const [customer, types, vehs, svcs] = await Promise.all([
           customerApi.getByIdWithStats(preselectedCustomerId),
           serviceTypeApi.getByCategory(cat),
           cat === 'vehicle' ? vehicleApi.getByOwner(preselectedCustomerId) : Promise.resolve(null),
+          serviceApi.getByCustomer(preselectedCustomerId),
         ]);
         if (cancelled || !customer) return;
         const stId = params.get('serviceTypeId');
         setSelectedCustomer(withVehicles(customer, vehs || []));
         setTypesByCategory({ [cat]: types });
         if (vehs) setVehicles(vehs);
+        setCustomerServices(svcs);
+        // Old imported rows may have no vehicle_id — link them to the owner's car by plate.
+        const plate = normPlate(params.get('vehicleNumber'));
+        const matched = vehs?.find(v => v.v_id === params.get('vehicleId') || (plate && normPlate(v.v_number) === plate));
         setRenewal({
           id: renewOf,
           initial: {
             serviceTypeId: stId ? Number(stId) : undefined,
-            vehicleId: params.get('vehicleId') || undefined,
+            vehicleId: matched?.v_id || params.get('vehicleId') || undefined,
             vehicleNumber: params.get('vehicleNumber') || undefined,
             vehicleType: params.get('vehicleType') || undefined,
+            vehicleName: matched?.v_name || undefined,
             vehicleClass: (params.get('vehicleClass') as VehicleClass) || undefined,
             vehicleTypeLicence: (params.get('vehicleTypeLicence') as VehicleTypeLicence) || undefined,
             mdlNumber: params.get('mdlNumber') || undefined,
             issueDate: params.get('issueDate') || undefined,
-            expiryDate: params.get('expiryDate') || undefined,
+            // expiry is deliberately not prefilled — it must be picked
             totalCost: params.get('cost') || undefined,
           },
         });
@@ -350,7 +357,19 @@ function NewServicePageContent() {
       return;
     }
 
+    const noExpiry = cart.find(i => !i.expiryDate);
+    if (noExpiry) {
+      toast.error(`Pick an expiry date for "${noExpiry.serviceName}".`);
+      return;
+    }
+    const noVehicle = cart.find(i => i.category === 'vehicle' && !i.vehicleId);
+    if (noVehicle) {
+      toast.error(`Select a vehicle for "${noVehicle.serviceName}".`);
+      return;
+    }
+
     setSubmittingCart(true);
+    let saved = 0;
     try {
       for (const item of cart) {
         if (item.category === 'vehicle') {
@@ -365,7 +384,8 @@ function NewServicePageContent() {
             total_cost: item.totalCost,
             notes: item.notes,
           };
-          await serviceApi.createVehicleService(payload);
+          const created = await serviceApi.createVehicleService(payload);
+          if (created.supersedeFailed) toast.warning(`"${item.serviceName}" saved, but the previous record could not be marked completed.`);
         } else {
           const payload: LicenceServiceFormData = {
             customer_id: selectedCustomer.c_id,
@@ -389,24 +409,38 @@ function NewServicePageContent() {
             console.error('Failed to mark previous service as completed', e);
           }
         }
+
+        // Saved items leave the cart right away, so a retry after a failure
+        // can't create them twice.
+        saved++;
+        setCart(prev => prev.filter(i => i.id !== item.id));
       }
 
-      toast.success(`Successfully created ${cart.length} service${cart.length > 1 ? 's' : ''}!`);
-      setCart([]);
+      toast.success(`Successfully created ${saved} service${saved > 1 ? 's' : ''}!`);
       formDirty.current = false;
-      router.push('/dashboard/services/overview');
+      goBack();
     } catch (err: unknown) {
       logClientError('create-cart-services', err, { customerId: selectedCustomer.c_id });
-      toast.error(getErrorMessage(err, 'Failed to create services. Please try again.'));
+      // Items saved before the failure are now live records — refresh so the form says Renew, not New.
+      if (saved > 0) serviceApi.getByCustomer(selectedCustomer.c_id).then(setCustomerServices).catch(() => { });
+      toast.error(`${saved > 0 ? `${saved} saved, the rest are still in your cart. ` : ''}${getErrorMessage(err, 'Failed to create services. Please try again.')}`);
     } finally {
       setSubmittingCart(false);
     }
   }
 
+  // Back lands wherever the user came from (customer profile, customers list,
+  // services list). With no history to go back to (new tab), fall back to the
+  // customer's profile if one is preselected, else the services list.
+  function goBack() {
+    if (window.history.length > 1) router.back();
+    else router.push(preselectedCustomerId ? `/dashboard/customers/${preselectedCustomerId}` : '/dashboard/services/overview');
+  }
+
   function exit() {
     if (cart.length > 0 && !confirm('You have unsaved services in your cart. Discard and leave?')) return;
     if (formDirty.current && !confirm('Discard the unsaved service?')) return;
-    router.push('/dashboard/services/overview');
+    goBack();
   }
 
   const types = category ? typesByCategory[category] : undefined;
@@ -417,6 +451,9 @@ function NewServicePageContent() {
   ];
 
   const isCartActive = cart.length > 0 && !!selectedCustomer;
+  // The cart can hold services for several vehicles, so name the one vehicle or count them.
+  const cartPlates = [...new Set(cart.map(c => c.vehicleNumber).filter(Boolean))];
+  const cartSubtitle = cartPlates.length === 1 ? `Vehicle: ${cartPlates[0]}` : cartPlates.length > 1 ? `${cartPlates.length} vehicles` : undefined;
 
   return (
     <div className={`transition-all duration-300 pb-24 ${isCartActive ? 'max-w-7xl mx-auto' : 'max-w-3xl mx-auto'}`}>
@@ -472,11 +509,17 @@ function NewServicePageContent() {
                       ))}
                     </div>
                   )}
+                  {cart.length > 0 && (
+                    <p className="mt-2 text-[11px] font-medium text-slate-500">
+                      Customer is locked while the cart has services. Remove them or create the services to switch.
+                    </p>
+                  )}
                 </div>
               </div>
               <Button
                 variant="ghost"
                 size="sm"
+                disabled={cart.length > 0}
                 className="shrink-0 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg self-start sm:self-center"
                 onClick={changeCustomer}
               >
@@ -660,7 +703,7 @@ function NewServicePageContent() {
             <ServicesCart
               cart={cart}
               customer={selectedCustomer}
-              vehicleNumber={cart.find(c => c.vehicleNumber)?.vehicleNumber}
+              subtitle={cartSubtitle}
               onUpdateItem={handleUpdateCartItem}
               onRemoveItem={handleRemoveCartItem}
               onConfirmAndCreate={handleConfirmAndCreate}
