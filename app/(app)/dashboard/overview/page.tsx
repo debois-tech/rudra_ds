@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, useContext } from 'react';
 import { DashboardOrgContext } from '../../app-shell';
 import { dashboardApi } from '@/lib/api';
 import type {
-    DashboardStats, CustomerDashboardView, ServiceOverview,
+    DashboardStats, Customer, ServiceOverview,
     ExpiringDocument,
 } from '@/lib/types';
 import {
@@ -36,6 +36,7 @@ type ActivityItem = {
     subtitle: string;
     date: Date;
     status?: string;
+    expiryDate?: string | null;
     url: string;
 }
 
@@ -93,7 +94,7 @@ export default function DashboardPage() {
         Promise.all([dashboardApi.getRecentCustomers(8), dashboardApi.getRecentServices(8)])
             .then(([customersData, servicesData]) => {
                 setActivities([
-                    ...customersData.map((c: CustomerDashboardView) => ({
+                    ...customersData.map((c: Customer) => ({
                         id: `c_${c.c_id}`,
                         type: 'customer' as const,
                         title: c.c_name,
@@ -108,6 +109,7 @@ export default function DashboardPage() {
                         subtitle: `${s.customer_name}${s.vehicle_number ? ` · ${s.vehicle_number}` : ''}`,
                         date: new Date(s.created_at),
                         status: s.status,
+                        expiryDate: s.expiry_date,
                         url: `/dashboard/services/overview`,
                     }))
                 ].sort((a, b) => b.date.getTime() - a.date.getTime()));
@@ -396,7 +398,7 @@ export default function DashboardPage() {
 
                                 {/* Right side */}
                                 <div className="flex items-center gap-3 shrink-0">
-                                    {item.status && <StatusBadge status={item.status} />}
+                                    {item.status && <StatusBadge status={item.status} expiryDate={item.expiryDate} />}
                                     <span className="text-[11px] text-slate-300 font-medium min-w-[60px] text-right hidden sm:block">
                                         {formatDistanceToNow(item.date, { addSuffix: false })}
                                     </span>

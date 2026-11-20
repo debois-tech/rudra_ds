@@ -6,6 +6,7 @@ export function StatusBars({ data }: { data: StatusBreakdown[] }) {
 
     const colors: Record<string, { bg: string; bar: string; text: string }> = {
         active: { bg: 'bg-emerald-50', bar: 'bg-emerald-500', text: 'text-emerald-700' },
+        expired: { bg: 'bg-amber-50', bar: 'bg-amber-400', text: 'text-amber-700' },
         completed: { bg: 'bg-slate-50', bar: 'bg-slate-400', text: 'text-slate-600' },
         cancelled: { bg: 'bg-red-50', bar: 'bg-red-400', text: 'text-red-600' },
     };

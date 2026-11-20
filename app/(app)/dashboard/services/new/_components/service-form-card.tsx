@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
-import { vehicleApi, renewalDates } from '@/lib/api';
+import { vehicleApi, normPlate } from '@/lib/api';
 import type { CustomerDashboardView, Vehicle, ServiceType, ServiceOverview, VehicleClass, VehicleTypeLicence, CartItem } from '@/lib/types';
 import { Loader2, Car, FileText, Check, RefreshCw, Plus, Lock, ShoppingBag } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -166,7 +166,8 @@ export function ServiceFormCard({
       fillForm(cartItem.issueDate, cartItem.expiryDate, String(cartItem.totalCost), cartItem.notes || '',
         cartItem.vehicleClass, cartItem.vehicleTypeLicence, cartItem.mdlNumber);
     } else if (exists && existingRecord) {
-      fillForm(today(), renewalDates(existingRecord).expiryDate || '', String(existingRecord.total_cost), '',
+      // Expiry starts empty on purpose: it has to be picked, not inherited.
+      fillForm(today(), '', String(existingRecord.total_cost), '',
         existingRecord.vehicle_class, existingRecord.vehicle_type_licence, existingRecord.mdl_number);
     } else {
       fillForm(today(), '', '', '');
@@ -197,6 +198,18 @@ export function ServiceFormCard({
     }
     if (!formIssueDate) {
       toast.error('Please select an issue date');
+      return;
+    }
+    if (!formExpiryDate) {
+      toast.error('Please select an expiry date');
+      return;
+    }
+    if (formExpiryDate < formIssueDate) {
+      toast.error('Expiry date cannot be before the issue date');
+      return;
+    }
+    if (category === 'vehicle' && !vehicleId) {
+      toast.error('Please select a vehicle');
       return;
     }
 
@@ -250,7 +263,52 @@ export function ServiceFormCard({
         <CardContent className="p-4 sm:p-5 bg-slate-50/30 space-y-4">
           {category === 'vehicle' && (
             <>
-              {/* 1. Add New Vehicle / Selected Vehicle Section (Moved Above) */}
+              {/* 1. Customer's Registered Vehicles (listed first) */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-700">
+                    Customer&apos;s Registered Vehicles:
+                  </span>
+                  {localVehicles.length > 0 && !vehicleId && (
+                    <span className="text-[11px] text-slate-400 font-medium">Click a vehicle to select</span>
+                  )}
+                </div>
+
+                {localVehicles.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {localVehicles.map((v, idx) => {
+                      const isSelected = vehicleId === v.v_id || (!vehicleId && vehicleNumber.trim() && v.v_number.toUpperCase() === vehicleNumber.trim().toUpperCase());
+                      const displayName = v.v_name || v.v_type || 'Vehicle';
+                      return (
+                        <button
+                          key={v.v_id || `${v.v_number}-${idx}`}
+                          type="button"
+                          onClick={() => {
+                            pickVehicle(isSelected ? undefined : v);
+                            onDirty();
+                          }}
+                          className={`group inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border cursor-pointer ${
+                            isSelected
+                              ? 'bg-slate-200/90 text-slate-900 border-slate-400 shadow-xs ring-1 ring-slate-300'
+                              : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-100/70'
+                          }`}
+                        >
+                          <Car className={`h-3.5 w-3.5 ${isSelected ? 'text-slate-800' : 'text-slate-400 group-hover:text-slate-600'}`} />
+                          <span className="font-mono font-bold tracking-tight">{v.v_number}</span>
+                          <span className={isSelected ? 'text-slate-600 font-normal' : 'text-slate-400 font-normal'}>
+                            ({displayName})
+                          </span>
+                          {isSelected && <Check className="h-3.5 w-3.5 ml-0.5 text-slate-800 stroke-[2.5]" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400 italic">No registered vehicles on record for this customer.</p>
+                )}
+              </div>
+
+              {/* 2. Add New Vehicle / Selected Vehicle */}
               <div className={`p-4 rounded-xl border shadow-xs space-y-3 transition-colors ${
                 vehicleId ? 'bg-slate-100/60 border-slate-300' : 'bg-white border-slate-200'
               }`}>
@@ -327,51 +385,6 @@ export function ServiceFormCard({
                   </div>
                 )}
               </div>
-
-              {/* 2. Customer's Existing Vehicles (Positioned below Add/Selected vehicle) */}
-              <div className="space-y-2 pt-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-700">
-                    Customer&apos;s Registered Vehicles:
-                  </span>
-                  {localVehicles.length > 0 && !vehicleId && (
-                    <span className="text-[11px] text-slate-400 font-medium">Click a vehicle to select</span>
-                  )}
-                </div>
-
-                {localVehicles.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {localVehicles.map((v, idx) => {
-                      const isSelected = vehicleId === v.v_id || (!vehicleId && vehicleNumber.trim() && v.v_number.toUpperCase() === vehicleNumber.trim().toUpperCase());
-                      const displayName = v.v_name || v.v_type || 'Vehicle';
-                      return (
-                        <button
-                          key={v.v_id || `${v.v_number}-${idx}`}
-                          type="button"
-                          onClick={() => {
-                            pickVehicle(isSelected ? undefined : v);
-                            onDirty();
-                          }}
-                          className={`group inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border cursor-pointer ${
-                            isSelected
-                              ? 'bg-slate-200/90 text-slate-900 border-slate-400 shadow-xs ring-1 ring-slate-300'
-                              : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-100/70'
-                          }`}
-                        >
-                          <Car className={`h-3.5 w-3.5 ${isSelected ? 'text-slate-800' : 'text-slate-400 group-hover:text-slate-600'}`} />
-                          <span className="font-mono font-bold tracking-tight">{v.v_number}</span>
-                          <span className={isSelected ? 'text-slate-600 font-normal' : 'text-slate-400 font-normal'}>
-                            ({displayName})
-                          </span>
-                          {isSelected && <Check className="h-3.5 w-3.5 ml-0.5 text-slate-800 stroke-[2.5]" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-xs text-slate-400 italic">No registered vehicles on record for this customer.</p>
-                )}
-              </div>
             </>
           )}
 
@@ -403,14 +416,19 @@ export function ServiceFormCard({
             {/* 2-Column Grid of Services */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
               {serviceTypes.map(st => {
-                const existingRecord = services.find(s =>
-                  s.service_type_id === st.st_id &&
-                  (category === 'licence' || (
-                    (vehicleId && s.vehicle_id === vehicleId) ||
-                    (plate && s.vehicle_number?.toUpperCase() === plate)
-                  ))
-                );
-                const cartItem = cart.find(c => c.serviceTypeId === st.st_id);
+                // One live service per vehicle + type: if there is one, the only
+                // option is Renew. `services` is live-only; the latest expiry wins.
+                const existingRecord = services
+                  .filter(s =>
+                    s.service_type_id === st.st_id &&
+                    (category === 'licence' || (
+                      (vehicleId && s.vehicle_id === vehicleId) ||
+                      (plate && normPlate(s.vehicle_number) === normPlate(plate))
+                    ))
+                  )
+                  .sort((a, b) => (b.expiry_date || '').localeCompare(a.expiry_date || ''))[0];
+                // A cart item belongs to its vehicle: PUC for car A is not "in cart" for car B.
+                const cartItem = cart.find(c => c.serviceTypeId === st.st_id && (category === 'licence' || c.vehicleId === vehicleId));
                 const inCart = !!cartItem;
                 const isExpanded = expandedServiceId === st.st_id;
                 const exists = !!existingRecord;
@@ -463,7 +481,20 @@ export function ServiceFormCard({
 
                       {/* Right: Action Button */}
                       <div className="shrink-0 flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
-                        {inCart ? (
+                        {isExpanded ? (
+                          // While the card is open the action button becomes a status label, not a control.
+                          (cartItem ? cartItem.isRenewal : exists) ? (
+                            <span role="status" className="inline-flex h-8 select-none items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-3 text-xs font-bold text-amber-700">
+                              <RefreshCw className="h-3 w-3" aria-hidden />
+                              Renewing
+                            </span>
+                          ) : (
+                            <span role="status" className="inline-flex h-8 select-none items-center gap-1.5 rounded-md border border-slate-200 bg-slate-100 px-3 text-xs font-bold text-slate-700">
+                              <Plus className="h-3 w-3" aria-hidden />
+                              New service
+                            </span>
+                          )
+                        ) : inCart ? (
                           <button
                             type="button"
                             onClick={() => handleToggleExpand(st, exists, existingRecord, cartItem)}
@@ -550,8 +581,9 @@ export function ServiceFormCard({
                               value={formIssueDate}
                               onChange={d => {
                                 setFormIssueDate(d);
+                                // An expiry now before the issue date is cleared, not silently rewritten.
                                 if (formExpiryDate && formExpiryDate < d) {
-                                  setFormExpiryDate(d);
+                                  setFormExpiryDate('');
                                 }
                               }}
                               className="h-9 text-xs bg-white"
@@ -560,12 +592,14 @@ export function ServiceFormCard({
 
                           <div>
                             <label className="text-[10px] uppercase font-bold tracking-wider text-slate-500 block mb-1">
-                              Expiry Date
+                              Expiry Date <span className="text-red-500">*</span>
                             </label>
                             <DateTimePicker
                               value={formExpiryDate}
                               onChange={setFormExpiryDate}
                               minDate={formIssueDate}
+                              required
+                              invalid={!formExpiryDate}
                               className="h-9 text-xs bg-white"
                             />
                           </div>
@@ -599,13 +633,13 @@ export function ServiceFormCard({
                         </div>
 
                         {/* Actions */}
-                        <div className="flex items-center justify-between pt-1">
+                        <div className="flex items-center justify-end gap-2 pt-1">
                           <Button
                             type="button"
-                            variant="ghost"
+                            variant="outline"
                             size="sm"
                             onClick={() => setExpandedServiceId(null)}
-                            className="h-8 text-xs text-slate-500 hover:text-slate-700"
+                            className="h-8 rounded-lg border-slate-300 bg-white px-3.5 text-xs font-bold text-black shadow-2xs hover:bg-slate-100 hover:text-black"
                           >
                             Cancel
                           </Button>

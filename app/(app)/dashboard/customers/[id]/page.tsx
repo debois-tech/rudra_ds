@@ -36,7 +36,7 @@ export default function CustomerDetailPage() {
   const [serviceQuery, setServiceQuery] = useState('');
   const historyRef = useRef<HTMLDivElement>(null);
 
-  // Picking a car: ease down to the (now filtered) Service History card.
+  // Picking a car: ease down to the (now filtered) Service Records card.
   // Deselecting (null) leaves the scroll alone.
   useEffect(() => {
     if (!selectedVehicleId) return;
@@ -296,7 +296,7 @@ export default function CustomerDetailPage() {
           <div ref={historyRef}>
           <Card className="rounded-2xl shadow-sm border-slate-200 overflow-hidden">
             <CardHeader className="bg-white border-b border-slate-100 pb-3 pt-5 px-6 flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-lg"><Wrench className="h-5 w-5 text-amber-500" /> Service History <span className="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full">{visibleServices.length}{visibleServices.length !== services.length && ` / ${services.length}`}</span></CardTitle>
+              <CardTitle className="flex items-center gap-2 text-lg"><Wrench className="h-5 w-5 text-amber-500" /> Service Records <span className="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full">{visibleServices.length}{visibleServices.length !== services.length && ` / ${services.length}`}</span></CardTitle>
               <div className="flex items-center gap-2">
                 <Select value={serviceType} onValueChange={v => setServiceType(v as typeof serviceType)}>
                   <SelectTrigger size="sm" aria-label="Filter service type" className={FILTER_TRIGGER_CLASS}>
@@ -352,7 +352,7 @@ export default function CustomerDetailPage() {
               {visibleServices.length === 0 ? (
                 <div className="p-8 text-center bg-white">
                  <Wrench className="h-8 w-8 text-slate-200 mx-auto mb-2" />
-                 <p className="text-sm text-slate-500 font-medium">{services.length === 0 ? 'No services recorded' : 'No services match this filter'}</p>
+                 <p className="text-sm text-slate-500 font-medium">{services.length === 0 ? 'No active or expired services' : 'No services match this filter'}</p>
                 </div>
               ) : (
                 <div className="max-h-[400px] overflow-auto">
@@ -384,7 +384,7 @@ export default function CustomerDetailPage() {
                             <p className="text-xs text-slate-500">{s.expiry_date ? format(new Date(s.expiry_date), 'dd MMM yyyy') : 'No Expiry'}</p>
                           </td>
                           <td className="py-3 px-4">
-                            <StatusBadge status={s.status} />
+                            <StatusBadge status={s.status} expiryDate={s.expiry_date} />
                           </td>
                           <td className="py-3 px-4 text-right font-bold text-slate-900">₹{Number(s.total_cost).toLocaleString()}</td>
                           <td className="py-3 px-4 text-right">

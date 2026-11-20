@@ -17,7 +17,7 @@ import { generateInvoice } from '@/lib/invoice';
 import { getErrorMessage, logClientError } from '@/lib/error-message';
 
 type CategoryFilter = 'all' | 'vehicle' | 'licence';
-type StatusFilter = 'all' | 'active' | 'expired' | 'completed' | 'cancelled';
+type StatusFilter = 'all' | 'active' | 'expired'; // completed/cancelled rows are never listed
 
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: 'newest', label: 'Newest first' },
@@ -165,8 +165,6 @@ export default function ServiceOverviewPage() {
                   <SelectItem value="all" className={FILTER_ITEM_CLASS}>All statuses</SelectItem>
                   <SelectItem value="active" className={FILTER_ITEM_CLASS}>Active</SelectItem>
                   <SelectItem value="expired" className={FILTER_ITEM_CLASS}>Expired</SelectItem>
-                  <SelectItem value="completed" className={FILTER_ITEM_CLASS}>Completed</SelectItem>
-                  <SelectItem value="cancelled" className={FILTER_ITEM_CLASS}>Cancelled</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -242,7 +240,7 @@ export default function ServiceOverviewPage() {
                         <p className="text-xs text-slate-500">Exp: {s.expiry_date ? format(new Date(s.expiry_date), 'dd MMM yy') : '—'}</p>
                       </td>
                       <td className="py-4 px-6">
-                        <StatusBadge status={s.status} />
+                        <StatusBadge status={s.status} expiryDate={s.expiry_date} />
                       </td>
                       <td className="py-4 px-6 text-right font-semibold text-slate-900 text-base">
                         ₹{Number(s.total_cost).toLocaleString()}

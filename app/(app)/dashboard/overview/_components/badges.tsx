@@ -1,4 +1,7 @@
-export function StatusBadge({ status }: { status: string }) {
+import { effectiveStatus } from '@/lib/utils';
+
+export function StatusBadge({ status: stored, expiryDate }: { status: string; expiryDate?: string | null }) {
+    const status = effectiveStatus(stored, expiryDate);
     const styles: Record<string, string> = {
         active: 'bg-emerald-50 text-emerald-600 border-emerald-100',
         completed: 'bg-slate-50 text-slate-500 border-slate-200',

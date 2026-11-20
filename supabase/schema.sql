@@ -803,10 +803,14 @@ BEGIN
         'statusBreakdown', (
             SELECT json_agg(row_to_json(t))
             FROM (
-                SELECT status, COUNT(*) as count
+                -- Nothing flips a stored 'active' to 'expired' on its date, so derive it here
+                -- (India date) to match what the app shows. Revenue/counts are untouched.
+                SELECT CASE WHEN status = 'active' AND expiry_date < (now() AT TIME ZONE 'Asia/Kolkata')::date
+                            THEN 'expired' ELSE status::text END AS status,
+                       COUNT(*) as count
                 FROM service_records
                 WHERE org_id = p_org_id
-                GROUP BY status
+                GROUP BY 1
             ) t
         ),
         'revenueByMonth', (
