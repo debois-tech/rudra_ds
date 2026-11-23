@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
             supabase.from('organizations').select('*', { count: 'exact', head: true }).eq('is_active', true),
             supabase.from('profiles').select('*', { count: 'exact', head: true }),
             supabase.from('customers').select('*', { count: 'exact', head: true }),
-            supabase.from('services').select('*', { count: 'exact', head: true }),
+            supabase.from('service_records').select('s_id', { count: 'exact', head: true }),
         ])
 
         return NextResponse.json({

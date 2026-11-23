@@ -35,6 +35,10 @@ function getClient() {
     return createSupabaseBrowser();
 }
 
+// Explicit org filter on list reads. RLS already scopes rows, but its
+// "super admin OR own org" OR stops Postgres from using the org_id indexes,
+// so without this every list scans all tenants' rows. Purely additive.
+
 
 // Escapes LIKE wildcards so user text is matched literally.
 const escapeLike = (term: string) => term.replace(/[\\%_]/g, m => '\\' + m);
@@ -88,7 +92,8 @@ export const customerApi = {
     // Cheap head-only count on the base table (the view would aggregate everything).
     async count(): Promise<number> {
         const supabase = getClient();
-        const { count, error } = await supabase.from('customers').select('c_id', { count: 'exact', head: true });
+        const orgId = await getOrgId();
+        const { count, error } = await supabase.from('customers').select('c_id', { count: 'exact', head: true }).eq('org_id', orgId);
         if (error) throw error;
         return count || 0;
     },
@@ -411,7 +416,8 @@ export const serviceApi = {
     async list(opts: { search?: string; sort?: ServiceSort; category?: ServiceCategory | 'all'; status?: ServiceStatus | 'all'; offset?: number }): Promise<{ rows: ServiceOverview[]; hasMore: boolean }> {
         const supabase = getClient();
         const { search = '', sort = 'newest', category = 'all', status = 'all', offset = 0 } = opts;
-        let query = supabase.from('v_services_overview').select('*').in('status', LIVE_STATUSES).or(notLongExpired());
+        const orgId = await getOrgId();
+        let query = supabase.from('v_services_overview').select('*').eq('org_id', orgId).in('status', LIVE_STATUSES).or(notLongExpired());
 
         const term = search.trim();
         if (term) {
@@ -443,7 +449,8 @@ export const serviceApi = {
 
     async count(): Promise<number> {
         const supabase = getClient();
-        const { count, error } = await supabase.from('service_records').select('s_id', { count: 'exact', head: true });
+        const orgId = await getOrgId();
+        const { count, error } = await supabase.from('service_records').select('s_id', { count: 'exact', head: true }).eq('org_id', orgId);
         if (error) throw error;
         return count || 0;
     },
@@ -613,9 +620,11 @@ export const dashboardApi = {
     // out under RLS). The dashboard only needs name, contact and created_at.
     async getRecentCustomers(limit: number = 5): Promise<Customer[]> {
         const supabase = getClient();
+        const orgId = await getOrgId();
         const { data, error } = await supabase
             .from('customers')
             .select('*')
+            .eq('org_id', orgId)
             .order('created_at', { ascending: false })
             .limit(limit);
         if (error) throw error;
@@ -624,9 +633,11 @@ export const dashboardApi = {
 
     async getRecentServices(limit: number = 10): Promise<ServiceOverview[]> {
         const supabase = getClient();
+        const orgId = await getOrgId();
         const { data, error } = await supabase
             .from('v_services_overview')
             .select('*')
+            .eq('org_id', orgId)
             .in('status', LIVE_STATUSES)
             .or(notLongExpired())
             .order('created_at', { ascending: false })
@@ -647,6 +658,7 @@ export const dashboardApi = {
     ): Promise<{ rows: ExpiringDocument[]; total: number }> {
         const supabase = getClient();
         const { limit = 25, offset = 0, search = '', category = 'all', sort = 'expiry-asc' } = opts;
+        const orgId = await getOrgId();
         const today = new Date();
         const dayStr = (shift: number) => {
             const d = new Date();
@@ -657,6 +669,7 @@ export const dashboardApi = {
         let query = supabase
             .from('v_services_overview')
             .select('s_id, customer_id, customer_name, customer_mobile, service_name, category, expiry_date, vehicle_number, service_type_id, issue_date, total_cost, status, vehicle_id, vehicle_type, vehicle_class, vehicle_type_licence, mdl_number', { count: 'exact' })
+            .eq('org_id', orgId)
             .not('expiry_date', 'is', null);
 
         query = filter.kind === 'expired'

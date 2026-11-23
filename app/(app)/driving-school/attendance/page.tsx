@@ -15,8 +15,8 @@ export default function AttendancePage() {
     
     // Data
     const [records, setRecords] = useState<DsAttendanceView[]>([])
-    const [students, setStudents] = useState<DsStudentDashboardView[]>([])
-    
+    const [allStudents, setAllStudents] = useState<DsStudentDashboardView[] | null>(null)
+
     // UI State
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState('')
@@ -26,15 +26,19 @@ export default function AttendancePage() {
     const [selectedIndex, setSelectedIndex] = useState(0)
     const listRef = useRef<HTMLDivElement>(null)
 
-    const loadAll = useCallback(async (d: string) => {
+    // The student list doesn't depend on the date — fetch it once; only the
+    // attendance records reload when the date changes.
+    useEffect(() => {
+        studentApi.getAll().then(setAllStudents).catch(() => {
+            setAllStudents([])
+            toast.error('Failed to load students')
+        })
+    }, [])
+
+    const loadRecords = useCallback(async (d: string) => {
         setLoading(true)
         try {
-            const [recs, studs] = await Promise.all([
-                attendanceApi.getByDate(d),
-                studentApi.getAll(),
-            ])
-            setRecords(recs)
-            setStudents(studs.filter(s => s.status === 'active' && s.enrollment_date <= d && (!s.completion_date || s.completion_date >= d)))
+            setRecords(await attendanceApi.getByDate(d))
         } catch {
             toast.error('Failed to load attendance data')
         } finally {
@@ -42,7 +46,11 @@ export default function AttendancePage() {
         }
     }, [])
 
-    useEffect(() => { loadAll(date) }, [date, loadAll])
+    useEffect(() => { loadRecords(date) }, [date, loadRecords])
+
+    const students = useMemo(() => (allStudents || []).filter(s =>
+        s.status === 'active' && s.enrollment_date <= date && (!s.completion_date || s.completion_date >= date)
+    ), [allStudents, date])
 
     const toggleStudent = async (student: DsStudentDashboardView) => {
         const existingRecord = records.find(r => r.student_id === student.id)
@@ -165,7 +173,7 @@ export default function AttendancePage() {
 
             {/* Main Content (Scrollable List) */}
             <div className="flex-1 min-h-0 overflow-y-auto pb-6 pr-2">
-                {loading ? (
+                {loading || !allStudents ? (
                     <div className="flex flex-col gap-2">
                         {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
                             <div key={i} className="h-14 rounded-xl bg-slate-100 animate-pulse" />

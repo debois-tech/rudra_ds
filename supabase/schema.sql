@@ -874,6 +874,19 @@ CREATE INDEX IF NOT EXISTS idx_document_services_org_expiry  ON public.document_
 CREATE INDEX IF NOT EXISTS idx_vehicle_services_org_expiry   ON public.vehicle_services(org_id, expiry_date);
 CREATE INDEX IF NOT EXISTS idx_vehicle_services_vehicle      ON public.vehicle_services(vehicle_id);
 
+-- 3. (2026-11-23) Services list sorts by issue_date; FK columns used by
+--    attendance marking (active-log lookup), supersede lookup and FK delete checks.
+--    Safe on a live DB (IF NOT EXISTS) — paste this block alone into the SQL editor.
+CREATE INDEX IF NOT EXISTS idx_vehicle_services_org_issue   ON public.vehicle_services(org_id, issue_date);
+CREATE INDEX IF NOT EXISTS idx_document_services_org_issue  ON public.document_services(org_id, issue_date);
+CREATE INDEX IF NOT EXISTS idx_vehicle_services_type        ON public.vehicle_services(service_type_id);
+CREATE INDEX IF NOT EXISTS idx_document_services_type       ON public.document_services(service_type_id);
+CREATE INDEX IF NOT EXISTS idx_ds_driving_logs_instructor   ON public.ds_driving_logs(instructor_id);
+CREATE INDEX IF NOT EXISTS idx_ds_driving_logs_vehicle      ON public.ds_driving_logs(vehicle_id);
+CREATE INDEX IF NOT EXISTS idx_ds_attendance_instructor     ON public.ds_attendance(instructor_id);
+CREATE INDEX IF NOT EXISTS idx_ds_attendance_vehicle        ON public.ds_attendance(vehicle_id);
+CREATE INDEX IF NOT EXISTS idx_ds_attendance_driving_log    ON public.ds_attendance(driving_log_id);
+
 -- 4. RLS initplan fix: policies calling get_user_org_id() / is_super_admin() /
 --    auth.uid() bare are re-evaluated PER ROW (each one a profiles lookup, and
 --    every table has both an sa_* and a user_* policy). Wrapping the call in

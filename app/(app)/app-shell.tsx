@@ -60,11 +60,10 @@ export function AppShell({ profile, orgName, children }: AppShellProps) {
         return () => document.removeEventListener('mousedown', handleClickOutside)
     }, [])
 
-    useEffect(() => {
-        if (profile.org_id) {
-            setOrgId(profile.org_id)
-        }
-    }, [profile.org_id])
+    // Set during render, not in an effect: child pages' effects run before this
+    // component's, so an effect here would let their first queries miss the
+    // cache and fetch the profile again. Idempotent, so safe on every render.
+    if (profile.org_id) setOrgId(profile.org_id)
 
     const handleSignOut = async () => {
         await signOut()

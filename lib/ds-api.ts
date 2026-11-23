@@ -22,12 +22,17 @@ function getClient() {
     return createSupabaseBrowser();
 }
 
+// List reads add an explicit .eq('org_id') — RLS's "super admin OR own org"
+// OR otherwise blocks the org_id indexes (see lib/api.ts). Purely additive.
+
 export const instructorApi = {
     async getAll(): Promise<DsInstructor[]> {
         const supabase = getClient();
+        const orgId = await getOrgId();
         const { data, error } = await supabase
             .from('ds_instructors')
             .select('*')
+            .eq('org_id', orgId)
             .order('name');
         if (error) throw error;
         return data || [];
@@ -91,9 +96,11 @@ export const instructorApi = {
 export const fleetVehicleApi = {
     async getAll(): Promise<DsFleetVehicle[]> {
         const supabase = getClient();
+        const orgId = await getOrgId();
         const { data, error } = await supabase
             .from('ds_fleet_vehicles')
             .select('*')
+            .eq('org_id', orgId)
             .order('v_number');
         if (error) throw error;
         return data || [];
@@ -154,9 +161,11 @@ export const fleetVehicleApi = {
 export const drivingLogApi = {
     async getByDate(date: string): Promise<DsDrivingLogView[]> {
         const supabase = getClient();
+        const orgId = await getOrgId();
         const { data, error } = await supabase
             .from('v_ds_driving_logs')
             .select('*')
+            .eq('org_id', orgId)
             .eq('logging_date', date)
             .order('start_datetime', { ascending: false });
         if (error) throw error;
@@ -165,9 +174,11 @@ export const drivingLogApi = {
 
     async getByDateRange(from: string, to: string): Promise<DsDrivingLogView[]> {
         const supabase = getClient();
+        const orgId = await getOrgId();
         const { data, error } = await supabase
             .from('v_ds_driving_logs')
             .select('*')
+            .eq('org_id', orgId)
             .gte('logging_date', from)
             .lte('logging_date', to)
             .order('logging_date', { ascending: false })
@@ -238,9 +249,11 @@ export const drivingLogApi = {
 export const studentApi = {
     async getAll(): Promise<DsStudentDashboardView[]> {
         const supabase = getClient();
+        const orgId = await getOrgId();
         const { data, error } = await supabase
             .from('v_ds_student_dashboard')
             .select('*')
+            .eq('org_id', orgId)
             .order('created_at', { ascending: false });
         if (error) throw error;
         return data || [];
@@ -383,9 +396,11 @@ export const feePaymentApi = {
 export const attendanceApi = {
     async getByDate(date: string): Promise<DsAttendanceView[]> {
         const supabase = getClient();
+        const orgId = await getOrgId();
         const { data, error } = await supabase
             .from('v_ds_attendance')
             .select('*')
+            .eq('org_id', orgId)
             .eq('attendance_date', date)
             .order('created_at', { ascending: false });
         if (error) throw error;
